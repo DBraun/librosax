@@ -4,7 +4,7 @@ dynamic = ["version", "dependencies", "optional-dependencies"]
 authors = [
   { name="David Braun", email="braun@ccrma.stanford.edu" },
 ]
-description = "Music generation models in JAX"
+description = "Librosa in JAX"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [

@@ -1,0 +1,27 @@
+[project]
+name = "Librosax"
+dynamic = ["version", "dependencies", "optional-dependencies"]
+authors = [
+  { name="David Braun", email="braun@ccrma.stanford.edu" },
+]
+description = "Music generation models in JAX"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+keywords = [
+    "audio",
+    "machine learning",
+    "jax",
+]
+
+[project.urls]
+Homepage = "https://github.com/DBraun/librosax"
+Issues = "https://github.com/DBraun/librosax/issues"
+
+[tool.setuptools.dynamic]
+version = {attr = "librosax.__version__"}

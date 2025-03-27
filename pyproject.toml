@@ -1,5 +1,5 @@
 [project]
-name = "Librosax"
+name = "librosax"
 dynamic = ["version", "dependencies", "optional-dependencies"]
 authors = [
   { name="David Braun", email="braun@ccrma.stanford.edu" },

@@ -30,6 +30,8 @@ class DropStripes(nn.Module):
     deterministic: Optional[bool] = None
 
     def __post_init__(self):
+        if self.axis < 0:
+            self.axis += 4
         assert self.axis in [2, 3]  # axis 2: time; axis 3: frequency
         super().__post_init__()
 
@@ -63,16 +65,15 @@ class DropStripes(nn.Module):
 
         key = self.make_rng("dropout")
 
-        # Create a copy of the input that we'll modify
-        outputs = inputs
+        # Create a separate key for each element in the batch
+        batch_keys = random.split(key, batch_size)
 
-        for n in range(batch_size):
-            key, subkey = random.split(key)
-            outputs = outputs.at[n].set(
-                self._transform_slice(outputs[n], total_width, subkey)
-            )
+        # Vectorize the _transform_slice function over the batch dimension
+        transformed = jax.vmap(lambda x, k: self._transform_slice(x, total_width, k))(
+            inputs, batch_keys
+        )
 
-        return outputs
+        return transformed
 
     def _transform_slice(self, e: jnp.ndarray, total_width: int, key: jax.Array):
         """Transform a single slice by dropping random stripes.
@@ -85,8 +86,12 @@ class DropStripes(nn.Module):
         Returns:
             jnp.ndarray: Transformed slice with random stripes set to zero.
         """
-        for _ in range(self.stripes_num):
-            # Split the key for random operations
+        # Create a mask of ones with the same shape as e
+        mask = jnp.ones_like(e)
+
+        # Define the body function for fori_loop
+        def body_fn(i, carry):
+            mask, key = carry
             key, distance_key, bgn_key = random.split(key, 3)
 
             # Generate random width and beginning position
@@ -97,13 +102,27 @@ class DropStripes(nn.Module):
                 bgn_key, shape=(), minval=0, maxval=total_width - distance
             )
 
-            # Apply mask based on dimension
+            # Create and apply the stripe mask based on axis
             if self.axis == 2:
-                e = e.at[:, bgn : bgn + distance, :].set(0)
+                # Create a mask for the time dimension
+                time_indices = jnp.arange(e.shape[1])
+                stripe_mask = (time_indices >= bgn) & (time_indices < bgn + distance)
+                stripe_mask = jnp.reshape(stripe_mask, (1, -1, 1))
+                mask = mask * (1.0 - stripe_mask.astype(mask.dtype))
             elif self.axis == 3:
-                e = e.at[:, :, bgn : bgn + distance].set(0)
+                # Create a mask for the frequency dimension
+                freq_indices = jnp.arange(e.shape[2])
+                stripe_mask = (freq_indices >= bgn) & (freq_indices < bgn + distance)
+                stripe_mask = jnp.reshape(stripe_mask, (1, 1, -1))
+                mask = mask * (1.0 - stripe_mask.astype(mask.dtype))
 
-        return e
+            return (mask, key)
+
+        # Use jax.lax.fori_loop to iterate through the stripes
+        (mask, _) = jax.lax.fori_loop(0, self.stripes_num, body_fn, (mask, key))
+
+        # Apply the mask to the input
+        return e * mask
 
 
 class SpecAugmentation(nn.Module):
@@ -249,7 +268,7 @@ class Spectrogram(nn.Module):
         return S
 
 
-class LogmelFilterBank(nn.Module):
+class LogMelFilterBank(nn.Module):
     """A module that converts spectrograms to (log) mel spectrograms.
 
     This module applies mel filterbank on spectrogram and optionally converts
@@ -320,7 +339,7 @@ class LogmelFilterBank(nn.Module):
         return output
 
 
-class MFCC(LogmelFilterBank):
+class MFCC(LogMelFilterBank):
     """A module that computes Mel-Frequency Cepstral Coefficients (MFCCs).
 
     This module extends LogmelFilterBank to compute MFCCs by applying

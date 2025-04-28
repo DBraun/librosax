@@ -10,6 +10,6 @@ from .layers.core import (
     DropStripes,
     SpecAugmentation,
     Spectrogram,
-    LogmelFilterBank,
+    LogMelFilterBank,
     MFCC,
 )

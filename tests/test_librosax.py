@@ -10,7 +10,13 @@ import torch
 import torchlibrosa
 
 import librosax
-from librosax.layers import Spectrogram, MFCC, LogmelFilterBank, SpecAugmentation
+from librosax.layers import (
+    Spectrogram,
+    MFCC,
+    LogMelFilterBank,
+    SpecAugmentation,
+    DropStripes,
+)
 
 
 @pytest.mark.parametrize(
@@ -157,7 +163,7 @@ def test_mel_spec():
     )  # todo: not a great atol
 
     # Compute the log-mel spectrogram.
-    logmel_spec, _ = LogmelFilterBank(
+    logmel_spec, _ = LogMelFilterBank(
         sr=sr, n_fft=n_fft, n_mels=n_mels, fmin=fmin, fmax=fmax, is_log=is_log
     ).init_with_output({"params": random.key(0)}, S)
 
@@ -203,3 +209,12 @@ def test_mel_spec():
     np.testing.assert_allclose(
         mfcc_features, mfcc_features_librosa, atol=4.8453e-5, rtol=1.09e-4
     )
+
+
+def test_drop_stripes():
+
+    drop_stripes = DropStripes(axis=2, drop_width=2, stripes_num=2, deterministic=False)
+    B, C, H, W = 2, 3, 9, 16
+    x = jnp.ones((B, C, H, W))
+    x, variables = drop_stripes.init_with_output({"params": random.key(0)}, x)
+    print(x)

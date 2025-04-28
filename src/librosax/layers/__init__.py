@@ -1,9 +1,9 @@
-from .core import DropStripes, SpecAugmentation, Spectrogram, LogmelFilterBank, MFCC
+from .core import DropStripes, SpecAugmentation, Spectrogram, LogMelFilterBank, MFCC
 
 __all__ = [
     "DropStripes",
     "SpecAugmentation",
     "Spectrogram",
-    "LogmelFilterBank",
+    "LogMelFilterBank",
     "MFCC",
 ]

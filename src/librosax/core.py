@@ -52,7 +52,11 @@ def stft(
     }[pad_mode]
 
     # Pad the window to n_fft size
-    win = get_window(window, win_length)
+    if window == "sqrt_hann":
+        win = np.sqrt(get_window("hann", win_length))
+    else:
+        win = get_window(window, win_length)
+
     padded_win = np.zeros(n_fft)
     start = (n_fft - win_length) // 2
     padded_win[start : start + win_length] = win
@@ -112,7 +116,11 @@ def istft(
         hop_length = win_length // 4
 
     # Pad the window to n_fft size
-    win = get_window(window, win_length)
+    if window == "sqrt_hann":
+        win = np.sqrt(get_window("hann", win_length))
+    else:
+        win = get_window(window, win_length)
+
     padded_win = np.zeros(n_fft)
     start = (n_fft - win_length) // 2
     padded_win[start : start + win_length] = win
@@ -135,7 +143,9 @@ def istft(
             # Pad the signal if it is shorter than the desired length
             pad_width = length - reconstructed_signal.shape[-1]
             reconstructed_signal = jnp.pad(
-                reconstructed_signal, ((0, 0), (0, 0), (0, pad_width)), mode="constant"
+                reconstructed_signal,
+                ((0, 0) * (reconstructed_signal.ndim - 1), (0, pad_width)),
+                mode="constant",
             )
         else:
             # Trim the signal if it is longer than the desired length

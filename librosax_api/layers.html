@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="prev" title="librosax" href="core.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2024.08.06 -->
-        <title>librosax.layers - Librosax Documentation, v0.0.3</title>
+        <title>librosax.layers - Librosax Documentation, v0.0.4</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=354aac6f" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=302659d7" />
@@ -166,7 +166,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">Librosax Documentation, v0.0.3</div></a>
+      <a href="../index.html"><div class="brand">Librosax Documentation, v0.0.4</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -190,7 +190,7 @@
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
   
-  <span class="sidebar-brand-text">Librosax Documentation, v0.0.3</span>
+  <span class="sidebar-brand-text">Librosax Documentation, v0.0.4</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -257,8 +257,8 @@ time frames or frequency bands in the spectrogram.</p>
 </dd></dl>
 
 <dl class="py class">
-<dt class="sig sig-object py" id="librosax.layers.core.LogmelFilterBank">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">LogmelFilterBank</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sr:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">22050</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_fft:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">2048</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_mels:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fmin:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fmax:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_log:</span> <span class="pre">bool</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amin:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">1e-10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">top_db:</span> <span class="pre">float</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">80.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">freeze_parameters:</span> <span class="pre">bool</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent:</span> <span class="pre">~flax.linen.module.Module</span> <span class="pre">|</span> <span class="pre">~flax.core.scope.Scope</span> <span class="pre">|</span> <span class="pre">~flax.linen.module._Sentinel</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">&lt;flax.linen.module._Sentinel</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name:</span> <span class="pre">str</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#librosax.layers.core.LogmelFilterBank" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object py" id="librosax.layers.core.LogMelFilterBank">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">LogMelFilterBank</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sr:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">22050</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_fft:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">2048</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_mels:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fmin:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fmax:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_log:</span> <span class="pre">bool</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amin:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">1e-10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">top_db:</span> <span class="pre">float</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">80.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">freeze_parameters:</span> <span class="pre">bool</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent:</span> <span class="pre">~flax.linen.module.Module</span> <span class="pre">|</span> <span class="pre">~flax.core.scope.Scope</span> <span class="pre">|</span> <span class="pre">~flax.linen.module._Sentinel</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">&lt;flax.linen.module._Sentinel</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name:</span> <span class="pre">str</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#librosax.layers.core.LogMelFilterBank" title="Link to this definition">¶</a></dt>
 <dd><p>A module that converts spectrograms to (log) mel spectrograms.</p>
 <p>This module applies mel filterbank on spectrogram and optionally converts
 the result to log scale.</p>
@@ -391,7 +391,7 @@ and frequency masking to spectrograms for audio tasks.</p>
             <ul>
 <li><a class="reference internal" href="#">librosax.layers</a><ul>
 <li><a class="reference internal" href="#librosax.layers.core.DropStripes"><code class="docutils literal notranslate"><span class="pre">DropStripes</span></code></a></li>
-<li><a class="reference internal" href="#librosax.layers.core.LogmelFilterBank"><code class="docutils literal notranslate"><span class="pre">LogmelFilterBank</span></code></a></li>
+<li><a class="reference internal" href="#librosax.layers.core.LogMelFilterBank"><code class="docutils literal notranslate"><span class="pre">LogMelFilterBank</span></code></a></li>
 <li><a class="reference internal" href="#librosax.layers.core.MFCC"><code class="docutils literal notranslate"><span class="pre">MFCC</span></code></a></li>
 <li><a class="reference internal" href="#librosax.layers.core.SpecAugmentation"><code class="docutils literal notranslate"><span class="pre">SpecAugmentation</span></code></a></li>
 <li><a class="reference internal" href="#librosax.layers.core.Spectrogram"><code class="docutils literal notranslate"><span class="pre">Spectrogram</span></code></a></li>
@@ -406,7 +406,7 @@ and frequency masking to spectrograms for audio tasks.</p>
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=47de8214"></script>
+</div><script src="../_static/documentation_options.js?v=8c5712d9"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/scripts/furo.js?v=5fa4622c"></script>

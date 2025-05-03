@@ -180,7 +180,8 @@ def test_istft2(
 def test_mel_spec():
     np.random.seed(42)
     sr = 22_050
-    x = np.random.uniform(-1, 1, size=(1, sr))  # fmt: skip
+
+    x = np.random.uniform(-1, 1, size=(1, sr,))  # fmt: skip
 
     n_fft = 2048
     hop_length = 512
@@ -247,21 +248,32 @@ def test_mel_spec():
         "lifter": 22,
     }
 
-    assert S.ndim == 3
-    mfcc_features, _ = MFCC(
-        **kwargs,
-    ).init_with_output({"params": random.key(0)}, S)
-    mfcc_features_librosa = librosa.feature.mfcc(
-        y=x,
-        hop_length=hop_length,
-        win_length=win_length,
-        pad_mode=pad_mode,
-        **kwargs,
-    )
+    S = S.squeeze(0)
+    x = x.squeeze(0)
 
-    np.testing.assert_allclose(
-        mfcc_features, mfcc_features_librosa, atol=6.6e-2, rtol=1.7e-1
-    )
+    assert S.ndim == 2
+    assert x.ndim == 1
+
+    # repeatedly unsqueeze to test (n_mfcc, time_steps), (B, n_mfcc, time_steps), and (B, C, n_mfcc, time_steps)
+    for i in range(3):
+
+        mfcc_features, _ = MFCC(
+            **kwargs,
+        ).init_with_output({"params": random.key(0)}, S)
+        mfcc_features_librosa = librosa.feature.mfcc(
+            y=x,
+            hop_length=hop_length,
+            win_length=win_length,
+            pad_mode=pad_mode,
+            **kwargs,
+        )
+
+        np.testing.assert_allclose(
+            mfcc_features, mfcc_features_librosa, atol=6.6e-2, rtol=1.7e-1
+        )
+
+        S = np.expand_dims(S, 0)
+        x = np.expand_dims(x, 0)
 
 
 def test_drop_stripes():

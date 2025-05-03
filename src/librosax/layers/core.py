@@ -342,7 +342,7 @@ class LogMelFilterBank(nn.Module):
 class MFCC(LogMelFilterBank):
     """A module that computes Mel-Frequency Cepstral Coefficients (MFCCs).
 
-    This module extends LogmelFilterBank to compute MFCCs by applying
+    This module extends LogMelFilterBank to compute MFCCs by applying
     a Discrete Cosine Transform (DCT) to the log-mel spectrogram.
 
     Attributes:
@@ -352,7 +352,7 @@ class MFCC(LogMelFilterBank):
         lifter: Liftering coefficient. 0 means no liftering. Default is 0.
         is_log: If ``True``, convert to log scale (must be ``True`` for MFCCs). Default is ``True``.
 
-        Inherits all attributes from LogmelFilterBank.
+        Inherits all attributes from LogMelFilterBank.
     """
 
     n_mfcc: int = 20  # Number of MFCCs to return
@@ -380,6 +380,7 @@ class MFCC(LogMelFilterBank):
             jnp.ndarray: MFCCs with appropriate shape based on input dimensions.
                 - For 2D input: shape ``(n_mfcc, time_steps)``
                 - For 3D input: shape ``(batch_size, n_mfcc, time_steps)``
+                - For 4D input: shape ``(batch_size, chans, n_mfcc, time_steps)``
 
         Raises:
             ValueError: If the input has invalid dimensions.
@@ -390,12 +391,8 @@ class MFCC(LogMelFilterBank):
         mfccs = dct(mel_spec, type=self.dct_type, norm=self.norm)
         mfccs = mfccs[..., : self.n_mfcc]
 
-        if mel_spec.ndim == 3:
-            mfccs = rearrange(mfccs, "B T n_mfcc -> B n_mfcc T")
-        elif mel_spec.ndim == 2:
-            mfccs = mfccs.T
-        else:
-            raise ValueError(f"Unsupported log-mel spectrogram shape: {mel_spec.shape}")
+        # (..., T, n_mfcc) -> (..., n_mfcc, T)
+        mfccs = rearrange(mfccs, "... T n_mfcc -> ... n_mfcc T")
 
         # Apply liftering if requested
         if self.lifter > 0:
@@ -420,20 +417,15 @@ class MFCC(LogMelFilterBank):
         if lifter <= 0:
             return mfccs
 
+        n_coeffs = mfccs.shape[-2]
+        lift = 1 + (lifter / 2) * jnp.sin(jnp.pi * jnp.arange(1, 1 + n_coeffs) / lifter)
+
         # Get the shape of MFCCs for proper broadcasting
-        if mfccs.ndim == 3:
-            # Batched input
-            n_coeffs = mfccs.shape[-2]
-            lift = 1 + (lifter / 2) * jnp.sin(
-                jnp.pi * jnp.arange(1, 1 + n_coeffs) / lifter
-            )
+        if mfccs.ndim == 4:
+            return mfccs * jnp.expand_dims(lift, (0, 1, -1))
+        elif mfccs.ndim == 3:
             return mfccs * jnp.expand_dims(lift, (0, -1))
         elif mfccs.ndim == 2:
-            # Non-batched input
-            n_coeffs = mfccs.shape[-1]
-            lift = 1 + (lifter / 2) * jnp.sin(
-                jnp.pi * jnp.arange(1, 1 + n_coeffs) / lifter
-            )
-            return mfccs * jnp.expand_dims(lift, 0)
+            return mfccs * jnp.expand_dims(lift, -1)
         else:
             raise ValueError(f"Unsupported MFCC shape: {mfccs.shape}")

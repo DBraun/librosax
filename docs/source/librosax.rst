@@ -1,0 +1,3 @@
+.. _librosax:
+
+.. automodule:: librosax

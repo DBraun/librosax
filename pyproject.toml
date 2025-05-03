@@ -4,12 +4,13 @@ dynamic = ["version", "dependencies", "optional-dependencies"]
 authors = [
   { name="David Braun", email="braun@ccrma.stanford.edu" },
 ]
-description = "Librosa in JAX"
+description = "A JAX implementation of librosa, TorchLibrosa, and nnAudio"
 readme = "README.md"
-requires-python = ">=3.10"
+license = {text = "ISC"}
+requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: ISC License (ISCL)",
     "Operating System :: OS Independent",
 ]
 
@@ -24,4 +25,4 @@ Homepage = "https://github.com/DBraun/librosax"
 Issues = "https://github.com/DBraun/librosax/issues"
 
 [tool.setuptools.dynamic]
-version = {attr = "librosax.__version__"}
+version = {attr = "librosax.version.version"}

@@ -62,7 +62,6 @@ def test_stft(
     )
 
     jax_res = np.array(jax_res)
-    jax_res = jax_res[..., : librosa_res.shape[-1]]  # todo: avoid this
 
     np.testing.assert_allclose(librosa_res, jax_res, atol=1e-5, rtol=1e-5)
 

@@ -401,9 +401,11 @@ def spectral_centroid(
         
     where S is a magnitude spectrogram, and freq is the array of frequencies
     (e.g., FFT frequencies in Hz) of the rows of S.
+
+    Users should ensure S is real-valued and non-negative.
     
     Args:
-        y: Audio time series. Multi-channel is supported.
+        y: Audio time series. Multichannel is supported.
         sr: Audio sampling rate
         S: (optional) Pre-computed spectrogram magnitude
         n_fft: FFT window size
@@ -428,9 +430,6 @@ def spectral_centroid(
         center=center,
         pad_mode=pad_mode,
     )
-    
-    # Note: Runtime checks are not compatible with JIT compilation
-    # Users should ensure S is real-valued and non-negative
         
     # Compute the center frequencies of each bin
     if freq is None:
@@ -469,9 +468,11 @@ def spectral_bandwidth(
     
     The spectral bandwidth at frame t is computed by:
         (sum_k S[k, t] * (freq[k, t] - centroid[t])**p)**(1/p)
+
+    Users should ensure S is real-valued and non-negative.
         
     Args:
-        y: Audio time series. Multi-channel is supported.
+        y: Audio time series. Multichannel is supported.
         sr: Audio sampling rate  
         S: (optional) Pre-computed spectrogram magnitude
         n_fft: FFT window size
@@ -499,10 +500,7 @@ def spectral_bandwidth(
         center=center,
         pad_mode=pad_mode,
     )
-    
-    # Note: Runtime checks are not compatible with JIT compilation
-    # Users should ensure S is real-valued and non-negative
-        
+
     # If we don't have a centroid provided, compute it
     if centroid is None:
         centroid = spectral_centroid(
@@ -552,10 +550,10 @@ def spectral_rolloff(
     The roll-off frequency is defined for each frame as the center frequency
     for a spectrogram bin such that at least roll_percent (0.85 by default)
     of the energy of the spectrum in this frame is contained in this bin and
-    the bins below.
-    
+    the bins below. Users should ensure S is real-valued and non-negative.
+
     Args:
-        y: Audio time series. Multi-channel is supported.
+        y: Audio time series. Multichannel is supported.
         sr: Audio sampling rate
         S: (optional) Pre-computed spectrogram magnitude
         n_fft: FFT window size
@@ -571,8 +569,8 @@ def spectral_rolloff(
     Returns:
         jnp.ndarray: Roll-off frequency for each frame [shape=(..., 1, t)]
     """
-    # Note: Runtime checks are not compatible with JIT compilation
-    # Users should ensure roll_percent is in (0, 1) and S is real-valued and non-negative
+    if not 0.0 < roll_percent < 1.0:
+        raise ValueError("roll_percent must lie in the range (0, 1)")
         
     S, n_fft = _spectrogram(
         y=y,
@@ -631,10 +629,11 @@ def spectral_flatness(
     Spectral flatness (or tonality coefficient) is a measure to quantify
     how much noise-like a sound is, as opposed to being tone-like.
     A high spectral flatness (closer to 1.0) indicates the spectrum is
-    similar to white noise.
+    similar to white noise. Users should ensure S is real-valued and
+    non-negative.
     
     Args:
-        y: Audio time series. Multi-channel is supported.
+        y: Audio time series. Multichannel is supported.
         S: (optional) Pre-computed spectrogram magnitude
         n_fft: FFT window size
         hop_length: Hop length for STFT
@@ -648,9 +647,9 @@ def spectral_flatness(
     Returns:
         jnp.ndarray: Spectral flatness for each frame [shape=(..., 1, t)]
     """
-    # Note: Runtime checks are not compatible with JIT compilation
-    # Users should ensure amin > 0 and S is real-valued and non-negative
-        
+    if amin <= 0:
+        raise ValueError("amin must be strictly positive")
+
     S, n_fft = _spectrogram(
         y=y,
         S=S,
@@ -790,6 +789,10 @@ def rms(
     elif S is not None:
         # Note: Runtime checks are not compatible with JIT compilation
         # Users should ensure S.shape[-2] == frame_length // 2 + 1
+        assert S.shape[-2] == frame_length // 2 + 1, (
+                f"Since S.shape[-2] is {S.shape[-2]}, "
+                f"frame_length is expected to be {S.shape[-2] * 2 - 2} or {S.shape[-2] * 2 - 1}; "
+                f"found {frame_length}")
             
         # Power spectrogram
         x = abs2(S, dtype=dtype)
@@ -885,7 +888,7 @@ def zero_crossing_rate(
     """Compute the zero-crossing rate of an audio time series.
     
     Args:
-        y: Audio time series. Multi-channel is supported.
+        y: Audio time series. Multichannel is supported.
         frame_length: Length of the frame over which to compute zero crossing rates
         hop_length: Number of samples to advance for each frame
         center: If True, frames are centered by padding the edges of y.
@@ -944,7 +947,7 @@ def spectral_contrast(
     correspond to broad-band noise.
     
     Args:
-        y: Audio time series. Multi-channel is supported.
+        y: Audio time series. Multichannel is supported.
         sr: Audio sampling rate
         S: (optional) Pre-computed spectrogram magnitude
         n_fft: FFT window size
@@ -981,19 +984,26 @@ def spectral_contrast(
         freq = fft_frequencies(sr=sr, n_fft=n_fft)
         
     freq = jnp.atleast_1d(freq)
-    
-    # Note: Runtime checks are not compatible with JIT compilation
-    # Users should ensure:
-    # - freq.shape matches S.shape[-2]
-    # - n_bands is a positive integer
-    # - 0 < quantile < 1
-    # - fmin > 0
-    # - frequency bands don't exceed Nyquist frequency
+
+    if freq.ndim != 1 or len(freq) != S.shape[-2]:
+        raise ValueError(f"freq.shape mismatch: expected ({S.shape[-2]},)")
+
+    if n_bands < 1 or not isinstance(n_bands, int):
+        raise ValueError("n_bands must be a positive integer")
+
+    if not 0.0 < quantile < 1.0:
+        raise ValueError("quantile must lie in the range (0, 1)")
+
+    if fmin <= 0:
+        raise ValueError("fmin must be a positive number")
         
     # Create octave bands
     octa = jnp.zeros(n_bands + 2)
     octa = octa.at[1:].set(fmin * (2.0 ** jnp.arange(0, n_bands + 1)))
-        
+
+    # if jnp.any(octa[:-1] >= 0.5 * sr):
+    #     raise ValueError("Frequency band exceeds Nyquist. Reduce either fmin or n_bands.")
+
     # Initialize output arrays
     shape = list(S.shape)
     shape[-2] = n_bands + 1
@@ -1095,7 +1105,7 @@ def melspectrogram(
         ``power``, ``n_mels``, ``fmin``, ``fmax``, ``htk``, ``norm``, ``dtype``
     
     Args:
-        y: Audio time series. Multi-channel is supported.
+        y: Audio time series. Multichannel is supported.
         sr: Audio sampling rate
         S: (optional) Pre-computed spectrogram magnitude
         n_fft: FFT window size
@@ -1204,7 +1214,7 @@ def mfcc(
         ``sr``, ``n_mfcc``, ``dct_type``, ``norm``, ``lifter``, plus all other kwargs.
     
     Args:
-        y: Audio time series. Multi-channel is supported.
+        y: Audio time series. Multichannel is supported.
         sr: Audio sampling rate
         S: (optional) log-power mel spectrogram
         n_mfcc: Number of MFCCs to return (default: 20)
@@ -1620,7 +1630,7 @@ def pseudo_cqt(
     accurate for low frequencies.
     
     Args:
-        y: Audio time series. Multi-channel is supported.
+        y: Audio time series. Multichannel is supported.
         sr: Sampling rate
         hop_length: Number of samples between successive CQT columns
         fmin: Minimum frequency. Defaults to C1 ~= 32.70 Hz
@@ -1752,7 +1762,7 @@ def chroma_cqt(
     """Chromagram from a constant-Q transform.
     
     Args:
-        y: Audio time series. Multi-channel is supported.
+        y: Audio time series. Multichannel is supported.
         sr: Sampling rate  
         C: Pre-computed CQT spectrogram
         hop_length: Number of samples between successive CQT columns
@@ -1837,7 +1847,7 @@ def tonnetz(
     two-dimensional coordinates.
     
     Args:
-        y: Audio time series. Multi-channel is supported.
+        y: Audio time series. Multichannel is supported.
         sr: Sampling rate of y
         chroma: Normalized energy for each chroma bin at each frame.
             If None, a chroma_stft is computed.
@@ -1914,7 +1924,7 @@ def chroma_stft(
     """Compute a chromagram from a power spectrogram or waveform.
     
     Args:
-        y: Audio time series. Multi-channel is supported.
+        y: Audio time series. Multichannel is supported.
         sr: Sampling rate
         S: Power spectrogram (optional if y is provided)
         norm: Column-wise normalization. See `normalize` for details.

@@ -196,13 +196,13 @@ def test_mel_spec():
     pad_mode = "constant"
 
     # Compute the spectrogram.
-    S, _ = Spectrogram(
+    S = Spectrogram(
         n_fft=n_fft,
         hop_length=hop_length,
         win_length=win_length,
         window=window,
         pad_mode=pad_mode,
-    ).init_with_output({"params": random.key(0)}, jnp.array(x))
+    ).apply({}, jnp.array(x))
     S = np.array(S)
     S_librosa = torchlibrosa.Spectrogram(
         n_fft=n_fft,
@@ -219,9 +219,9 @@ def test_mel_spec():
     )  # todo: not a great atol
 
     # Compute the log-mel spectrogram.
-    logmel_spec, _ = LogMelFilterBank(
+    logmel_spec = LogMelFilterBank(
         sr=sr, n_fft=n_fft, n_mels=n_mels, fmin=fmin, fmax=fmax, is_log=is_log
-    ).init_with_output({"params": random.key(0)}, S)
+    ).apply({}, S)
 
     logmel_spec_librosa = torchlibrosa.LogmelFilterBank(
         sr=sr, n_fft=n_fft, n_mels=n_mels, fmin=fmin, fmax=fmax, is_log=is_log
@@ -230,13 +230,13 @@ def test_mel_spec():
 
     np.testing.assert_allclose(logmel_spec, logmel_spec_librosa, atol=5e-3, rtol=1.3e-3)
 
-    spec_aug_x, _ = SpecAugmentation(
+    spec_aug_x = SpecAugmentation(
         time_drop_width=64,
         time_stripes_num=2,
         freq_drop_width=8,
         freq_stripes_num=2,
         deterministic=False,
-    ).init_with_output({"params": random.key(0)}, logmel_spec)
+    ).apply({}, logmel_spec, rngs={"dropout": jax.random.key(0)})
 
     kwargs = {
         "sr": sr,
@@ -259,9 +259,9 @@ def test_mel_spec():
     # repeatedly unsqueeze to test (n_mfcc, time_steps), (B, n_mfcc, time_steps), and (B, C, n_mfcc, time_steps)
     for i in range(3):
 
-        mfcc_features, _ = MFCC(
+        mfcc_features = MFCC(
             **kwargs,
-        ).init_with_output({"params": random.key(0)}, S)
+        ).apply({}, S)
         mfcc_features_librosa = librosa.feature.mfcc(
             y=x,
             hop_length=hop_length,
@@ -283,7 +283,7 @@ def test_drop_stripes():
     drop_stripes = DropStripes(axis=2, drop_width=2, stripes_num=2, deterministic=False)
     B, C, H, W = 2, 3, 9, 16
     x = jnp.ones((B, C, H, W))
-    x, variables = drop_stripes.init_with_output({"params": random.key(0)}, x)
+    x = drop_stripes.apply({}, x, rngs={"dropout": jax.random.key(0)})
     print(x)
 
 

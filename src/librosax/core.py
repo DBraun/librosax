@@ -21,6 +21,10 @@ def stft(
 
     This function computes the STFT of the given waveform using JAX's ``scipy.signal.stft`` implementation.
 
+    Note:
+        For JAX JIT compilation, the following arguments should be marked as static:
+        ``n_fft``, ``hop_length``, ``win_length``, ``window``, ``center``, ``pad_mode``
+
     Args:
         waveform: Input signal waveform.
         n_fft: FFT size.
@@ -1085,6 +1089,11 @@ def melspectrogram(
     
     By default, power=2 operates on a power spectrum.
     
+    Note:
+        For JAX JIT compilation, all arguments except ``y`` and ``S`` should be marked as static:
+        ``sr``, ``n_fft``, ``hop_length``, ``win_length``, ``window``, ``center``, ``pad_mode``,
+        ``power``, ``n_mels``, ``fmin``, ``fmax``, ``htk``, ``norm``, ``dtype``
+    
     Args:
         y: Audio time series. Multi-channel is supported.
         sr: Audio sampling rate
@@ -1188,6 +1197,11 @@ def mfcc(
     """Compute Mel-frequency cepstral coefficients (MFCCs).
     
     MFCCs are computed from the log-power mel spectrogram.
+    
+    Note:
+        For JAX JIT compilation, all arguments except ``y`` and ``S`` should be marked as static.
+        This includes all the melspectrogram parameters and MFCC-specific parameters:
+        ``sr``, ``n_mfcc``, ``dct_type``, ``norm``, ``lifter``, plus all other kwargs.
     
     Args:
         y: Audio time series. Multi-channel is supported.
@@ -1500,8 +1514,13 @@ def cqt(
 ) -> jnp.ndarray:
     """Compute the constant-Q transform using recursive downsampling.
     
-    This implementation uses jax.lax.scan for the recursive structure,
-    processing octaves sequentially with progressively downsampled signals.
+    This implementation uses a simplified approach with fixed FFT size for JIT compatibility.
+    
+    Note:
+        For JAX JIT compilation, all arguments except ``y`` should be marked as static:
+        ``sr``, ``hop_length``, ``fmin``, ``n_bins``, ``bins_per_octave``, ``tuning``,
+        ``filter_scale``, ``norm``, ``sparsity``, ``window``, ``scale``, ``pad_mode``,
+        ``res_type``, ``dtype``
     
     Args:
         y: Audio time series

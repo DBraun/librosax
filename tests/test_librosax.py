@@ -819,3 +819,405 @@ def test_melspectrogram():
     np.testing.assert_allclose(
         melspec_jax_custom, melspec_librosa_custom, atol=1e-5, rtol=1e-5
     )
+
+
+def test_mfcc():
+    """Test MFCC against librosa implementation."""
+    # Generate test signal
+    sr = 22050
+    duration = 1.0
+    t = np.linspace(0, duration, int(sr * duration))
+    
+    # Create a test signal with harmonic content
+    y = (
+        0.5 * np.sin(2 * np.pi * 440 * t) +   # A4
+        0.3 * np.sin(2 * np.pi * 880 * t) +   # A5
+        0.2 * np.sin(2 * np.pi * 1760 * t)    # A6
+    )
+    
+    # For 1D input, librosa returns (n_mfcc, t)
+    # Make sure our implementation matches this
+    
+    # Test parameters
+    n_fft = 2048
+    hop_length = 512
+    n_mfcc = 20
+    n_mels = 128
+    
+    # Create JIT-compiled version of mfcc
+    mfcc_jit = jax.jit(
+        librosax.mfcc,
+        static_argnames=('sr', 'n_mfcc', 'dct_type', 'norm', 'lifter', 
+                        'n_fft', 'hop_length', 'win_length', 'window', 
+                        'center', 'pad_mode', 'power', 'n_mels', 'fmin', 
+                        'fmax', 'htk', 'melspectrogram_params')
+    )
+    
+    # Test with default parameters
+    mfcc_librosa = librosa.feature.mfcc(
+        y=y, sr=sr, n_mfcc=n_mfcc, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels
+    )
+    
+    y_jax = jnp.array(y)
+    mfcc_jax = mfcc_jit(
+        y=y_jax, sr=sr, n_mfcc=n_mfcc, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels
+    )
+    
+    # Handle shape mismatch for 1D input
+    # JAX returns shape with batch dimension, librosa doesn't
+    if y.ndim == 1 and mfcc_jax.ndim == 3:
+        mfcc_jax = mfcc_jax.squeeze(0)
+    
+    np.testing.assert_allclose(
+        mfcc_jax, mfcc_librosa, atol=1e-4, rtol=1e-4
+    )
+    
+    # Test with different parameters
+    mfcc_librosa_custom = librosa.feature.mfcc(
+        y=y, sr=sr, n_mfcc=13, n_fft=n_fft, hop_length=hop_length,
+        n_mels=40, fmin=100.0, fmax=8000.0
+    )
+    
+    mfcc_jax_custom = mfcc_jit(
+        y=y_jax, sr=sr, n_mfcc=13, n_fft=n_fft, hop_length=hop_length,
+        n_mels=40, fmin=100.0, fmax=8000.0
+    )
+    
+    if y.ndim == 1 and mfcc_jax_custom.ndim == 3:
+        mfcc_jax_custom = mfcc_jax_custom.squeeze(0)
+    
+    np.testing.assert_allclose(
+        mfcc_jax_custom, mfcc_librosa_custom, atol=1e-4, rtol=1e-4
+    )
+    
+    # Test with liftering
+    mfcc_librosa_lifter = librosa.feature.mfcc(
+        y=y, sr=sr, n_mfcc=n_mfcc, n_fft=n_fft, hop_length=hop_length,
+        n_mels=n_mels, lifter=22
+    )
+    
+    mfcc_jax_lifter = mfcc_jit(
+        y=y_jax, sr=sr, n_mfcc=n_mfcc, n_fft=n_fft, hop_length=hop_length,
+        n_mels=n_mels, lifter=22
+    )
+    
+    if y.ndim == 1 and mfcc_jax_lifter.ndim == 3:
+        mfcc_jax_lifter = mfcc_jax_lifter.squeeze(0)
+    
+    np.testing.assert_allclose(
+        mfcc_jax_lifter, mfcc_librosa_lifter, atol=1e-4, rtol=1e-4
+    )
+    
+    # Test with pre-computed mel spectrogram
+    mel_spec = librosa.feature.melspectrogram(
+        y=y, sr=sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels
+    )
+    log_mel_spec = librosa.power_to_db(mel_spec)
+    log_mel_spec_jax = jnp.array(log_mel_spec)
+    
+    mfcc_librosa_S = librosa.feature.mfcc(
+        S=log_mel_spec, n_mfcc=n_mfcc
+    )
+    
+    mfcc_jax_S = mfcc_jit(
+        S=log_mel_spec_jax, n_mfcc=n_mfcc
+    )
+    
+    # S input should have same shape handling
+    if log_mel_spec.ndim == 2 and mfcc_jax_S.ndim == 3:
+        mfcc_jax_S = mfcc_jax_S.squeeze(0)
+    
+    np.testing.assert_allclose(
+        mfcc_jax_S, mfcc_librosa_S, atol=1e-4, rtol=1e-4
+    )
+
+
+def test_chroma_stft():
+    """Test chroma_stft against librosa implementation."""
+    # Generate test signal with known harmonic content
+    sr = 22050
+    duration = 2.0
+    t = np.linspace(0, duration, int(sr * duration))
+    
+    # Create a signal with clear pitch content
+    # C major triad: C4 (261.63 Hz), E4 (329.63 Hz), G4 (392.00 Hz)
+    y = (
+        0.4 * np.sin(2 * np.pi * 261.63 * t) +  # C4
+        0.3 * np.sin(2 * np.pi * 329.63 * t) +  # E4
+        0.3 * np.sin(2 * np.pi * 392.00 * t)    # G4
+    )
+    
+    # Test parameters
+    n_fft = 2048
+    hop_length = 512
+    
+    # Create JIT-compiled version of chroma_stft
+    chroma_stft_jit = jax.jit(
+        librosax.chroma_stft,
+        static_argnames=('sr', 'norm', 'n_fft', 'hop_length', 'win_length', 
+                        'window', 'center', 'pad_mode', 'tuning', 'n_chroma')
+    )
+    
+    # Test with default parameters
+    chroma_librosa = librosa.feature.chroma_stft(
+        y=y, sr=sr, n_fft=n_fft, hop_length=hop_length
+    )
+    
+    y_jax = jnp.array(y)
+    chroma_jax = chroma_stft_jit(
+        y=y_jax, sr=sr, n_fft=n_fft, hop_length=hop_length
+    )
+    
+    # Handle shape for 1D input
+    if y.ndim == 1 and chroma_jax.ndim == 3:
+        chroma_jax = chroma_jax.squeeze(0)
+    
+    # Chroma features can have slight numerical differences due to 
+    # filter bank construction, so we use a slightly relaxed tolerance
+    np.testing.assert_allclose(
+        chroma_jax, chroma_librosa, atol=0.1, rtol=0.1
+    )
+    
+    # Test with pre-computed power spectrogram
+    S = np.abs(librosa.stft(y, n_fft=n_fft, hop_length=hop_length)) ** 2
+    S_jax = jnp.array(S)
+    
+    chroma_librosa_S = librosa.feature.chroma_stft(
+        S=S, sr=sr
+    )
+    
+    chroma_jax_S = chroma_stft_jit(
+        S=S_jax, sr=sr
+    )
+    
+    if S.ndim == 2 and chroma_jax_S.ndim == 3:
+        chroma_jax_S = chroma_jax_S.squeeze(0)
+    
+    np.testing.assert_allclose(
+        chroma_jax_S, chroma_librosa_S, atol=0.1, rtol=0.1
+    )
+    
+    # Test with different parameters
+    chroma_librosa_custom = librosa.feature.chroma_stft(
+        y=y, sr=sr, n_fft=n_fft, hop_length=hop_length,
+        n_chroma=24, tuning=0.0
+    )
+    
+    chroma_jax_custom = chroma_stft_jit(
+        y=y_jax, sr=sr, n_fft=n_fft, hop_length=hop_length,
+        n_chroma=24, tuning=0.0
+    )
+    
+    if y.ndim == 1 and chroma_jax_custom.ndim == 3:
+        chroma_jax_custom = chroma_jax_custom.squeeze(0)
+    
+    np.testing.assert_allclose(
+        chroma_jax_custom, chroma_librosa_custom, atol=0.1, rtol=0.1
+    )
+
+
+def test_tonnetz():
+    """Test tonnetz against librosa implementation."""
+    # Generate test signal with harmonic content
+    sr = 22050
+    duration = 2.0
+    t = np.linspace(0, duration, int(sr * duration))
+    
+    # Create a harmonic signal
+    # C major chord progression: C - F - G - C
+    freq_c = 261.63  # C4
+    freq_f = 349.23  # F4
+    freq_g = 392.00  # G4
+    
+    # Simple chord progression
+    y = np.zeros_like(t)
+    n = len(t)
+    # C chord (C-E-G)
+    y[:n//4] = (
+        0.4 * np.sin(2 * np.pi * freq_c * t[:n//4]) +
+        0.3 * np.sin(2 * np.pi * 329.63 * t[:n//4]) +  # E4
+        0.3 * np.sin(2 * np.pi * freq_g * t[:n//4])
+    )
+    # F chord (F-A-C)
+    y[n//4:n//2] = (
+        0.4 * np.sin(2 * np.pi * freq_f * t[:n//4]) +
+        0.3 * np.sin(2 * np.pi * 440.00 * t[:n//4]) +  # A4
+        0.3 * np.sin(2 * np.pi * 523.25 * t[:n//4])    # C5
+    )
+    # G chord (G-B-D)
+    y[n//2:3*n//4] = (
+        0.4 * np.sin(2 * np.pi * freq_g * t[:n//4]) +
+        0.3 * np.sin(2 * np.pi * 493.88 * t[:n//4]) +  # B4
+        0.3 * np.sin(2 * np.pi * 587.33 * t[:n//4])    # D5
+    )
+    # C chord again
+    y[3*n//4:] = y[:n//4]
+    
+    # Create JIT-compiled version of tonnetz
+    tonnetz_jit = jax.jit(
+        librosax.tonnetz,
+        static_argnames=('sr',)
+    )
+    
+    # Since librosax uses chroma_stft, we need to use the same for fair comparison
+    # First compute chroma_stft
+    chroma_stft = librosa.feature.chroma_stft(y=y, sr=sr)
+    
+    # Test with pre-computed chroma_stft for both
+    tonnetz_librosa = librosa.feature.tonnetz(chroma=chroma_stft)
+    
+    chroma_jax = jnp.array(chroma_stft)
+    tonnetz_jax = tonnetz_jit(chroma=chroma_jax)
+    
+    # Handle shape
+    if chroma_stft.ndim == 2 and tonnetz_jax.ndim == 3:
+        tonnetz_jax = tonnetz_jax.squeeze(0)
+    
+    # Should be very close when using same chroma input
+    np.testing.assert_allclose(
+        tonnetz_jax, tonnetz_librosa, atol=1e-5, rtol=1e-5
+    )
+    
+    # Test tonnetz computation from audio directly
+    y_jax = jnp.array(y)
+    tonnetz_jax_from_audio = tonnetz_jit(y=y_jax, sr=sr)
+    
+    # This uses chroma_stft internally, so compare with librosa using chroma_stft too
+    tonnetz_librosa_stft = librosa.feature.tonnetz(
+        chroma=librosa.feature.chroma_stft(y=y, sr=sr)
+    )
+    
+    if y.ndim == 1 and tonnetz_jax_from_audio.ndim == 3:
+        tonnetz_jax_from_audio = tonnetz_jax_from_audio.squeeze(0)
+    
+    np.testing.assert_allclose(
+        tonnetz_jax_from_audio, tonnetz_librosa_stft, atol=0.02, rtol=0.02
+    )
+
+
+def test_pseudo_cqt():
+    """Test pseudo_cqt implementation."""
+    # Generate test signal with known frequency content
+    sr = 22050
+    duration = 2.0
+    t = np.linspace(0, duration, int(sr * duration))
+    
+    # Create a signal with multiple harmonics
+    # A4 (440 Hz) with harmonics
+    f0 = 440.0
+    y = (
+        0.5 * np.sin(2 * np.pi * f0 * t) +        # Fundamental
+        0.3 * np.sin(2 * np.pi * 2 * f0 * t) +   # 2nd harmonic
+        0.2 * np.sin(2 * np.pi * 3 * f0 * t)     # 3rd harmonic
+    )
+    
+    # Test parameters
+    hop_length = 512
+    n_bins = 84
+    bins_per_octave = 12
+    
+    # Create JIT-compiled version
+    pseudo_cqt_jit = jax.jit(
+        librosax.pseudo_cqt,
+        static_argnames=('sr', 'hop_length', 'fmin', 'n_bins', 'bins_per_octave',
+                        'tuning', 'filter_scale', 'norm', 'sparsity', 'window',
+                        'scale', 'pad_mode', 'dtype')
+    )
+    
+    # Test basic functionality
+    y_jax = jnp.array(y)
+    C_jax = pseudo_cqt_jit(y_jax, sr=sr, hop_length=hop_length, n_bins=n_bins)
+    
+    # Check output shape
+    expected_frames = 1 + (len(y) - 1) // hop_length
+    assert C_jax.shape == (n_bins, expected_frames) or \
+           C_jax.shape[1] == expected_frames + 1, \
+           f"Shape mismatch: {C_jax.shape}"
+    
+    # Check that we have energy at expected frequencies
+    freqs = librosax.cqt_frequencies(n_bins=n_bins, bins_per_octave=bins_per_octave)
+    
+    # Find bins closest to our test frequencies
+    idx_f0 = np.argmin(np.abs(freqs - f0))
+    idx_2f0 = np.argmin(np.abs(freqs - 2 * f0))
+    idx_3f0 = np.argmin(np.abs(freqs - 3 * f0))
+    
+    # Average energy across time
+    C_mean = np.mean(np.abs(C_jax), axis=1)
+    
+    # Check that we have peaks at the expected frequencies
+    assert C_mean[idx_f0] > np.mean(C_mean) * 2, "No peak at fundamental"
+    assert C_mean[idx_2f0] > np.mean(C_mean) * 1.5, "No peak at 2nd harmonic"
+    assert C_mean[idx_3f0] > np.mean(C_mean), "No peak at 3rd harmonic"
+    
+    # Test with different parameters
+    C_jax_24 = pseudo_cqt_jit(
+        y_jax, sr=sr, hop_length=hop_length, 
+        n_bins=48, bins_per_octave=24
+    )
+    assert C_jax_24.shape[0] == 48
+    
+    # Since librosa's pseudo_cqt uses complex implementation details,
+    # we can't easily compare exact values. Instead, we verify that
+    # our implementation produces reasonable results with expected properties.
+
+
+def test_chroma_cqt():
+    """Test chroma_cqt implementation."""
+    # Generate test signal - C major scale
+    sr = 22050
+    duration = 2.0
+    t = np.linspace(0, duration, int(sr * duration))
+    
+    # C major scale frequencies (C4 to B4)
+    scale_freqs = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88]
+    
+    # Play each note for a portion of the duration
+    y = np.zeros_like(t)
+    note_duration = len(t) // len(scale_freqs)
+    
+    for i, freq in enumerate(scale_freqs):
+        start = i * note_duration
+        end = min((i + 1) * note_duration, len(t))
+        y[start:end] = 0.5 * np.sin(2 * np.pi * freq * t[start:end])
+    
+    # Create JIT-compiled version
+    chroma_cqt_jit = jax.jit(
+        librosax.chroma_cqt,
+        static_argnames=('sr', 'hop_length', 'fmin', 'norm', 'threshold',
+                        'tuning', 'n_chroma', 'n_octaves', 'bins_per_octave',
+                        'cqt_mode')
+    )
+    
+    # Test with default parameters
+    y_jax = jnp.array(y)
+    chroma_jax = chroma_cqt_jit(y=y_jax, sr=sr)
+    
+    # Check output shape
+    assert chroma_jax.shape[0] == 12, f"Expected 12 chroma bins, got {chroma_jax.shape[0]}"
+    
+    # Since we're playing a C major scale, we expect to see energy
+    # in specific chroma bins at specific times
+    # C=0, D=2, E=4, F=5, G=7, A=9, B=11
+    expected_chromas = [0, 2, 4, 5, 7, 9, 11]
+    
+    # Check that each note activates the expected chroma
+    for i, expected_chroma in enumerate(expected_chromas):
+        # Get the time frames for this note
+        start_frame = i * chroma_jax.shape[1] // len(scale_freqs)
+        end_frame = (i + 1) * chroma_jax.shape[1] // len(scale_freqs)
+        
+        # Average chroma for this note's duration
+        note_chroma = np.mean(chroma_jax[:, start_frame:end_frame], axis=1)
+        
+        # The expected chroma should be among the strongest
+        sorted_indices = np.argsort(note_chroma)[::-1]
+        assert expected_chroma in sorted_indices[:3], \
+            f"Note {i} (chroma {expected_chroma}) not in top 3 chromas"
+    
+    # Test with pre-computed CQT
+    C_jax = librosax.pseudo_cqt(y_jax, sr=sr)
+    chroma_from_cqt = chroma_cqt_jit(C=jnp.abs(C_jax), sr=sr)
+    
+    # Should have same shape
+    assert chroma_from_cqt.shape[0] == 12

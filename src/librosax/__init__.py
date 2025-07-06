@@ -13,6 +13,17 @@ from .core import (
     rms,
     zero_crossing_rate,
     melspectrogram,
+    mfcc,
+    chroma_stft,
+    chroma_cqt,
+    tonnetz,
+    pseudo_cqt,
+    cqt_frequencies,
+    note_to_hz,
+    chroma_filter,
+    hz_to_octs,
+    fft_frequencies,
+    normalize,
 )
 from .layers.core import (
     DropStripes,

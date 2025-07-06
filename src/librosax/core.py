@@ -1161,3 +1161,624 @@ def melspectrogram(
     melspec = jnp.einsum("...ft,mf->...mt", S, mel_basis)
     
     return melspec
+
+
+def mfcc(
+    *,
+    y: Optional[jnp.ndarray] = None,
+    sr: float = 22050,
+    S: Optional[jnp.ndarray] = None,
+    n_mfcc: int = 20,
+    dct_type: int = 2,
+    norm: Optional[str] = "ortho",
+    lifter: int = 0,
+    n_fft: int = 2048,
+    hop_length: int = 512,
+    win_length: Optional[int] = None,
+    window: str = "hann",
+    center: bool = True,
+    pad_mode: str = "constant",
+    power: float = 2.0,
+    n_mels: int = 128,
+    fmin: float = 0.0,
+    fmax: Optional[float] = None,
+    htk: bool = False,
+    melspectrogram_params: Optional[dict] = None,
+) -> jnp.ndarray:
+    """Compute Mel-frequency cepstral coefficients (MFCCs).
+    
+    MFCCs are computed from the log-power mel spectrogram.
+    
+    Args:
+        y: Audio time series. Multi-channel is supported.
+        sr: Audio sampling rate
+        S: (optional) log-power mel spectrogram
+        n_mfcc: Number of MFCCs to return (default: 20)
+        dct_type: Discrete cosine transform (DCT) type (default: 2)
+        norm: If "ortho", use orthonormal DCT basis. Default: "ortho"
+        lifter: If lifter>0, apply liftering (cepstral filtering) to the MFCCs.
+            If lifter=0, no liftering is applied.
+        n_fft: FFT window size (used if y is provided)
+        hop_length: Hop length for STFT (used if y is provided)
+        win_length: Window length (used if y is provided)
+        window: Window function (used if y is provided)
+        center: If True, pad the signal (used if y is provided)
+        pad_mode: Padding mode (used if y is provided)
+        power: Exponent for the magnitude melspectrogram (used if y is provided)
+        n_mels: Number of mel bands (used if y is provided)
+        fmin: Lowest frequency in Hz (used if y is provided)
+        fmax: Highest frequency in Hz (used if y is provided)
+        htk: Use HTK formula for mel scale (used if y is provided)
+        melspectrogram_params: Additional keyword arguments for melspectrogram
+            (used if y is provided)
+            
+    Returns:
+        jnp.ndarray: MFCC sequence [shape=(..., n_mfcc, t)]
+    """
+    if S is None:
+        # Compute mel spectrogram if not provided
+        mel_params = dict(
+            y=y,
+            sr=sr,
+            n_fft=n_fft,
+            hop_length=hop_length,
+            win_length=win_length,
+            window=window,
+            center=center,
+            pad_mode=pad_mode,
+            power=power,
+            n_mels=n_mels,
+            fmin=fmin,
+            fmax=fmax,
+            htk=htk,
+            norm="slaney",  # Default mel normalization for librosa
+        )
+        
+        # Override with any custom parameters
+        if melspectrogram_params is not None:
+            mel_params.update(melspectrogram_params)
+            
+        S = melspectrogram(**mel_params)
+        
+        # Convert to log scale
+        S = power_to_db(S)
+    
+    # Note: S has shape (..., n_mels, t)
+    # Need to transpose for DCT which expects (..., t, n_mels)
+    S_transposed = jnp.moveaxis(S, -2, -1)
+    
+    # Apply DCT
+    from jax.scipy.fft import dct as jax_dct
+    mfccs = jax_dct(S_transposed, type=dct_type, norm=norm, axis=-1)
+    
+    # Keep only the first n_mfcc coefficients
+    mfccs = mfccs[..., :n_mfcc]
+    
+    # Transpose back to (..., n_mfcc, t)
+    mfccs = jnp.moveaxis(mfccs, -1, -2)
+    
+    # Apply liftering if requested
+    if lifter > 0:
+        # Create liftering coefficients
+        n = jnp.arange(n_mfcc)
+        lift = 1 + (lifter / 2) * jnp.sin(jnp.pi * (n + 1) / lifter)
+        
+        # Reshape for broadcasting
+        ndim_diff = mfccs.ndim - 1
+        lift_shape = [1] * ndim_diff + [n_mfcc] + [1]
+        lift = lift.reshape(lift_shape)
+        
+        mfccs = mfccs * lift
+    
+    return mfccs
+
+
+def hz_to_octs(frequencies: jnp.ndarray, *, tuning: float = 0.0, bins_per_octave: int = 12) -> jnp.ndarray:
+    """Convert frequencies (Hz) to octave numbers.
+    
+    Args:
+        frequencies: Array of frequencies in Hz
+        tuning: Tuning deviation from A440 in fractional bins
+        bins_per_octave: Number of bins per octave (default: 12)
+        
+    Returns:
+        jnp.ndarray: Octave numbers (C1 = 0, C2 = 1, ..., A4 = 4.75)
+    """
+    A440 = 440.0 * 2.0 ** (tuning / bins_per_octave)
+    # C1 is 4 octaves below A4
+    octs = jnp.log2(frequencies / (A440 / 16))
+    return octs
+
+
+def chroma_filter(
+    *,
+    sr: float,
+    n_fft: int,
+    n_chroma: int = 12,
+    tuning: float = 0.0,
+    ctroct: float = 5.0,
+    octwidth: Optional[float] = 2,
+    norm: Optional[float] = 2,
+    base_c: bool = True,
+    dtype: jnp.dtype = jnp.float32,
+) -> jnp.ndarray:
+    """Create a chroma filter bank.
+    
+    Creates a linear transformation matrix to project FFT bins onto chroma bins.
+    
+    Args:
+        sr: Sampling rate
+        n_fft: Number of FFT bins
+        n_chroma: Number of chroma bins to produce (default: 12)
+        tuning: Tuning deviation from A440 in fractional bins (default: 0.0)
+        ctroct: Center of Gaussian weighting in octaves (default: 5.0)
+        octwidth: Gaussian half-width for weighting. None for flat weighting (default: 2)
+        norm: Normalization factor for filter weights. None for no normalization (default: 2)
+        base_c: If True, start filter bank at C. If False, start at A (default: True)
+        dtype: Data type for filter bank
+        
+    Returns:
+        jnp.ndarray: Chroma filter bank [shape=(n_chroma, 1 + n_fft/2)]
+    """
+    wts = jnp.zeros((n_chroma, n_fft), dtype=dtype)
+    
+    # Get the FFT bins, not counting the DC component
+    frequencies = jnp.linspace(0, sr, n_fft, endpoint=False)[1:]
+    
+    frqbins = n_chroma * hz_to_octs(
+        frequencies, tuning=tuning, bins_per_octave=n_chroma
+    )
+    
+    # make up a value for the 0 Hz bin = 1.5 octaves below bin 1
+    # (so chroma is 50% rotated from bin 1, and bin width is broad)
+    frqbins = jnp.concatenate([jnp.array([frqbins[0] - 1.5 * n_chroma]), frqbins])
+    
+    binwidthbins = jnp.concatenate([jnp.maximum(frqbins[1:] - frqbins[:-1], 1.0), jnp.array([1])])
+    
+    # Create the chroma matrix
+    D = jnp.arange(0, n_chroma, dtype=jnp.float32)[jnp.newaxis, :] - frqbins[:, jnp.newaxis]
+    
+    n_chroma2 = jnp.round(float(n_chroma) / 2)
+    
+    # Project into range -n_chroma/2 .. n_chroma/2
+    # add on fixed offset of 10*n_chroma to ensure all values passed to
+    # remainder are positive
+    D = jnp.remainder(D + n_chroma2 + 10 * n_chroma, n_chroma) - n_chroma2
+    
+    # Gaussian bumps - 2*D to make them narrower
+    wts = jnp.exp(-0.5 * (2 * D / binwidthbins[:, jnp.newaxis]) ** 2)
+    
+    # Transpose to match expected shape
+    wts = wts.T
+    
+    # normalize each column
+    wts = normalize(wts, norm=norm, axis=0)
+    
+    # Maybe apply scaling for fft bins
+    if octwidth is not None:
+        wts = wts * jnp.exp(-0.5 * (((frqbins / n_chroma - ctroct) / octwidth) ** 2))
+    
+    if base_c:
+        wts = jnp.roll(wts, -3 * (n_chroma // 12), axis=0)
+    
+    # remove aliasing columns, only take up to n_fft/2 + 1
+    return wts[:, : int(1 + n_fft / 2)]
+
+
+def note_to_hz(note: str, **kwargs) -> float:
+    """Convert note name to frequency in Hz.
+    
+    Args:
+        note: Note name (e.g., 'C4', 'A#3', 'Bb5')
+        **kwargs: Additional arguments passed to librosa.note_to_hz
+        
+    Returns:
+        float: Frequency in Hz
+    """
+    # For now, delegate to librosa
+    return float(librosa.note_to_hz(note, **kwargs))
+
+
+def cqt_frequencies(
+    *,
+    n_bins: int = 84,
+    bins_per_octave: int = 12,
+    fmin: float = 32.70,
+    tuning: float = 0.0,
+) -> jnp.ndarray:
+    """Compute the center frequencies of Constant-Q bins.
+    
+    Args:
+        n_bins: Number of frequency bins
+        bins_per_octave: Number of bins per octave  
+        fmin: Minimum frequency (Hz)
+        tuning: Tuning deviation from A440 in fractions of a bin
+        
+    Returns:
+        jnp.ndarray: Center frequencies for each CQT bin
+    """
+    correction = 2.0 ** (tuning / bins_per_octave)
+    
+    # Generate geometric sequence of frequencies
+    frequencies = fmin * correction * (2.0 ** (jnp.arange(n_bins) / bins_per_octave))
+    
+    return frequencies
+
+
+def pseudo_cqt(
+    y: jnp.ndarray,
+    *,
+    sr: float = 22050,
+    hop_length: int = 512,
+    fmin: Optional[float] = None,
+    n_bins: int = 84,
+    bins_per_octave: int = 12,
+    tuning: Optional[float] = 0.0,
+    filter_scale: float = 1.0,
+    norm: Optional[float] = 1.0,
+    sparsity: float = 0.01,
+    window: str = "hann",
+    scale: bool = True,
+    pad_mode: str = "constant",
+    dtype: jnp.dtype = jnp.complex64,
+) -> jnp.ndarray:
+    """Compute the pseudo constant-Q transform of an audio signal.
+    
+    This is a simplified CQT that uses a single FFT size rather than
+    the recursive sub-sampling of the full CQT. It's faster but less
+    accurate for low frequencies.
+    
+    Args:
+        y: Audio time series. Multi-channel is supported.
+        sr: Sampling rate
+        hop_length: Number of samples between successive CQT columns
+        fmin: Minimum frequency. Defaults to C1 ~= 32.70 Hz
+        n_bins: Number of frequency bins, starting at fmin
+        bins_per_octave: Number of bins per octave
+        tuning: Tuning offset in fractions of a bin. If None, assumed 0.
+        filter_scale: Filter scale factor. Small values (<1) use shorter windows
+        norm: Type of norm to use for basis function normalization
+        sparsity: Sparsification factor (not implemented yet)
+        window: Window function
+        scale: If True, scale by sqrt(n_fft)
+        pad_mode: Padding mode for frame analysis
+        dtype: Complex data type for calculations
+        
+    Returns:
+        jnp.ndarray: Pseudo Constant-Q transform [shape=(..., n_bins, t)]
+    """
+    if fmin is None:
+        # C1 by default
+        fmin = note_to_hz("C1")
+        
+    # Apply tuning correction
+    fmin = fmin * 2.0 ** (tuning / bins_per_octave)
+    
+    # Get CQT frequencies
+    freqs = cqt_frequencies(
+        n_bins=n_bins,
+        bins_per_octave=bins_per_octave, 
+        fmin=fmin,
+        tuning=0.0  # Already applied above
+    )
+    
+    # For pseudo-CQT, we use a simple approach with fixed FFT size
+    # This is less accurate than full CQT but much simpler to implement
+    
+    # Estimate required FFT size
+    # We need enough frequency resolution for the lowest frequency
+    # and enough time resolution for the highest frequency
+    alpha = 1.0  # Bandwidth factor (simplified)
+    
+    # Compute filter lengths for each frequency
+    # Using a simplified version - proper implementation would use
+    # filters.wavelet_lengths from librosa
+    Q = filter_scale / alpha
+    lengths = Q * sr / freqs
+    
+    # For JIT compatibility, we need to use a fixed FFT size
+    # This is a limitation of the current implementation
+    # Use a reasonable default that works for most cases
+    n_fft = 16384  # Fixed size for JIT compatibility
+    
+    # Ensure it's large enough for the hop length
+    if n_fft < 2 * hop_length:
+        n_fft = 2048 * (1 + (2 * hop_length) // 2048)
+    
+    # Compute STFT
+    D = stft(
+        y,
+        n_fft=n_fft,
+        hop_length=hop_length,
+        window=window,
+        center=True,
+        pad_mode=pad_mode,
+    )
+    
+    # Get magnitude spectrogram
+    S = jnp.abs(D)
+    
+    # Build the CQT kernel (simplified version)
+    # In a full implementation, this would use proper wavelet basis functions
+    n_freqs = 1 + n_fft // 2
+    fft_freqs = fft_frequencies(sr=sr, n_fft=n_fft)
+    
+    # Create Gaussian-like filters centered at CQT frequencies
+    # This is a simplified approximation
+    # Width is proportional to the CQT frequency (constant-Q property)
+    sigmas = freqs / (bins_per_octave * 2)  # Simplified bandwidth
+    
+    # Vectorized computation of all filters
+    # fft_freqs shape: (n_freqs,)
+    # freqs shape: (n_bins,)
+    # Broadcasting to compute all filters at once
+    diff = fft_freqs[jnp.newaxis, :] - freqs[:, jnp.newaxis]  # (n_bins, n_freqs)
+    weights = jnp.exp(-0.5 * (diff / sigmas[:, jnp.newaxis]) ** 2)
+    
+    # Normalize if requested
+    if norm == 1:
+        kernel = weights / jnp.sum(weights, axis=1, keepdims=True)
+    elif norm == 2:
+        kernel = weights / jnp.sqrt(jnp.sum(weights ** 2, axis=1, keepdims=True))
+    elif norm == jnp.inf:
+        kernel = weights / jnp.max(weights, axis=1, keepdims=True)
+    else:
+        kernel = weights
+    
+    # Apply CQT kernel to magnitude spectrogram
+    # S shape: (..., n_freqs, time)
+    # kernel shape: (n_bins, n_freqs)
+    # Result shape: (..., n_bins, time)
+    C = jnp.einsum("...ft,bf->...bt", S, kernel)
+    
+    if scale:
+        C = C / jnp.sqrt(n_fft)
+        
+    return C
+
+
+def chroma_cqt(
+    *,
+    y: Optional[jnp.ndarray] = None,
+    sr: float = 22050,
+    C: Optional[jnp.ndarray] = None,
+    hop_length: int = 512,
+    fmin: Optional[float] = None,
+    norm: Optional[Union[float, str]] = jnp.inf,
+    threshold: float = 0.0,
+    tuning: Optional[float] = 0.0,
+    n_chroma: int = 12,
+    n_octaves: int = 7,
+    window: Optional[jnp.ndarray] = None,
+    bins_per_octave: int = 36,
+    cqt_mode: str = "full",
+    **kwargs,
+) -> jnp.ndarray:
+    """Chromagram from a constant-Q transform.
+    
+    Args:
+        y: Audio time series. Multi-channel is supported.
+        sr: Sampling rate  
+        C: Pre-computed CQT spectrogram
+        hop_length: Number of samples between successive CQT columns
+        fmin: Minimum frequency. Default: C1 ~= 32.70 Hz
+        norm: Normalization mode for chroma
+        threshold: Pre-normalization energy threshold
+        tuning: Tuning deviation from A440 in fractional bins
+        n_chroma: Number of chroma bins to produce
+        n_octaves: Number of octaves to analyze above fmin
+        window: Optional weighting window
+        bins_per_octave: Number of bins per octave in the CQT
+        cqt_mode: CQT mode ('full' or 'hybrid')
+        **kwargs: Additional parameters for pseudo_cqt
+        
+    Returns:
+        jnp.ndarray: Normalized chroma [shape=(..., n_chroma, t)]
+    """
+    if fmin is None:
+        fmin = note_to_hz("C1")
+        
+    if C is None:
+        # Use pseudo_cqt for now (full CQT not implemented yet)
+        C = jnp.abs(
+            pseudo_cqt(
+                y,
+                sr=sr,
+                hop_length=hop_length,
+                fmin=fmin,
+                n_bins=n_octaves * bins_per_octave,
+                bins_per_octave=bins_per_octave,
+                tuning=tuning,
+                **kwargs,
+            )
+        )
+    
+    # Map CQT bins to chroma bins
+    # This is a simplified version - proper implementation would use
+    # cq_to_chroma matrix from librosa
+    n_cqt_bins = C.shape[-2]
+    
+    # Create a proper mapping matrix from CQT bins to chroma bins
+    # The key insight is that if bins_per_octave is a multiple of n_chroma,
+    # then we can group consecutive CQT bins into chroma bins
+    bins_per_chroma = bins_per_octave // n_chroma
+    
+    # Create the mapping matrix
+    # Vectorized version for JAX compatibility
+    bin_indices = jnp.arange(n_cqt_bins)
+    chroma_indices = (bin_indices // bins_per_chroma) % n_chroma
+    
+    cq_to_chr = jnp.zeros((n_chroma, n_cqt_bins))
+    cq_to_chr = cq_to_chr.at[chroma_indices, bin_indices].set(1.0)
+    
+    # Apply the mapping
+    # C shape: (..., n_cqt_bins, t)
+    # cq_to_chr shape: (n_chroma, n_cqt_bins)
+    # Result shape: (..., n_chroma, t)
+    chroma = jnp.einsum("...ct,bc->...bt", C, cq_to_chr)
+    
+    # Apply threshold
+    if threshold > 0:
+        chroma = jnp.where(chroma < threshold, 0, chroma)
+    
+    # Normalize
+    if norm is not None:
+        chroma = normalize(chroma, norm=norm, axis=-2)
+        
+    return chroma
+
+
+def tonnetz(
+    *,
+    y: Optional[jnp.ndarray] = None,
+    sr: float = 22050,
+    chroma: Optional[jnp.ndarray] = None,
+    **kwargs,
+) -> jnp.ndarray:
+    """Compute the tonal centroid features (tonnetz).
+    
+    This representation projects chroma features onto a 6-dimensional basis 
+    representing the perfect fifth, minor third, and major third each as 
+    two-dimensional coordinates.
+    
+    Args:
+        y: Audio time series. Multi-channel is supported.
+        sr: Sampling rate of y
+        chroma: Normalized energy for each chroma bin at each frame.
+            If None, a chroma_stft is computed.
+        **kwargs: Additional keyword arguments to chroma_stft,
+            if chroma is not pre-computed.
+            
+    Returns:
+        jnp.ndarray: Tonal centroid features [shape=(..., 6, t)]
+            Tonnetz dimensions:
+            - 0: Fifth x-axis
+            - 1: Fifth y-axis
+            - 2: Minor x-axis
+            - 3: Minor y-axis
+            - 4: Major x-axis
+            - 5: Major y-axis
+    """
+    if y is None and chroma is None:
+        raise ValueError(
+            "Either the audio samples or the chromagram must be "
+            "passed as an argument."
+        )
+        
+    if chroma is None:
+        # Use chroma_stft instead of chroma_cqt for now
+        chroma = chroma_stft(y=y, sr=sr, **kwargs)
+    
+    # Generate Transformation matrix
+    n_chroma = chroma.shape[-2]
+    dim_map = jnp.linspace(0, 12, num=n_chroma, endpoint=False)
+    
+    # Interval scaling factors
+    scale = jnp.array([7.0 / 6, 7.0 / 6, 3.0 / 2, 3.0 / 2, 2.0 / 3, 2.0 / 3])
+    
+    # Create the transformation matrix
+    V = scale[:, jnp.newaxis] * dim_map[jnp.newaxis, :]
+    
+    # Even rows compute sin() offset
+    V = V.at[::2].add(-0.5)
+    
+    # Radii for each dimension
+    R = jnp.array([1, 1, 1, 1, 0.5, 0.5])  # Fifths, Minor, Major
+    
+    # Compute the projection matrix
+    phi = R[:, jnp.newaxis] * jnp.cos(jnp.pi * V)
+    
+    # Normalize chroma features
+    chroma_norm = normalize(chroma, norm=1, axis=-2)
+    
+    # Do the transform to tonnetz
+    # phi shape: (6, n_chroma)
+    # chroma_norm shape: (..., n_chroma, t)
+    # tonnetz shape: (..., 6, t)
+    tonnetz = jnp.einsum("pc,...ct->...pt", phi, chroma_norm)
+    
+    return tonnetz
+
+
+def chroma_stft(
+    *,
+    y: Optional[jnp.ndarray] = None,
+    sr: float = 22050,
+    S: Optional[jnp.ndarray] = None,
+    norm: Optional[Union[float, str]] = jnp.inf,
+    n_fft: int = 2048,
+    hop_length: int = 512,
+    win_length: Optional[int] = None,
+    window: str = "hann",
+    center: bool = True,
+    pad_mode: str = "constant",
+    tuning: Optional[float] = None,
+    n_chroma: int = 12,
+    **kwargs,
+) -> jnp.ndarray:
+    """Compute a chromagram from a power spectrogram or waveform.
+    
+    Args:
+        y: Audio time series. Multi-channel is supported.
+        sr: Sampling rate
+        S: Power spectrogram (optional if y is provided)
+        norm: Column-wise normalization. See `normalize` for details.
+        n_fft: FFT window size
+        hop_length: Hop length
+        win_length: Window length
+        window: Window specification
+        center: Center the frames
+        pad_mode: Padding mode
+        tuning: Tuning deviation from A440 in fractional bins.
+            If None, tuning will be automatically estimated (not implemented yet).
+        n_chroma: Number of chroma bins to produce
+        **kwargs: Additional arguments to chroma_filter (ctroct, octwidth, norm, base_c)
+        
+    Returns:
+        jnp.ndarray: Chromagram [shape=(..., n_chroma, t)]
+    """
+    # Get power spectrogram
+    S, n_fft = _spectrogram(
+        y=y,
+        S=S,
+        n_fft=n_fft,
+        hop_length=hop_length,
+        win_length=win_length,
+        window=window,
+        center=center,
+        pad_mode=pad_mode,
+    )
+    
+    # _spectrogram returns magnitude, but chroma needs power
+    if y is not None:
+        S = S ** 2
+    
+    # For now, we don't implement automatic tuning estimation
+    # Users need to provide tuning explicitly or use default 0.0
+    if tuning is None:
+        # In a full implementation, we would estimate tuning here
+        # For now, just use A440 standard tuning
+        tuning = 0.0
+    
+    # Get the filter bank
+    chromafb = chroma_filter(
+        sr=sr,
+        n_fft=n_fft,
+        tuning=tuning,
+        n_chroma=n_chroma,
+        **kwargs
+    )
+    
+    # Apply the filter bank
+    # chromafb shape: (n_chroma, 1 + n_fft/2)
+    # S shape: (..., 1 + n_fft/2, t)
+    # Use einsum for flexible dimensions
+    raw_chroma = jnp.einsum("...ft,cf->...ct", S, chromafb)
+    
+    # Normalize
+    if norm is not None:
+        chroma = normalize(raw_chroma, norm=norm, axis=-2)
+    else:
+        chroma = raw_chroma
+        
+    return chroma

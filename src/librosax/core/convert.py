@@ -837,7 +837,11 @@ def note_to_midi(
         raise ParameterError(f"Improper note format: {note:s}")
 
     pitch = match.group("note").upper()
-    offset = jnp.sum([acc_map[o] for o in match.group("accidental")])
+    accidentals = match.group("accidental")
+    if accidentals:
+        offset = sum(acc_map[o] for o in accidentals)
+    else:
+        offset = 0
     octave = match.group("octave")
     cents = match.group("cents")
 
@@ -854,7 +858,7 @@ def note_to_midi(
     note_value: float = 12 * (octave + 1) + pitch_map[pitch] + offset + cents
 
     if round_midi:
-        return int(jnp.round(note_value))
+        return jnp.round(note_value).astype(jnp.int32)
     else:
         return note_value
 
@@ -1043,7 +1047,7 @@ def midi_to_hz(
     hz_to_midi
     note_to_hz
     """
-    return 440.0 * (2.0 ** ((jnp.asanyarray(notes) - 69.0) / 12.0))
+    return 440.0 * (2.0 ** ((jnp.asarray(notes) - 69.0) / 12.0))
 
 
 @overload

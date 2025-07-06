@@ -13,6 +13,7 @@ import torch
 import torchlibrosa
 
 import librosax
+import librosax.feature
 from librosax.layers import (
     Spectrogram,
     MFCC,
@@ -308,7 +309,7 @@ def test_spectral_centroid():
     
     # Create JIT-compiled version of spectral_centroid
     spectral_centroid_jit = jax.jit(
-        librosax.spectral_centroid,
+        librosax.feature.spectral_centroid,
         static_argnames=('sr', 'n_fft', 'hop_length', 'win_length', 'window', 'center', 'pad_mode')
     )
     
@@ -366,7 +367,7 @@ def test_spectral_bandwidth():
     
     # Create JIT-compiled version of spectral_bandwidth
     spectral_bandwidth_jit = jax.jit(
-        librosax.spectral_bandwidth,
+        librosax.feature.spectral_bandwidth,
         static_argnames=('sr', 'n_fft', 'hop_length', 'p', 'win_length', 'window', 'center', 'pad_mode', 'norm')
     )
     
@@ -439,7 +440,7 @@ def test_spectral_rolloff():
     
     # Create JIT-compiled version of spectral_rolloff
     spectral_rolloff_jit = jax.jit(
-        librosax.spectral_rolloff,
+        librosax.feature.spectral_rolloff,
         static_argnames=('sr', 'n_fft', 'hop_length', 'roll_percent', 'win_length', 'window', 'center', 'pad_mode')
     )
     
@@ -501,7 +502,7 @@ def test_spectral_flatness():
     
     # Create JIT-compiled version of spectral_flatness
     spectral_flatness_jit = jax.jit(
-        librosax.spectral_flatness,
+        librosax.feature.spectral_flatness,
         static_argnames=('n_fft', 'hop_length', 'amin', 'power', 'win_length', 'window', 'center', 'pad_mode')
     )
     
@@ -562,7 +563,7 @@ def test_rms():
     
     # Create JIT-compiled version of rms
     rms_jit = jax.jit(
-        librosax.rms,
+        librosax.feature.rms,
         static_argnames=('frame_length', 'hop_length', 'center', 'pad_mode')
     )
     
@@ -629,7 +630,7 @@ def test_zero_crossing_rate():
     
     # Create JIT-compiled version of zero_crossing_rate
     zero_crossing_rate_jit = jax.jit(
-        librosax.zero_crossing_rate,
+        librosax.feature.zero_crossing_rate,
         static_argnames=('frame_length', 'hop_length', 'center', 'pad_mode', 'threshold', 'ref_magnitude', 'pad', 'zero_pos', 'axis')
     )
     
@@ -700,7 +701,7 @@ def test_spectral_contrast():
     
     # Create JIT-compiled version of spectral_contrast
     spectral_contrast_jit = jax.jit(
-        librosax.spectral_contrast,
+        librosax.feature.spectral_contrast,
         static_argnames=('sr', 'n_fft', 'hop_length', 'fmin', 'n_bands', 'quantile', 'linear', 'win_length', 'window', 'center', 'pad_mode')
     )
     
@@ -769,7 +770,7 @@ def test_melspectrogram():
     
     # Create JIT-compiled version of melspectrogram
     melspectrogram_jit = jax.jit(
-        librosax.melspectrogram,
+        librosax.feature.melspectrogram,
         static_argnames=('sr', 'n_fft', 'hop_length', 'win_length', 'window', 
                         'center', 'pad_mode', 'power', 'n_mels', 'fmin', 'fmax', 
                         'htk', 'norm', 'dtype')
@@ -846,7 +847,7 @@ def test_mfcc():
     
     # Create JIT-compiled version of mfcc
     mfcc_jit = jax.jit(
-        librosax.mfcc,
+        librosax.feature.mfcc,
         static_argnames=('sr', 'n_mfcc', 'dct_type', 'norm', 'lifter', 
                         'n_fft', 'hop_length', 'win_length', 'window', 
                         'center', 'pad_mode', 'power', 'n_mels', 'fmin', 
@@ -953,7 +954,7 @@ def test_chroma_stft():
     
     # Create JIT-compiled version of chroma_stft
     chroma_stft_jit = jax.jit(
-        librosax.chroma_stft,
+        librosax.feature.chroma_stft,
         static_argnames=('sr', 'norm', 'n_fft', 'hop_length', 'win_length', 
                         'window', 'center', 'pad_mode', 'tuning', 'n_chroma')
     )
@@ -1055,7 +1056,7 @@ def test_tonnetz():
     
     # Create JIT-compiled version of tonnetz
     tonnetz_jit = jax.jit(
-        librosax.tonnetz,
+        librosax.feature.tonnetz,
         static_argnames=('sr',)
     )
     
@@ -1118,7 +1119,7 @@ def test_pseudo_cqt():
     
     # Create JIT-compiled version
     pseudo_cqt_jit = jax.jit(
-        librosax.pseudo_cqt,
+        librosax.feature.pseudo_cqt,
         static_argnames=('sr', 'hop_length', 'fmin', 'n_bins', 'bins_per_octave',
                         'tuning', 'filter_scale', 'norm', 'sparsity', 'window',
                         'scale', 'pad_mode', 'dtype')
@@ -1135,7 +1136,7 @@ def test_pseudo_cqt():
            f"Shape mismatch: {C_jax.shape}"
     
     # Check that we have energy at expected frequencies
-    freqs = librosax.cqt_frequencies(n_bins=n_bins, bins_per_octave=bins_per_octave)
+    freqs = librosax.feature.cqt_frequencies(n_bins=n_bins, bins_per_octave=bins_per_octave)
     
     # Find bins closest to our test frequencies
     idx_f0 = np.argmin(np.abs(freqs - f0))
@@ -1183,7 +1184,7 @@ def test_chroma_cqt():
     
     # Create JIT-compiled version
     chroma_cqt_jit = jax.jit(
-        librosax.chroma_cqt,
+        librosax.feature.chroma_cqt,
         static_argnames=('sr', 'hop_length', 'fmin', 'norm', 'threshold',
                         'tuning', 'n_chroma', 'n_octaves', 'bins_per_octave',
                         'cqt_mode')
@@ -1216,7 +1217,7 @@ def test_chroma_cqt():
             f"Note {i} (chroma {expected_chroma}) not in top 3 chromas"
     
     # Test with pre-computed CQT
-    C_jax = librosax.pseudo_cqt(y_jax, sr=sr)
+    C_jax = librosax.feature.pseudo_cqt(y_jax, sr=sr)
     chroma_from_cqt = chroma_cqt_jit(C=jnp.abs(C_jax), sr=sr)
     
     # Should have same shape
@@ -1240,7 +1241,7 @@ def test_cqt():
     
     # Create JIT-compiled version
     cqt_jit = jax.jit(
-        librosax.cqt,
+        librosax.feature.cqt,
         static_argnames=('sr', 'hop_length', 'fmin', 'n_bins', 'bins_per_octave',
                         'tuning', 'filter_scale', 'norm', 'sparsity', 'window',
                         'scale', 'pad_mode', 'res_type', 'dtype')
@@ -1254,7 +1255,7 @@ def test_cqt():
     assert C_jax.shape[0] == 84
     
     # Check that we have energy at expected frequencies
-    freqs = librosax.cqt_frequencies(n_bins=84, bins_per_octave=12)
+    freqs = librosax.feature.cqt_frequencies(n_bins=84, bins_per_octave=12)
     
     # Find bins closest to our test frequencies
     idx_f0 = np.argmin(np.abs(freqs - f0))

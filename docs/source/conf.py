@@ -19,10 +19,10 @@ project = "Librosax"
 copyright = "2025, David Braun"
 author = "David Braun"
 first_line = open(
-    os.path.join(pathlib.Path(__file__).parents[2], "src/librosax/__init__.py"), "r"
+    os.path.join(pathlib.Path(__file__).parents[2], "src/librosax/version.py"), "r"
 ).readline()
-# first_line is '__version__ = "1.2.3"'
-assert first_line.startswith("__version__ = ")
+# first_line is 'version = "1.2.3"'
+assert first_line.startswith("version = ")
 release = first_line.split("=")[1].strip()[1:-1]
 
 # -- General configuration ---------------------------------------------------

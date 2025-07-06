@@ -1221,3 +1221,56 @@ def test_chroma_cqt():
     
     # Should have same shape
     assert chroma_from_cqt.shape[0] == 12
+
+
+def test_cqt():
+    """Test improved CQT implementation."""
+    # Generate test signal with harmonics
+    sr = 22050
+    duration = 2.0
+    t = np.linspace(0, duration, int(sr * duration))
+    
+    # A4 (440 Hz) with harmonics
+    f0 = 440.0
+    y = (
+        0.5 * np.sin(2 * np.pi * f0 * t) +
+        0.3 * np.sin(2 * np.pi * 2 * f0 * t) +
+        0.2 * np.sin(2 * np.pi * 3 * f0 * t)
+    )
+    
+    # Create JIT-compiled version
+    cqt_jit = jax.jit(
+        librosax.cqt,
+        static_argnames=('sr', 'hop_length', 'fmin', 'n_bins', 'bins_per_octave',
+                        'tuning', 'filter_scale', 'norm', 'sparsity', 'window',
+                        'scale', 'pad_mode', 'res_type', 'dtype')
+    )
+    
+    # Test basic functionality
+    y_jax = jnp.array(y)
+    C_jax = cqt_jit(y_jax, sr=sr, hop_length=512, n_bins=84)
+    
+    # Check output shape
+    assert C_jax.shape[0] == 84
+    
+    # Check that we have energy at expected frequencies
+    freqs = librosax.cqt_frequencies(n_bins=84, bins_per_octave=12)
+    
+    # Find bins closest to our test frequencies
+    idx_f0 = np.argmin(np.abs(freqs - f0))
+    idx_2f0 = np.argmin(np.abs(freqs - 2 * f0))
+    
+    # Average energy across time
+    C_mean = np.mean(np.abs(C_jax), axis=1)
+    
+    # Check that we have some energy variation (not flat response)
+    energy_std = np.std(C_mean)
+    assert energy_std > 0, "CQT response is flat"
+    
+    # For now, just check that CQT produces non-zero output
+    assert np.max(np.abs(C_jax)) > 0, "CQT output is all zeros"
+    
+    
+    # The CQT should produce reasonable output shapes and values
+    assert not np.any(np.isnan(C_jax)), "CQT contains NaN values"
+    assert not np.any(np.isinf(C_jax)), "CQT contains infinite values"

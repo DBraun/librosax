@@ -17,6 +17,7 @@ from .core import (
     chroma_stft,
     chroma_cqt,
     tonnetz,
+    cqt,
     pseudo_cqt,
     cqt_frequencies,
     note_to_hz,

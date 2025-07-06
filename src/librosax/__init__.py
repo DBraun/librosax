@@ -12,6 +12,7 @@ from .core import (
     spectral_contrast,
     rms,
     zero_crossing_rate,
+    melspectrogram,
 )
 from .layers.core import (
     DropStripes,

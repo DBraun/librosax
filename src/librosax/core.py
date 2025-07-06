@@ -1057,3 +1057,107 @@ def spectral_contrast(
         contrast = power_to_db(peak) - power_to_db(valley)
         
     return contrast
+
+
+def melspectrogram(
+    *,
+    y: Optional[jnp.ndarray] = None,
+    sr: float = 22050,
+    S: Optional[jnp.ndarray] = None,
+    n_fft: int = 2048,
+    hop_length: int = 512,
+    win_length: Optional[int] = None,
+    window: str = "hann",
+    center: bool = True,
+    pad_mode: str = "constant",
+    power: float = 2.0,
+    n_mels: int = 128,
+    fmin: float = 0.0,
+    fmax: Optional[float] = None,
+    htk: bool = False,
+    norm: Optional[Union[str, float]] = "slaney",
+    dtype: jnp.dtype = jnp.float32,
+) -> jnp.ndarray:
+    """Compute a mel-scaled spectrogram.
+    
+    If a time-series input y is provided, its magnitude spectrogram S is
+    first computed, and then mapped onto the mel scale by mel_f.dot(S**power).
+    
+    By default, power=2 operates on a power spectrum.
+    
+    Args:
+        y: Audio time series. Multi-channel is supported.
+        sr: Audio sampling rate
+        S: (optional) Pre-computed spectrogram magnitude
+        n_fft: FFT window size
+        hop_length: Hop length for STFT
+        win_length: Window length
+        window: Window function
+        center: If True, pad the signal
+        pad_mode: Padding mode
+        power: Exponent for the magnitude melspectrogram.
+            e.g., 1 for energy, 2 for power, etc.
+            If 0, return the STFT magnitude directly.
+        n_mels: Number of mel bands to generate
+        fmin: Lowest frequency (in Hz)
+        fmax: Highest frequency (in Hz). If None, use fmax = sr / 2.0
+        htk: Use HTK formula instead of Slaney
+        norm: {None, "slaney", float > 0}
+            If "slaney", divide the triangular mel weights by the width of the
+            mel band (area normalization).
+            If numeric, use norm as a mel exponent normalization.
+            See librosa.filters.mel for details.
+        dtype: Data type of the output array
+        
+    Returns:
+        jnp.ndarray: Mel spectrogram [shape=(..., n_mels, t)]
+    """
+    if fmax is None:
+        fmax = sr / 2
+    
+    # Compute the spectrogram magnitude
+    if S is None:
+        S, n_fft = _spectrogram(
+            y=y,
+            n_fft=n_fft,
+            hop_length=hop_length,
+            win_length=win_length,
+            window=window,
+            center=center,
+            pad_mode=pad_mode,
+        )
+        
+        # Apply power scaling if needed
+        if power != 1.0:
+            S = jnp.power(S, power).astype(dtype)
+        else:
+            S = S.astype(dtype)
+    else:
+        # When S is provided, it's already at the desired power scale
+        # So just convert dtype
+        S = S.astype(dtype)
+        # We need to infer n_fft from the spectrogram shape
+        n_fft = 2 * (S.shape[-2] - 1)
+    
+    # Build mel filter matrix
+    mel_basis = librosa.filters.mel(
+        sr=sr,
+        n_fft=n_fft,
+        n_mels=n_mels,
+        fmin=fmin,
+        fmax=fmax,
+        htk=htk,
+        norm=norm,
+        dtype=np.float32,  # librosa uses numpy
+    )
+    
+    # Convert to JAX array
+    mel_basis = jnp.array(mel_basis, dtype=dtype)
+    
+    # Apply mel filterbank
+    # mel_basis shape: (n_mels, 1 + n_fft/2)
+    # S shape: (..., 1 + n_fft/2, t)
+    # Use einsum for flexible dimensions
+    melspec = jnp.einsum("...ft,mf->...mt", S, mel_basis)
+    
+    return melspec

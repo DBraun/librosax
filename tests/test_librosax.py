@@ -745,3 +745,77 @@ def test_spectral_contrast():
     np.testing.assert_allclose(
         contrast_jax_custom, contrast_librosa_custom, atol=1e-3, rtol=1e-3
     )
+
+
+def test_melspectrogram():
+    """Test melspectrogram against librosa implementation."""
+    # Generate test signal
+    sr = 22050
+    duration = 1.0
+    t = np.linspace(0, duration, int(sr * duration))
+    
+    # Create a test signal with multiple frequency components
+    y = (
+        0.5 * np.sin(2 * np.pi * 440 * t) +   # A4
+        0.3 * np.sin(2 * np.pi * 880 * t) +   # A5
+        0.2 * np.sin(2 * np.pi * 1760 * t) +  # A6
+        0.1 * np.sin(2 * np.pi * 3520 * t)    # A7
+    )
+    
+    # Test parameters
+    n_fft = 2048
+    hop_length = 512
+    n_mels = 128
+    
+    # Create JIT-compiled version of melspectrogram
+    melspectrogram_jit = jax.jit(
+        librosax.melspectrogram,
+        static_argnames=('sr', 'n_fft', 'hop_length', 'win_length', 'window', 
+                        'center', 'pad_mode', 'power', 'n_mels', 'fmin', 'fmax', 
+                        'htk', 'norm', 'dtype')
+    )
+    
+    # Test with default parameters
+    melspec_librosa = librosa.feature.melspectrogram(
+        y=y, sr=sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels
+    )
+    
+    y_jax = jnp.array(y)
+    melspec_jax = melspectrogram_jit(
+        y=y_jax, sr=sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels
+    )
+    
+    np.testing.assert_allclose(
+        melspec_jax, melspec_librosa, atol=1e-5, rtol=1e-5
+    )
+    
+    # Test with pre-computed spectrogram
+    S = np.abs(librosa.stft(y, n_fft=n_fft, hop_length=hop_length)) ** 2
+    S_jax = jnp.array(S)
+    
+    melspec_librosa_S = librosa.feature.melspectrogram(
+        S=S, sr=sr, n_mels=n_mels
+    )
+    
+    melspec_jax_S = melspectrogram_jit(
+        S=S_jax, sr=sr, n_mels=n_mels
+    )
+    
+    np.testing.assert_allclose(
+        melspec_jax_S, melspec_librosa_S, atol=1e-5, rtol=1e-5
+    )
+    
+    # Test with different parameters
+    melspec_librosa_custom = librosa.feature.melspectrogram(
+        y=y, sr=sr, n_fft=n_fft, hop_length=hop_length,
+        n_mels=64, fmin=100.0, fmax=8000.0, power=1.0
+    )
+    
+    melspec_jax_custom = melspectrogram_jit(
+        y=y_jax, sr=sr, n_fft=n_fft, hop_length=hop_length,
+        n_mels=64, fmin=100.0, fmax=8000.0, power=1.0
+    )
+    
+    np.testing.assert_allclose(
+        melspec_jax_custom, melspec_librosa_custom, atol=1e-5, rtol=1e-5
+    )

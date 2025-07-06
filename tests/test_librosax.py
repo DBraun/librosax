@@ -306,14 +306,20 @@ def test_spectral_centroid():
     n_fft = 2048
     hop_length = 512
     
+    # Create JIT-compiled version of spectral_centroid
+    spectral_centroid_jit = jax.jit(
+        librosax.spectral_centroid,
+        static_argnames=('sr', 'n_fft', 'hop_length', 'win_length', 'window', 'center', 'pad_mode')
+    )
+    
     # Compute with librosa
     centroid_librosa = librosa.feature.spectral_centroid(
         y=y, sr=sr, n_fft=n_fft, hop_length=hop_length
     )
     
-    # Compute with librosax
+    # Compute with librosax (JIT-compiled)
     y_jax = jnp.array(y)
-    centroid_jax = librosax.spectral_centroid(
+    centroid_jax = spectral_centroid_jit(
         y=y_jax, sr=sr, n_fft=n_fft, hop_length=hop_length
     )
     
@@ -330,7 +336,7 @@ def test_spectral_centroid():
         S=S, sr=sr, n_fft=n_fft, hop_length=hop_length
     )
     
-    centroid_jax_S = librosax.spectral_centroid(
+    centroid_jax_S = spectral_centroid_jit(
         S=S_jax, sr=sr, n_fft=n_fft, hop_length=hop_length
     )
     
@@ -358,14 +364,20 @@ def test_spectral_bandwidth():
     n_fft = 2048
     hop_length = 512
     
+    # Create JIT-compiled version of spectral_bandwidth
+    spectral_bandwidth_jit = jax.jit(
+        librosax.spectral_bandwidth,
+        static_argnames=('sr', 'n_fft', 'hop_length', 'p', 'win_length', 'window', 'center', 'pad_mode', 'norm')
+    )
+    
     # Compute with librosa
     bandwidth_librosa = librosa.feature.spectral_bandwidth(
         y=y, sr=sr, n_fft=n_fft, hop_length=hop_length
     )
     
-    # Compute with librosax
+    # Compute with librosax (JIT-compiled)
     y_jax = jnp.array(y)
-    bandwidth_jax = librosax.spectral_bandwidth(
+    bandwidth_jax = spectral_bandwidth_jit(
         y=y_jax, sr=sr, n_fft=n_fft, hop_length=hop_length
     )
     
@@ -382,7 +394,7 @@ def test_spectral_bandwidth():
         S=S, sr=sr, n_fft=n_fft, hop_length=hop_length
     )
     
-    bandwidth_jax_S = librosax.spectral_bandwidth(
+    bandwidth_jax_S = spectral_bandwidth_jit(
         S=S_jax, sr=sr, n_fft=n_fft, hop_length=hop_length
     )
     
@@ -396,7 +408,7 @@ def test_spectral_bandwidth():
             y=y, sr=sr, n_fft=n_fft, hop_length=hop_length, p=p
         )
         
-        bandwidth_jax_p = librosax.spectral_bandwidth(
+        bandwidth_jax_p = spectral_bandwidth_jit(
             y=y_jax, sr=sr, n_fft=n_fft, hop_length=hop_length, p=p
         )
         
@@ -425,6 +437,12 @@ def test_spectral_rolloff():
     n_fft = 2048
     hop_length = 512
     
+    # Create JIT-compiled version of spectral_rolloff
+    spectral_rolloff_jit = jax.jit(
+        librosax.spectral_rolloff,
+        static_argnames=('sr', 'n_fft', 'hop_length', 'roll_percent', 'win_length', 'window', 'center', 'pad_mode')
+    )
+    
     # Test different roll percentages
     for roll_percent in [0.01, 0.85, 0.99]:
         # Compute with librosa
@@ -432,9 +450,9 @@ def test_spectral_rolloff():
             y=y, sr=sr, n_fft=n_fft, hop_length=hop_length, roll_percent=roll_percent
         )
         
-        # Compute with librosax
+        # Compute with librosax (JIT-compiled)
         y_jax = jnp.array(y)
-        rolloff_jax = librosax.spectral_rolloff(
+        rolloff_jax = spectral_rolloff_jit(
             y=y_jax, sr=sr, n_fft=n_fft, hop_length=hop_length, roll_percent=roll_percent
         )
         
@@ -451,7 +469,7 @@ def test_spectral_rolloff():
         S=S, sr=sr, n_fft=n_fft, hop_length=hop_length
     )
     
-    rolloff_jax_S = librosax.spectral_rolloff(
+    rolloff_jax_S = spectral_rolloff_jit(
         S=S_jax, sr=sr, n_fft=n_fft, hop_length=hop_length
     )
     
@@ -481,15 +499,21 @@ def test_spectral_flatness():
     n_fft = 2048
     hop_length = 512
     
+    # Create JIT-compiled version of spectral_flatness
+    spectral_flatness_jit = jax.jit(
+        librosax.spectral_flatness,
+        static_argnames=('n_fft', 'hop_length', 'amin', 'power', 'win_length', 'window', 'center', 'pad_mode')
+    )
+    
     for y in [noise, tone, mixed]:
         # Compute with librosa
         flatness_librosa = librosa.feature.spectral_flatness(
             y=y, n_fft=n_fft, hop_length=hop_length
         )
         
-        # Compute with librosax
+        # Compute with librosax (JIT-compiled)
         y_jax = jnp.array(y)
-        flatness_jax = librosax.spectral_flatness(
+        flatness_jax = spectral_flatness_jit(
             y=y_jax, n_fft=n_fft, hop_length=hop_length
         )
         
@@ -503,7 +527,7 @@ def test_spectral_flatness():
     S_jax = jnp.array(S)
     
     flatness_librosa_S = librosa.feature.spectral_flatness(S=S)
-    flatness_jax_S = librosax.spectral_flatness(S=S_jax)
+    flatness_jax_S = spectral_flatness_jit(S=S_jax)
     
     np.testing.assert_allclose(
         flatness_jax_S, flatness_librosa_S, atol=1e-5, rtol=1e-5
@@ -514,7 +538,7 @@ def test_spectral_flatness():
     S_power_jax = jnp.array(S_power)
     
     flatness_librosa_power = librosa.feature.spectral_flatness(S=S_power, power=1.0)
-    flatness_jax_power = librosax.spectral_flatness(S=S_power_jax, power=1.0)
+    flatness_jax_power = spectral_flatness_jit(S=S_power_jax, power=1.0)
     
     np.testing.assert_allclose(
         flatness_jax_power, flatness_librosa_power, atol=1e-5, rtol=1e-5
@@ -536,13 +560,19 @@ def test_rms():
     frame_length = 2048
     hop_length = 512
     
+    # Create JIT-compiled version of rms
+    rms_jit = jax.jit(
+        librosax.rms,
+        static_argnames=('frame_length', 'hop_length', 'center', 'pad_mode')
+    )
+    
     # Test from time series
     rms_librosa = librosa.feature.rms(
         y=y, frame_length=frame_length, hop_length=hop_length, center=True
     )
     
     y_jax = jnp.array(y)
-    rms_jax = librosax.rms(
+    rms_jax = rms_jit(
         y=y_jax, frame_length=frame_length, hop_length=hop_length, center=True
     )
     
@@ -555,7 +585,7 @@ def test_rms():
     S_jax = jnp.array(S)
     
     rms_librosa_S = librosa.feature.rms(S=S)
-    rms_jax_S = librosax.rms(S=S_jax)
+    rms_jax_S = rms_jit(S=S_jax)
     
     np.testing.assert_allclose(
         rms_jax_S, rms_librosa_S, atol=1e-5, rtol=1e-5
@@ -566,7 +596,7 @@ def test_rms():
         y=y, frame_length=frame_length, hop_length=hop_length, center=False
     )
     
-    rms_jax_no_center = librosax.rms(
+    rms_jax_no_center = rms_jit(
         y=y_jax, frame_length=frame_length, hop_length=hop_length, center=False
     )
     
@@ -597,13 +627,19 @@ def test_zero_crossing_rate():
     frame_length = 2048
     hop_length = 512
     
+    # Create JIT-compiled version of zero_crossing_rate
+    zero_crossing_rate_jit = jax.jit(
+        librosax.zero_crossing_rate,
+        static_argnames=('frame_length', 'hop_length', 'center', 'pad_mode', 'threshold', 'ref_magnitude', 'pad', 'zero_pos', 'axis')
+    )
+    
     # Test with default parameters
     zcr_librosa = librosa.feature.zero_crossing_rate(
         y, frame_length=frame_length, hop_length=hop_length, center=True
     )
     
     y_jax = jnp.array(y)
-    zcr_jax = librosax.zero_crossing_rate(
+    zcr_jax = zero_crossing_rate_jit(
         y_jax, frame_length=frame_length, hop_length=hop_length, center=True
     )
     
@@ -616,7 +652,7 @@ def test_zero_crossing_rate():
         y, frame_length=frame_length, hop_length=hop_length, center=False
     )
     
-    zcr_jax_no_center = librosax.zero_crossing_rate(
+    zcr_jax_no_center = zero_crossing_rate_jit(
         y_jax, frame_length=frame_length, hop_length=hop_length, center=False
     )
     
@@ -629,7 +665,7 @@ def test_zero_crossing_rate():
         y, frame_length=frame_length, hop_length=hop_length, center=True, threshold=0.01
     )
     
-    zcr_jax_thresh = librosax.zero_crossing_rate(
+    zcr_jax_thresh = zero_crossing_rate_jit(
         y_jax, frame_length=frame_length, hop_length=hop_length, center=True, threshold=0.01
     )
     
@@ -662,13 +698,19 @@ def test_spectral_contrast():
     n_fft = 2048
     hop_length = 512
     
+    # Create JIT-compiled version of spectral_contrast
+    spectral_contrast_jit = jax.jit(
+        librosax.spectral_contrast,
+        static_argnames=('sr', 'n_fft', 'hop_length', 'fmin', 'n_bands', 'quantile', 'linear', 'win_length', 'window', 'center', 'pad_mode')
+    )
+    
     # Test with default parameters
     contrast_librosa = librosa.feature.spectral_contrast(
         y=y, sr=sr, n_fft=n_fft, hop_length=hop_length
     )
     
     y_jax = jnp.array(y)
-    contrast_jax = librosax.spectral_contrast(
+    contrast_jax = spectral_contrast_jit(
         y=y_jax, sr=sr, n_fft=n_fft, hop_length=hop_length
     )
     
@@ -683,7 +725,7 @@ def test_spectral_contrast():
     S_jax = jnp.array(S)
     
     contrast_librosa_S = librosa.feature.spectral_contrast(S=S, sr=sr)
-    contrast_jax_S = librosax.spectral_contrast(S=S_jax, sr=sr)
+    contrast_jax_S = spectral_contrast_jit(S=S_jax, sr=sr)
     
     np.testing.assert_allclose(
         contrast_jax_S, contrast_librosa_S, atol=1e-3, rtol=1e-3
@@ -695,7 +737,7 @@ def test_spectral_contrast():
         fmin=100.0, n_bands=4, quantile=0.05, linear=True
     )
     
-    contrast_jax_custom = librosax.spectral_contrast(
+    contrast_jax_custom = spectral_contrast_jit(
         y=y_jax, sr=sr, n_fft=n_fft, hop_length=hop_length,
         fmin=100.0, n_bands=4, quantile=0.05, linear=True
     )

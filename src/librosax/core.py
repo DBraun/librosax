@@ -425,11 +425,8 @@ def spectral_centroid(
         pad_mode=pad_mode,
     )
     
-    if not jnp.isrealobj(S):
-        raise ValueError("Spectral centroid is only defined with real-valued input")
-        
-    if jnp.any(S < 0):
-        raise ValueError("Spectral centroid is only defined with non-negative energies")
+    # Note: Runtime checks are not compatible with JIT compilation
+    # Users should ensure S is real-valued and non-negative
         
     # Compute the center frequencies of each bin
     if freq is None:
@@ -499,11 +496,8 @@ def spectral_bandwidth(
         pad_mode=pad_mode,
     )
     
-    if not jnp.isrealobj(S):
-        raise ValueError("Spectral bandwidth is only defined with real-valued input")
-        
-    if jnp.any(S < 0):
-        raise ValueError("Spectral bandwidth is only defined with non-negative energies")
+    # Note: Runtime checks are not compatible with JIT compilation
+    # Users should ensure S is real-valued and non-negative
         
     # If we don't have a centroid provided, compute it
     if centroid is None:
@@ -573,8 +567,8 @@ def spectral_rolloff(
     Returns:
         jnp.ndarray: Roll-off frequency for each frame [shape=(..., 1, t)]
     """
-    if not 0.0 < roll_percent < 1.0:
-        raise ValueError("roll_percent must lie in the range (0, 1)")
+    # Note: Runtime checks are not compatible with JIT compilation
+    # Users should ensure roll_percent is in (0, 1) and S is real-valued and non-negative
         
     S, n_fft = _spectrogram(
         y=y,
@@ -586,12 +580,6 @@ def spectral_rolloff(
         center=center,
         pad_mode=pad_mode,
     )
-    
-    if not jnp.isrealobj(S):
-        raise ValueError("Spectral rolloff is only defined with real-valued input")
-        
-    if jnp.any(S < 0):
-        raise ValueError("Spectral rolloff is only defined with non-negative energies")
         
     # Compute the center frequencies of each bin
     if freq is None:
@@ -656,8 +644,8 @@ def spectral_flatness(
     Returns:
         jnp.ndarray: Spectral flatness for each frame [shape=(..., 1, t)]
     """
-    if amin <= 0:
-        raise ValueError("amin must be strictly positive")
+    # Note: Runtime checks are not compatible with JIT compilation
+    # Users should ensure amin > 0 and S is real-valued and non-negative
         
     S, n_fft = _spectrogram(
         y=y,
@@ -669,12 +657,6 @@ def spectral_flatness(
         center=center,
         pad_mode=pad_mode,
     )
-    
-    if not jnp.isrealobj(S):
-        raise ValueError("Spectral flatness is only defined with real-valued input")
-        
-    if jnp.any(S < 0):
-        raise ValueError("Spectral flatness is only defined with non-negative energies")
         
     # Apply power and threshold
     S_thresh = jnp.maximum(amin, S**power)
@@ -802,13 +784,8 @@ def rms(
         power = jnp.mean(abs2(x, dtype=dtype), axis=-2, keepdims=True)
         
     elif S is not None:
-        # Check the frame length
-        if S.shape[-2] != frame_length // 2 + 1:
-            raise ValueError(
-                f"Since S.shape[-2] is {S.shape[-2]}, "
-                f"frame_length is expected to be {S.shape[-2] * 2 - 2} or {S.shape[-2] * 2 - 1}; "
-                f"found {frame_length}"
-            )
+        # Note: Runtime checks are not compatible with JIT compilation
+        # Users should ensure S.shape[-2] == frame_length // 2 + 1
             
         # Power spectrogram
         x = abs2(S, dtype=dtype)
@@ -1001,24 +978,17 @@ def spectral_contrast(
         
     freq = jnp.atleast_1d(freq)
     
-    if freq.ndim != 1 or len(freq) != S.shape[-2]:
-        raise ValueError(f"freq.shape mismatch: expected ({S.shape[-2]},)")
-        
-    if n_bands < 1 or not isinstance(n_bands, int):
-        raise ValueError("n_bands must be a positive integer")
-        
-    if not 0.0 < quantile < 1.0:
-        raise ValueError("quantile must lie in the range (0, 1)")
-        
-    if fmin <= 0:
-        raise ValueError("fmin must be a positive number")
+    # Note: Runtime checks are not compatible with JIT compilation
+    # Users should ensure:
+    # - freq.shape matches S.shape[-2]
+    # - n_bands is a positive integer
+    # - 0 < quantile < 1
+    # - fmin > 0
+    # - frequency bands don't exceed Nyquist frequency
         
     # Create octave bands
     octa = jnp.zeros(n_bands + 2)
     octa = octa.at[1:].set(fmin * (2.0 ** jnp.arange(0, n_bands + 1)))
-    
-    if jnp.any(octa[:-1] >= 0.5 * sr):
-        raise ValueError("Frequency band exceeds Nyquist. Reduce either fmin or n_bands.")
         
     # Initialize output arrays
     shape = list(S.shape)

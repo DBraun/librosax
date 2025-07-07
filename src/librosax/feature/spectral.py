@@ -24,6 +24,8 @@ __all__ = [
     "melspectrogram",
     "mfcc",
     "tonnetz",
+    "cqt",
+    "cqt_frequencies",
 ]
 
 
@@ -1141,103 +1143,115 @@ def cqt_frequencies_np(
     return frequencies
 
 
-def _cqt_filter_bank_fixed(
+def _create_cqt_kernels(
+    Q: float,
     sr: float,
+    fmin: float,
     n_bins: int,
     bins_per_octave: int,
-    fmin: float,
-    filter_scale: float,
     norm: Optional[float],
     window: str = "hann",
-    n_fft_fixed: int = 8192,  # Fixed FFT size for JIT
-) -> tuple[jnp.ndarray, jnp.ndarray]:
-    """Create CQT filter bank using proper wavelet basis functions.
-
-    This function creates the filters in a JIT-compatible way by using
-    a fixed maximum filter length and vectorized operations.
-
-    Returns:
-        filters: Filter coefficients for each CQT bin
-        lengths: Length of each filter
-    """
-    # Get CQT frequencies
-    freqs = cqt_frequencies(
-        n_bins=n_bins,
-        bins_per_octave=bins_per_octave,
-        fmin=fmin,
-        tuning=0.0
-    )
-
-    # Q factor (constant for all bins)
-    Q = float(filter_scale / (2.0 ** (1.0 / bins_per_octave) - 1))
-
-    # Calculate filter lengths
-    lengths = jnp.ceil(Q * sr / freqs).astype(jnp.int32)
+    fmax: Optional[float] = None,
+    topbin_check: bool = True,
+    gamma: float = 0.0,
+    n_fft_fixed: Optional[int] = None,
+) -> tuple[jnp.ndarray, int, jnp.ndarray, jnp.ndarray]:
+    """Create CQT kernels following nnAudio's implementation.
     
-    # For JIT compatibility, we need a fixed maximum length
-    # Use a conservative estimate that works for most CQT applications
-    max_len = min(4096, n_fft_fixed // 2)
+    This function creates the CQT kernels in time domain, similar to nnAudio's
+    create_cqt_kernels function.
+    
+    Returns:
+        kernels: Complex CQT kernels in time domain
+        fftLen: FFT length used
+        lengths: Length of each filter
+        freqs: Center frequencies for each bin
+    """
+    # Calculate frequencies for each bin
+    if (fmax is not None) and (n_bins is None):
+        n_bins = int(jnp.ceil(bins_per_octave * jnp.log2(fmax / fmin)))
+        freqs = fmin * 2.0 ** (jnp.arange(n_bins) / float(bins_per_octave))
+    elif (fmax is None) and (n_bins is not None):
+        freqs = fmin * 2.0 ** (jnp.arange(n_bins) / float(bins_per_octave))
+    else:
+        # If both are given, use fmax to calculate n_bins
+        if fmax is not None:
+            n_bins = int(jnp.ceil(bins_per_octave * jnp.log2(fmax / fmin)))
+        freqs = fmin * 2.0 ** (jnp.arange(n_bins) / float(bins_per_octave))
+    
+    # Note: topbin_check validation should be done outside JIT compilation
+    # For JIT compatibility, we don't perform runtime checks here
+    
+    # Calculate filter lengths using nnAudio's formula
+    alpha = 2.0 ** (1.0 / bins_per_octave) - 1.0
+    lengths = jnp.ceil(Q * sr / (freqs + gamma / alpha))
+    
+    # Calculate FFT length
+    # For JIT compatibility, we need to handle this differently
+    if n_fft_fixed is None:
+        # Default to a reasonable FFT size for CQT
+        # This should be large enough for most use cases
+        fftLen = 16384
+    else:
+        fftLen = n_fft_fixed
     
     # Initialize kernel array
-    kernels = jnp.zeros((n_bins, n_fft_fixed), dtype=jnp.complex64)
+    kernels = jnp.zeros((n_bins, fftLen), dtype=jnp.complex64)
     
-    # Calculate where each filter should be centered
-    fft_center = n_fft_fixed // 2
-    
-    # Create a vectorized version
-    # For each bin, create the filter at the appropriate position
-    def create_filter(k):
+    # Create each kernel
+    def create_kernel(k):
         freq = freqs[k]
-        length = jnp.minimum(lengths[k], max_len)
+        l = lengths[k]
         
-        # Calculate start position to center the kernel
-        start = fft_center - length // 2
+        # Center the kernel
+        # Following nnAudio's centering logic
+        start = jax.lax.cond(
+            l % 2 == 1,
+            lambda _: (fftLen / 2.0 - l / 2.0 - 0.5),
+            lambda _: (fftLen / 2.0 - l / 2.0),
+            None
+        )
+        start = jnp.round(start).astype(jnp.int32)
         
-        # Create time indices for this filter
-        t_indices = jnp.arange(n_fft_fixed) - start
+        # For JIT compatibility, we work with a fixed-size array and mask
+        # Create time indices for the full FFT length
+        all_t = jnp.arange(fftLen) - start
         
-        # Create mask for valid samples
-        mask = jnp.logical_and(t_indices >= 0, t_indices < length)
+        # Create mask for valid kernel samples
+        mask = jnp.logical_and(all_t >= 0, all_t < l)
         
         # Shift indices to be centered around 0
-        t_centered = t_indices - length // 2
+        t_centered = all_t - l // 2
         
-        # Create the complex sinusoid
-        sinusoid = jnp.exp(2j * jnp.pi * freq * t_centered / sr) / length
+        # Create complex sinusoid for all positions
+        sig_all = jnp.exp(1j * 2 * jnp.pi * freq * t_centered / sr) / jnp.maximum(l, 1)
         
-        # Apply window function
+        # Apply window
         if window == "hann":
-            # Proper Hann window
-            win_pos = jnp.where(mask, t_indices.astype(jnp.float32), 0.0)
-            window_vals = 0.5 - 0.5 * jnp.cos(2 * jnp.pi * win_pos / jnp.maximum(length - 1, 1))
-            window_vals = jnp.where(mask, window_vals, 0.0)
+            # Create window for all positions
+            win_indices = jnp.where(mask, all_t.astype(jnp.float32), 0.0)
+            win_all = 0.5 - 0.5 * jnp.cos(2 * jnp.pi * win_indices / jnp.maximum(l - 1, 1))
+            win_all = jnp.where(mask, win_all, 0.0)
         else:
-            # Rectangular window
-            window_vals = jnp.where(mask, 1.0, 0.0)
-            
-        # Apply window to sinusoid
-        windowed_kernel = sinusoid * window_vals
+            win_all = jnp.where(mask, 1.0, 0.0)
         
-        # Apply mask
-        windowed_kernel = jnp.where(mask, windowed_kernel, 0.0)
+        # Apply window and mask
+        kernel = sig_all * win_all * mask
         
         # Normalize if requested
         if norm == 1:
-            norm_factor = jnp.sum(jnp.abs(windowed_kernel))
-            windowed_kernel = windowed_kernel / jnp.maximum(norm_factor, 1e-10)
+            norm_factor = jnp.sum(jnp.abs(kernel))
+            kernel = kernel / jnp.maximum(norm_factor, 1e-10)
         elif norm == 2:
-            norm_factor = jnp.sqrt(jnp.sum(jnp.abs(windowed_kernel) ** 2))
-            windowed_kernel = windowed_kernel / jnp.maximum(norm_factor, 1e-10)
-        elif norm == jnp.inf:
-            norm_factor = jnp.max(jnp.abs(windowed_kernel))
-            windowed_kernel = windowed_kernel / jnp.maximum(norm_factor, 1e-10)
+            norm_factor = jnp.sqrt(jnp.sum(jnp.abs(kernel) ** 2))
+            kernel = kernel / jnp.maximum(norm_factor, 1e-10)
         
-        return windowed_kernel
+        return kernel
     
-    # Use vmap to create all filters at once
-    kernels = jax.vmap(create_filter)(jnp.arange(n_bins))
-
-    return kernels, lengths
+    # Use vmap to create all kernels
+    kernels = jax.vmap(create_kernel)(jnp.arange(n_bins))
+    
+    return kernels, fftLen, lengths, freqs
 
 
 def cqt(
@@ -1257,90 +1271,129 @@ def cqt(
     pad_mode: str = "constant",
     res_type: Optional[str] = None,
     dtype: jnp.dtype = jnp.complex64,
-    n_fft: int = 16384,
+    n_fft: Optional[int] = None,
+    use_1992_version: bool = True,
 ) -> jnp.ndarray:
-    """Compute the constant-Q transform using recursive downsampling.
+    """Compute the constant-Q transform following nnAudio's CQT1992v2 implementation.
 
-    This implementation uses a simplified approach with fixed FFT size for JIT compatibility.
+    This implementation follows nnAudio's CQT1992v2 algorithm which computes the CQT
+    efficiently by convolving the time-domain signal with CQT kernels.
 
     Note:
         For JAX JIT compilation, all arguments except ``y`` should be marked as static:
         ``sr``, ``hop_length``, ``fmin``, ``n_bins``, ``bins_per_octave``, ``tuning``,
         ``filter_scale``, ``norm``, ``sparsity``, ``window``, ``scale``, ``pad_mode``,
-        ``res_type``, ``dtype``, ``n_fft``
+        ``res_type``, ``dtype``, ``n_fft``, ``use_1992_version``
 
     Args:
         y: Audio time series
         sr: Sampling rate
         hop_length: Number of samples between successive CQT columns
-        fmin: Minimum frequency (default: C1)
+        fmin: Minimum frequency (default: C1 = 32.70 Hz)
         n_bins: Number of frequency bins
         bins_per_octave: Number of bins per octave
         tuning: Tuning offset in fractions of a bin
-        filter_scale: Filter scale factor
-        norm: Normalization type
+        filter_scale: Filter scale factor (Q = filter_scale / (2^(1/bins_per_octave) - 1))
+        norm: Normalization type for basis functions (1, 2, or None)
         sparsity: Sparsification factor (not implemented)
         window: Window function
-        scale: If True, scale by filter length
+        scale: If True, scale by sqrt(filter_lengths) following librosa normalization
         pad_mode: Padding mode
-        res_type: Resampling type (not used in this simplified version)
+        res_type: Resampling type (not used in 1992 version)
         dtype: Complex data type
-        n_fft: FFT size for the filter bank and STFT computation
+        n_fft: FFT size (if None, calculated automatically)
+        use_1992_version: If True, use CQT1992v2 algorithm (recommended)
 
     Returns:
         CQT matrix [shape=(n_bins, t)]
     """
     if fmin is None:
-        fmin = note_to_hz("C1")
+        fmin = 32.70  # C1 frequency, matching nnAudio's default
 
     # Apply tuning correction
     fmin = fmin * 2.0 ** (tuning / bins_per_octave)
 
-    # Calculate number of octaves
-    n_octaves = jnp.ceil(n_bins / bins_per_octave).astype(jnp.int32)
+    # Calculate Q factor
+    Q = float(filter_scale) / (2.0 ** (1.0 / bins_per_octave) - 1.0)
 
-    # For now, let's implement a simpler version that's JIT-compatible
-    # The full recursive CQT with jax.lax.scan requires more complex state management
-    # Fall back to an improved pseudo-CQT with better filter design
-
-    # Create proper CQT filter bank
-    filters, lengths = _cqt_filter_bank_fixed(
+    # Create CQT kernels
+    cqt_kernels, kernel_width, lengths, freqs = _create_cqt_kernels(
+        Q=Q,
         sr=sr,
+        fmin=fmin,
         n_bins=n_bins,
         bins_per_octave=bins_per_octave,
-        fmin=fmin,
-        filter_scale=filter_scale,
         norm=norm,
         window=window,
         n_fft_fixed=n_fft,
     )
 
-    # Compute STFT with the fixed FFT size
-    D = stft(
-        y,
-        n_fft=n_fft,
-        hop_length=hop_length,
-        window=window,
-        center=True,
-        pad_mode=pad_mode,
+    # Ensure y is 2D (batch, time)
+    if y.ndim == 1:
+        y = y[jnp.newaxis, :]
+    
+    # Add channel dimension if needed
+    if y.ndim == 2:
+        y = y[:, jnp.newaxis, :]
+
+    # Pad the signal if center is True
+    if pad_mode == "constant":
+        y = jnp.pad(y, ((0, 0), (0, 0), (kernel_width // 2, kernel_width // 2)), mode="constant")
+    elif pad_mode == "reflect":
+        y = jnp.pad(y, ((0, 0), (0, 0), (kernel_width // 2, kernel_width // 2)), mode="reflect")
+
+    # Split kernels into real and imaginary parts
+    cqt_kernels_real = jnp.real(cqt_kernels)[:, jnp.newaxis, :]
+    cqt_kernels_imag = jnp.imag(cqt_kernels)[:, jnp.newaxis, :]
+
+    # Perform 1D convolution with CQT kernels using FFT-based approach
+    # This is more efficient and JIT-compatible
+    
+    # Remove padding and channel dimensions for processing
+    y_1d = y[0, 0, :]
+    
+    # For CQT, compute STFT without additional scaling
+    # Use a rectangular window since CQT kernels already have windows
+    # Create rectangular window
+    rect_window = jnp.ones(kernel_width)
+    
+    # Compute STFT using scipy.signal.stft with no extra scaling
+    from jax.scipy import signal
+    
+    _, _, D = signal.stft(
+        y_1d,
+        window=rect_window,
+        nperseg=kernel_width,
+        noverlap=kernel_width - hop_length,
+        nfft=kernel_width,
+        boundary=None,  # No padding, we already padded
+        padded=False,
+        axis=-1,
     )
+    # Note: scipy.signal.stft in JAX doesn't apply the win_length scaling
+    
+    # Take FFT of kernels
+    cqt_kernels_fft = jnp.fft.fft(cqt_kernels, axis=1)
+    
+    # Extract only the positive frequencies
+    cqt_kernels_fft = cqt_kernels_fft[:, :kernel_width // 2 + 1]
+    
+    # Multiply in frequency domain
+    # D shape: (freq_bins, time_frames)
+    # cqt_kernels_fft shape: (n_bins, freq_bins)
+    C = jnp.einsum('bf,ft->bt', cqt_kernels_fft.conj(), D)
 
-    # Apply filters in frequency domain
-    filters_fft = jnp.fft.fft(filters, axis=1)[:, :D.shape[0]]
+    # C is already complex from the einsum operation
 
-    # Apply filters: multiply in frequency domain
-    # D shape: (n_freqs, n_frames)
-    # filters_fft shape: (n_bins, n_freqs)
-    C = jnp.einsum('bf,ft->bt', filters_fft.conj(), D)
-
+    # Apply scaling following nnAudio's normalization
     if scale:
-        # Scale to match librosa's output magnitude
-        # Based on nnAudio's implementation, the proper scaling is:
-        # sqrt(filter_lengths) / kernel_fft_size
-        # Since we use n_fft as our kernel FFT size and our filters
-        # are already normalized by length, we need additional scaling
-        scale_factors = jnp.sqrt(lengths[:, jnp.newaxis]) / n_fft
-        C = C * scale_factors
+        # IMPORTANT: In nnAudio, the sqrt(lengths) scaling is applied to real and imaginary
+        # parts separately before taking magnitude. This affects the final magnitude values.
+        scale_factors = jnp.sqrt(lengths)[:, jnp.newaxis]
+        # Scale real and imaginary parts separately to match nnAudio
+        C_real = jnp.real(C) * scale_factors
+        C_imag = jnp.imag(C) * scale_factors
+        C = C_real + 1j * C_imag
 
     return C
 

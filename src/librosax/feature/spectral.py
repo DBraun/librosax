@@ -651,75 +651,135 @@ def spectral_contrast(
     octa = jnp.zeros(n_bands + 2)
     octa = octa.at[1:].set(fmin * (2.0 ** jnp.arange(0, n_bands + 1)))
 
-    # if jnp.any(octa[:-1] >= 0.5 * sr):
-    #     raise ValueError("Frequency band exceeds Nyquist. Reduce either fmin or n_bands.")
-
-    # Initialize output arrays
-    shape = list(S.shape)
-    shape[-2] = n_bands + 1
-
-    valley_list = []
-    peak_list = []
-
-    # Process each frequency band
-    for k in range(n_bands + 1):
+    # Calculate maximum possible quantile index size
+    # The largest band is typically the last one, which can extend to all remaining bins
+    # from the lowest frequency of that band to the Nyquist frequency
+    # In the worst case, this could be nearly all frequency bins
+    max_possible_band_size = S.shape[-2]  # Conservative upper bound
+    # Use Python int() to ensure it's a static value
+    max_quantile_size = int(max_possible_band_size * float(quantile)) + 1
+    
+    # Process bands using scan for JIT compatibility
+    def process_band(carry, k):
+        S, freq, octa, sr, n_bands, quantile = carry
+        
         f_low = octa[k]
-        if k < n_bands:
-            f_high = octa[k + 1]
-        else:
-            # Last band - set a high upper limit
-            f_high = sr / 2
-
-        # Find bins in current band
-        current_band = jnp.logical_and(freq >= f_low, freq <= f_high)
-
-        # Find indices of current band
-        idx = jnp.where(current_band)[0]
-
-        # Adjust band boundaries
-        if k > 0 and len(idx) > 0 and idx[0] > 0:
-            # Include one bin below for all but first band
-            current_band = current_band.at[idx[0] - 1].set(True)
-
-        if k == n_bands:
-            # Include all bins above for last band
-            idx_last = jnp.where(current_band)[0]
-            if len(idx_last) > 0 and idx_last[-1] < len(freq) - 1:
-                current_band = current_band.at[idx_last[-1] + 1:].set(True)
-
-        # Extract sub-band
-        sub_band = S[..., current_band, :]
-
-        if k < n_bands and sub_band.shape[-2] > 1:
-            # Remove last frequency bin for all but the last band
-            sub_band = sub_band[..., :-1, :]
-
-        # Calculate number of bins for peaks/valleys
-        n_bins = sub_band.shape[-2]
-
-        # Always take at least one bin from each side
-        n_idx = int(jnp.maximum(jnp.rint(quantile * n_bins), 1))
-
-        # Sort sub-band along frequency axis
-        sortedr = jnp.sort(sub_band, axis=-2)
-
-        # Compute valley (low energy) and peak (high energy)
-        valley_val = jnp.mean(sortedr[..., :n_idx, :], axis=-2)
-        peak_val = jnp.mean(sortedr[..., -n_idx:, :], axis=-2)
-
-        valley_list.append(valley_val)
-        peak_list.append(peak_val)
-
-    # Stack results
-    valley = jnp.stack(valley_list, axis=-2)
-    peak = jnp.stack(peak_list, axis=-2)
-
+        f_high = jax.lax.cond(
+            k < n_bands,
+            lambda: octa[k + 1],
+            lambda: sr / 2
+        )
+        
+        # Create band mask
+        band_mask = jnp.logical_and(freq >= f_low, freq <= f_high)
+        
+        # Find first and last indices
+        # Use cumsum trick to find positions
+        cumsum = jnp.cumsum(band_mask)
+        has_true = cumsum[-1] > 0
+        
+        # Find first True (where cumsum goes from 0 to 1)
+        first_idx = jnp.where(has_true,
+                             jnp.argmax(cumsum > 0),
+                             0)
+        
+        # Find last True
+        reverse_cumsum = jnp.cumsum(band_mask[::-1])
+        last_idx = jnp.where(has_true,
+                            len(band_mask) - 1 - jnp.argmax(reverse_cumsum > 0),
+                            0)
+        
+        # Adjust boundaries as in librosa
+        # For k > 0, include one bin below
+        first_idx = jax.lax.cond(
+            jnp.logical_and(k > 0, first_idx > 0),
+            lambda: first_idx - 1,
+            lambda: first_idx
+        )
+        
+        # For the last band, extend to the end
+        last_idx = jax.lax.cond(
+            k == n_bands,
+            lambda: len(freq) - 1,
+            lambda: last_idx
+        )
+        
+        # Update band mask with adjusted boundaries
+        indices = jnp.arange(len(freq))
+        band_mask_adjusted = jnp.logical_and(indices >= first_idx, indices <= last_idx)
+        
+        # For non-final bands, exclude the last bin
+        band_mask_final = jax.lax.cond(
+            k < n_bands,
+            lambda: jnp.logical_and(band_mask_adjusted, indices < last_idx),
+            lambda: band_mask_adjusted
+        )
+        
+        # Count bins for quantile calculation (use original band mask count)
+        n_bins_for_quantile = jnp.sum(band_mask_adjusted)
+        
+        # Extract sub-band values
+        # Use masking approach
+        sub_band_values = jnp.where(band_mask_final[:, None], S, -jnp.inf)
+        
+        # Sort along frequency axis
+        sorted_sub = jnp.sort(sub_band_values, axis=0)
+        
+        # Find where valid values start (first non-(-inf) value)
+        valid_mask = sorted_sub > -jnp.inf
+        n_valid = jnp.sum(valid_mask, axis=0)
+        
+        # Calculate quantile index
+        n_idx = jnp.maximum(jnp.rint(quantile * n_bins_for_quantile).astype(jnp.int32), 1)
+        
+        # For each time frame, we need to extract bottom n_idx and top n_idx values
+        # max_quantile_size is captured from the outer scope as a static value
+        
+        # Create index arrays for gathering
+        time_frames = S.shape[-1]
+        frame_indices = jnp.arange(time_frames)
+        idx_range = jnp.arange(max_quantile_size)
+        
+        # Find first valid index per frame
+        first_valid_idx = jnp.argmax(valid_mask, axis=0)
+        
+        # Valley indices: first n_idx valid values
+        valley_indices = first_valid_idx[None, :] + idx_range[:, None]
+        valley_indices = jnp.clip(valley_indices, 0, sorted_sub.shape[0] - 1)
+        
+        # Gather valley values
+        valley_values = sorted_sub[valley_indices, frame_indices]
+        valley_mask = idx_range[:, None] < jnp.minimum(n_idx, n_valid)[None, :]
+        valley_values = jnp.where(valley_mask, valley_values, 0)
+        valley = jnp.sum(valley_values, axis=0) / jnp.maximum(jnp.sum(valley_mask, axis=0), 1)
+        
+        # Peak indices: last n_idx valid values
+        last_valid_idx = first_valid_idx + n_valid - 1
+        peak_start_idx = jnp.maximum(last_valid_idx - n_idx + 1, first_valid_idx)
+        
+        peak_indices = peak_start_idx[None, :] + idx_range[:, None]
+        peak_indices = jnp.clip(peak_indices, 0, sorted_sub.shape[0] - 1)
+        
+        # Gather peak values
+        peak_values = sorted_sub[peak_indices, frame_indices]
+        peak_mask = idx_range[:, None] < jnp.minimum(n_idx, n_valid)[None, :]
+        peak_values = jnp.where(peak_mask, peak_values, 0)
+        peak = jnp.sum(peak_values, axis=0) / jnp.maximum(jnp.sum(peak_mask, axis=0), 1)
+        
+        return carry, (valley, peak)
+    
+    # Process all bands
+    carry = (S, freq, octa, sr, n_bands, quantile)
+    _, (valleys, peaks) = jax.lax.scan(
+        process_band, carry, jnp.arange(n_bands + 1)
+    )
+    
     # Compute contrast
     if linear:
-        contrast = peak - valley
+        contrast = peaks - valleys
     else:
-        contrast = power_to_db(peak) - power_to_db(valley)
-
+        contrast = power_to_db(peaks) - power_to_db(valleys)
+    
     return contrast
 
 

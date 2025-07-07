@@ -675,7 +675,6 @@ def test_zero_crossing_rate():
     )
 
 
-@pytest.mark.xfail(reason="spectral_contrast has small implementation differences in band boundary handling")
 def test_spectral_contrast():
     """Test spectral_contrast against librosa implementation."""
     # Generate test signal
@@ -715,8 +714,6 @@ def test_spectral_contrast():
         y=y_jax, sr=sr, n_fft=n_fft, hop_length=hop_length
     )
     
-    # Note: spectral_contrast has small implementation differences due to 
-    # band boundary handling, so we use a slightly higher tolerance
     np.testing.assert_allclose(
         contrast_jax, contrast_librosa, atol=1e-3, rtol=1e-3
     )

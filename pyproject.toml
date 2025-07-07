@@ -4,12 +4,13 @@ dynamic = ["version", "dependencies", "optional-dependencies"]
 authors = [
   { name="David Braun", email="braun@ccrma.stanford.edu" },
 ]
-description = "Librosa in JAX"
+description = "A JAX implementation of audio processing functions"
 readme = "README.md"
+license = {text = "ISC"}
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: ISC License (ISCL)",
     "Operating System :: OS Independent",
 ]
 

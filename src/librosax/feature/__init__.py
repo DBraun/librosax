@@ -1,3 +1,62 @@
+"""
+Feature extraction
+==================
+
+Spectral features
+-----------------
+.. autosummary::
+    :toctree: generated/
+
+    spectral_centroid
+    spectral_bandwidth
+    spectral_rolloff
+    spectral_flatness
+    spectral_contrast
+    rms
+    zero_crossing_rate
+
+Mel-frequency representations
+-----------------------------
+.. autosummary::
+    :toctree: generated/
+
+    melspectrogram
+    mfcc
+
+Chromagram
+----------
+.. autosummary::
+    :toctree: generated/
+
+    chroma_stft
+    chroma_cqt
+    chroma_filter
+
+Constant-Q transform
+--------------------
+.. autosummary::
+    :toctree: generated/
+
+    cqt
+    pseudo_cqt
+    cqt_frequencies
+
+Tonal features
+--------------
+.. autosummary::
+    :toctree: generated/
+
+    tonnetz
+
+Pitch and frequency
+-------------------
+.. autosummary::
+    :toctree: generated/
+
+    hz_to_octs
+    note_to_hz
+"""
+
 from .spectral import (
     chroma_stft,
     chroma_cqt,
@@ -39,4 +98,10 @@ __all__ = [
     "melspectrogram",
     "mfcc",
     "tonnetz",
+    "hz_to_octs",
+    "chroma_filter",
+    "note_to_hz",
+    "cqt_frequencies",
+    "cqt",
+    "pseudo_cqt",
 ]

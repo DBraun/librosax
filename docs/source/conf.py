@@ -29,10 +29,23 @@ release = first_line.split("=")[1].strip()[1:-1]
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    "sphinx.ext.napoleon",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.intersphinx",
+    "numpydoc",
 ]
+
+# Autosummary settings
+autosummary_generate = True
+autodoc_member_order = 'bysource'
+
+# Intersphinx mappings
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3/', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    'jax': ('https://jax.readthedocs.io/en/latest/', None),
+}
 
 templates_path = ["_templates"]
 exclude_patterns = []

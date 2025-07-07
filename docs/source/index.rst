@@ -1,35 +1,52 @@
+.. librosax documentation master file
+
 Librosax documentation
-=======================
+======================
 
-**Librosax** is a port of some of `librosa <https://github.com/librosa/librosa/>`_ to `JAX <https://jax.readthedocs.io/en/latest/>`_.
-The source code is `here <https://github.com/DBraun/librosax>`_.
-Librosax follows `Effort-based Versioning <https://jacobtomlinson.dev/effver/>`_.
+**Librosax** is a JAX implementation of audio processing functions from `librosa <https://github.com/librosa/librosa/>`_ and `TorchLibrosa <https://github.com/qiuqiangkong/torchlibrosa>`_.
 
-Librosax can be installed with pip:
+The source code is available on `GitHub <https://github.com/DBraun/librosax>`_. Librosax follows `Effort-based Versioning <https://jacobtomlinson.dev/effver/>`_.
 
-.. code-block:: bash
-
-   pip install librosax
-
-Content
---------------------------
-.. toctree::
-   :maxdepth: 1
-   :caption: librosax API
-
-   librosax_api/core
-   librosax_api/layers
-
-Citation
+Getting started
 ---------------
 
-.. code-block::
+.. toctree::
+   :maxdepth: 1
+
+   install
+
+
+API documentation
+-----------------
+
+.. toctree::
+   :maxdepth: 2
+
+   librosax
+   feature
+   layers
+
+
+Citation
+--------
+
+If you use librosax in your research, please cite:
+
+.. code-block:: bibtex
 
    @software{Braun_librosax_2025,
       author = {Braun, David},
       month = mar,
       title = {{librosax}},
       url = {https://github.com/DBraun/librosax},
-      version = {0.0.1},
+      version = {0.0.5},
       year = {2025}
    }
+
+
+Indices and tables
+------------------
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`

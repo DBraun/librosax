@@ -8,6 +8,7 @@ from jax.scipy import signal as jssignal
 
 from librosax.core.spectrum import fft_frequencies, normalize, power_to_db, stft, _spectrogram
 from librosax.core.convert import note_to_hz
+from functools import partial
 
 __all__ = [
     "spectral_centroid",
@@ -26,6 +27,7 @@ __all__ = [
     "mfcc",
     "tonnetz",
     "cqt",
+    "cqt2010",
     "cqt_frequencies",
 ]
 
@@ -1253,6 +1255,8 @@ def cqt(
     dtype: jnp.dtype = jnp.complex64,
     n_fft: Optional[int] = None,
     use_1992_version: bool = True,
+    output_format: str = "complex",
+    normalization_type: str = "librosa",
 ) -> jnp.ndarray:
     """Compute the constant-Q transform following nnAudio's CQT1992v2 implementation.
 
@@ -1263,7 +1267,8 @@ def cqt(
         For JAX JIT compilation, all arguments except ``y`` should be marked as static:
         ``sr``, ``hop_length``, ``fmin``, ``n_bins``, ``bins_per_octave``, ``tuning``,
         ``filter_scale``, ``norm``, ``sparsity``, ``window``, ``scale``, ``pad_mode``,
-        ``res_type``, ``dtype``, ``n_fft``, ``use_1992_version``
+        ``res_type``, ``dtype``, ``n_fft``, ``use_1992_version``, ``output_format``,
+        ``normalization_type``
 
     Args:
         y: Audio time series
@@ -1283,9 +1288,11 @@ def cqt(
         dtype: Complex data type
         n_fft: FFT size (if None, calculated automatically)
         use_1992_version: If True, use CQT1992v2 algorithm (recommended)
+        output_format: Output format ('complex', 'magnitude', 'phase')
+        normalization_type: Normalization type ('librosa', 'convolutional', 'wrap')
 
     Returns:
-        CQT matrix [shape=(n_bins, t)]
+        CQT matrix [shape=(n_bins, t)] format depends on output_format
     """
     if fmin is None:
         fmin = 32.70  # C1 frequency, matching nnAudio's default
@@ -1308,72 +1315,468 @@ def cqt(
         n_fft_fixed=n_fft,
     )
 
-    # Ensure y is 2D (batch, time)
+    # Track if we need to squeeze batch dimension later
+    squeeze_batch = False
     if y.ndim == 1:
         y = y[jnp.newaxis, :]
+        squeeze_batch = True
     
-    # Add channel dimension if needed
-    if y.ndim == 2:
-        y = y[:, jnp.newaxis, :]
-
+    # Ensure y is 2D (batch, time)
+    batch_size = y.shape[0]
+    
     # Pad the signal if center is True
     if pad_mode == "constant":
-        y = jnp.pad(y, ((0, 0), (0, 0), (kernel_width // 2, kernel_width // 2)), mode="constant")
+        y = jnp.pad(y, ((0, 0), (kernel_width // 2, kernel_width // 2)), mode="constant")
     elif pad_mode == "reflect":
-        y = jnp.pad(y, ((0, 0), (0, 0), (kernel_width // 2, kernel_width // 2)), mode="reflect")
+        y = jnp.pad(y, ((0, 0), (kernel_width // 2, kernel_width // 2)), mode="reflect")
 
     # Split kernels into real and imaginary parts
     cqt_kernels_real = jnp.real(cqt_kernels)[:, jnp.newaxis, :]
     cqt_kernels_imag = jnp.imag(cqt_kernels)[:, jnp.newaxis, :]
 
-    # Perform 1D convolution with CQT kernels using FFT-based approach
-    # This is more efficient and JIT-compatible
-    
-    # Remove padding and channel dimensions for processing
-    y_1d = y[0, 0, :]
-    
-    # For CQT, compute STFT without additional scaling
-    # Use a rectangular window since CQT kernels already have windows
-    # Create rectangular window
+    # Process each batch element
+    # Create rectangular window since CQT kernels already have windows
     rect_window = jnp.ones(kernel_width)
     
-    # Compute STFT using scipy.signal.stft with no extra scaling
-    _, _, D = jssignal.stft(
-        y_1d,
-        window=rect_window,
-        nperseg=kernel_width,
-        noverlap=kernel_width - hop_length,
-        nfft=kernel_width,
-        boundary=None,  # No padding, we already padded
-        padded=False,
-        axis=-1,
-    )
-    # Note: scipy.signal.stft in JAX doesn't apply the win_length scaling
-    
-    # Take FFT of kernels
+    # Take FFT of kernels once
     cqt_kernels_fft = jnp.fft.fft(cqt_kernels, axis=1)
-    
     # Extract only the positive frequencies
     cqt_kernels_fft = cqt_kernels_fft[:, :kernel_width // 2 + 1]
     
-    # Multiply in frequency domain
-    # D shape: (freq_bins, time_frames)
-    # cqt_kernels_fft shape: (n_bins, freq_bins)
-    C = jnp.einsum('bf,ft->bt', cqt_kernels_fft.conj(), D)
+    # Process batch using vmap for efficiency
+    def process_single(y_single):
+        # Compute STFT for this signal
+        _, _, D = jssignal.stft(
+            y_single,
+            window=rect_window,
+            nperseg=kernel_width,
+            noverlap=kernel_width - hop_length,
+            nfft=kernel_width,
+            boundary=None,  # No padding, we already padded
+            padded=False,
+            axis=-1,
+        )
+        
+        # Multiply in frequency domain
+        # D shape: (freq_bins, time_frames)
+        # cqt_kernels_fft shape: (n_bins, freq_bins)
+        return jnp.einsum('bf,ft->bt', cqt_kernels_fft.conj(), D)
+    
+    # Apply to all batch elements
+    C = jax.vmap(process_single)(y)
 
     # C is already complex from the einsum operation
 
-    # Apply scaling following nnAudio's normalization
-    if scale:
-        # Apply sqrt(lengths) normalization
-        # When using FFT-based convolution vs nnAudio's direct convolution,
-        # we need an additional scaling factor to match the output magnitude
-        # This is empirically determined to match nnAudio's output
-        fft_correction = 1.0 / jnp.sqrt(kernel_width) * 8.0
-        scale_factors = jnp.sqrt(lengths)[:, jnp.newaxis] * fft_correction
-        C = C * scale_factors
+    # Apply normalization based on type
+    if normalization_type == "librosa":
+        if scale:
+            # Apply sqrt(lengths) normalization
+            # When using FFT-based convolution vs nnAudio's direct convolution,
+            # we need an additional scaling factor to match the output magnitude
+            # This is empirically determined to match nnAudio's output
+            # The factor depends on the kernel width and hop length
+            fft_correction = 1.0 / jnp.sqrt(kernel_width) * 32.0
+            scale_factors = jnp.sqrt(lengths)[:, jnp.newaxis] * fft_correction
+            C = C * scale_factors
+    elif normalization_type == "convolutional":
+        # No additional normalization
+        pass
+    elif normalization_type == "wrap":
+        # Apply wrap normalization
+        C = C * 2.0
+    else:
+        raise ValueError(f"Unknown normalization type: {normalization_type}")
 
-    return C
+    # Format output based on output_format
+    if output_format.lower() == "magnitude":
+        result = jnp.abs(C)
+    elif output_format.lower() == "complex":
+        result = C
+    elif output_format.lower() == "phase":
+        phase = jnp.angle(C)
+        result = jnp.stack([jnp.cos(phase), jnp.sin(phase)], axis=-1)
+    else:
+        raise ValueError(f"Unknown output format: {output_format}")
+    
+    # Remove batch dimension if we added it
+    if squeeze_batch:
+        result = result[0]
+        
+    return result
+
+
+def _create_lowpass_filter(
+    band_center: float = 0.5,
+    kernel_length: int = 256,
+    transition_bandwidth: float = 0.03,
+    dtype: jnp.dtype = jnp.float32,
+) -> jnp.ndarray:
+    """Create a lowpass filter for downsampling.
+    
+    Args:
+        band_center: Center frequency (normalized to Nyquist)
+        kernel_length: Length of the filter kernel
+        transition_bandwidth: Width of the transition band
+        dtype: Data type for the filter
+        
+    Returns:
+        Filter kernel coefficients
+    """
+    passband_max = band_center / (1 + transition_bandwidth)
+    stopband_min = band_center * (1 + transition_bandwidth)
+    
+    key_frequencies = [0.0, passband_max, stopband_min, 1.0]
+    gain_at_key_frequencies = [1.0, 1.0, 0.0, 0.0]
+    
+    # Use scipy for filter design
+    import scipy.signal
+    filter_kernel = scipy.signal.firwin2(kernel_length, key_frequencies, gain_at_key_frequencies)
+    
+    return jnp.array(filter_kernel, dtype=dtype)
+
+
+def _next_power_of_2(n: int) -> int:
+    """Calculate the next power of 2."""
+    return int(2 ** np.ceil(np.log2(n)))
+
+
+def _early_downsample_count(
+    nyquist_hz: float,
+    filter_cutoff_hz: float, 
+    hop_length: int,
+    n_octaves: int
+) -> int:
+    """Compute the number of early downsampling operations."""
+    downsample_count1 = max(0, int(np.ceil(np.log2(0.85 * nyquist_hz / filter_cutoff_hz)) - 1) - 1)
+    num_twos = int(np.ceil(np.log2(hop_length)))
+    downsample_count2 = max(0, num_twos - n_octaves + 1)
+    
+    return min(downsample_count1, downsample_count2)
+
+
+def _get_early_downsample_params(
+    sr: float,
+    hop_length: int,
+    fmax_t: float,
+    Q: float,
+    n_octaves: int,
+    dtype: jnp.dtype = jnp.float32,
+) -> tuple:
+    """Compute downsampling parameters for early downsampling."""
+    window_bandwidth = 1.5  # for hann window
+    filter_cutoff = fmax_t * (1 + 0.5 * window_bandwidth / Q)
+    
+    downsample_count = _early_downsample_count(sr / 2, filter_cutoff, hop_length, n_octaves)
+    downsample_factor = 2 ** downsample_count
+    
+    hop_length //= downsample_factor
+    new_sr = sr / float(downsample_factor)
+    
+    if downsample_factor != 1:
+        early_downsample_filter = _create_lowpass_filter(
+            band_center=1 / downsample_factor,
+            kernel_length=256,
+            transition_bandwidth=0.03,
+            dtype=dtype,
+        )
+    else:
+        early_downsample_filter = None
+        
+    return new_sr, hop_length, downsample_factor, early_downsample_filter
+
+
+@partial(jax.jit, static_argnames=('n', 'axis'))
+def _downsample_by_n(x: jnp.ndarray, filter_kernel: jnp.ndarray, n: int, axis: int = -1) -> jnp.ndarray:
+    """Downsample signal by factor n using the given filter.
+    
+    This matches nnAudio's approach using strided convolution with padding.
+    """
+    # Calculate padding to match nnAudio
+    padding = (filter_kernel.shape[0] - 1) // 2
+    
+    # Apply padding
+    if axis == -1 or axis == len(x.shape) - 1:
+        x_padded = jnp.pad(x, padding, mode='constant')
+    else:
+        # Handle other axes if needed
+        pad_width = [(0, 0)] * len(x.shape)
+        pad_width[axis] = (padding, padding)
+        x_padded = jnp.pad(x, pad_width, mode='constant')
+    
+    # Apply filter and downsample in one step using strided convolution
+    # This ensures consistent output sizes
+    filtered = jnp.convolve(x_padded, filter_kernel, mode='valid')
+    
+    # Downsample
+    return filtered[::n]
+
+
+def _get_cqt_complex(
+    x: jnp.ndarray,
+    cqt_kernels_real: jnp.ndarray,
+    cqt_kernels_imag: jnp.ndarray, 
+    hop_length: int,
+    pad_length: int,
+    pad_mode: str = "constant",
+) -> jnp.ndarray:
+    """Compute CQT using time-domain convolution.
+    
+    This implementation matches nnAudio's approach using strided convolution.
+    
+    Args:
+        x: Input signal [shape=(batch, time)]
+        cqt_kernels_real: Real part of CQT kernels [shape=(n_bins, 1, kernel_length)]
+        cqt_kernels_imag: Imaginary part of CQT kernels [shape=(n_bins, 1, kernel_length)]
+        hop_length: Hop size (stride)
+        pad_length: Padding length
+        pad_mode: Padding mode
+        
+    Returns:
+        Complex CQT [shape=(batch, n_bins, time, 2)]
+    """
+    # Pad the signal - matches nnAudio's center padding
+    if pad_mode == "constant":
+        x_padded = jnp.pad(x, ((0, 0), (pad_length, pad_length)), mode="constant")
+    elif pad_mode == "reflect":
+        x_padded = jnp.pad(x, ((0, 0), (pad_length, pad_length)), mode="reflect")
+    else:
+        x_padded = x
+    
+    # Use JAX's conv_general_dilated_local for 1D strided convolution
+    # This ensures consistent output sizes like PyTorch's conv1d
+    from jax import lax
+    
+    # Reshape inputs for conv_general_dilated
+    # x needs shape: (batch, in_channels=1, time)
+    # kernels need shape: (out_channels, in_channels=1, kernel_length)
+    x_reshaped = x_padded[:, jnp.newaxis, :]  # Add channel dimension
+    
+    # Ensure kernels have the right shape
+    if cqt_kernels_real.ndim == 2:
+        # Shape is (n_bins, kernel_length), need to add channel dimension
+        kernels_real = cqt_kernels_real[:, jnp.newaxis, :]
+        kernels_imag = cqt_kernels_imag[:, jnp.newaxis, :]
+    else:
+        # Already has channel dimension
+        kernels_real = cqt_kernels_real
+        kernels_imag = cqt_kernels_imag
+    
+    # Perform strided convolution
+    # dimension_numbers: (batch, channel, spatial)
+    cqt_real = lax.conv_general_dilated(
+        x_reshaped,
+        kernels_real,
+        window_strides=(hop_length,),
+        padding='VALID',
+        dimension_numbers=('NCH', 'OIH', 'NCH')
+    )
+    
+    cqt_imag = -lax.conv_general_dilated(
+        x_reshaped,
+        kernels_imag,
+        window_strides=(hop_length,),
+        padding='VALID',
+        dimension_numbers=('NCH', 'OIH', 'NCH')
+    )
+    
+    # The output shape from conv is (batch, n_bins, time)
+    # No need to squeeze - the conv already gives us the right shape
+    
+    # Stack real and imaginary parts
+    return jnp.stack([cqt_real, cqt_imag], axis=-1)
+
+
+def cqt2010(
+    y: jnp.ndarray,
+    *,
+    sr: float = 22050,
+    hop_length: int = 512,
+    fmin: Optional[float] = None,
+    fmax: Optional[float] = None,
+    n_bins: int = 84,
+    bins_per_octave: int = 12,
+    tuning: float = 0.0,
+    filter_scale: float = 1.0,
+    norm: Optional[float] = 1.0,
+    sparsity: float = 0.01,  # todo: not used
+    window: str = "hann",
+    scale: bool = True,
+    pad_mode: str = "reflect",
+    res_type: Optional[str] = None,  # todo: not used
+    dtype: jnp.dtype = jnp.complex64,  # todo: not used
+    output_format: str = "magnitude",
+    earlydownsample: bool = True,
+) -> jnp.ndarray:
+    """Compute constant-Q transform using the 2010 algorithm with multi-resolution.
+    
+    This implementation follows nnAudio's CQT2010v2 algorithm which is more
+    memory-efficient than CQT1992. It creates a small CQT kernel for the top
+    octave and uses downsampling to compute lower octaves.
+    
+    Args:
+        y: Audio time series
+        sr: Sampling rate  
+        hop_length: Number of samples between successive CQT columns
+        fmin: Minimum frequency (default: C1 = 32.70 Hz)
+        fmax: Maximum frequency (default: inferred from n_bins)
+        n_bins: Number of frequency bins
+        bins_per_octave: Number of bins per octave
+        tuning: Tuning offset in fractions of a bin
+        filter_scale: Filter scale factor
+        norm: Normalization type for basis functions
+        sparsity: Sparsification factor (not implemented)
+        window: Window function
+        scale: If True, scale the output
+        pad_mode: Padding mode
+        res_type: Resampling type (not used)
+        dtype: Complex data type
+        output_format: Output format ('magnitude', 'complex', 'phase')
+        earlydownsample: If True, use early downsampling optimization
+        
+    Returns:
+        CQT matrix
+    """
+    if fmin is None:
+        fmin = 32.70  # C1
+        
+    # Apply tuning
+    fmin = fmin * 2.0 ** (tuning / bins_per_octave)
+    
+    # Calculate Q factor
+    Q = float(filter_scale) / (2.0 ** (1.0 / bins_per_octave) - 1.0)
+    
+    # Calculate number of octaves
+    n_octaves = int(np.ceil(float(n_bins) / bins_per_octave))
+    n_filters = min(bins_per_octave, n_bins)
+    
+    # Get the top octave parameters
+    fmin_t = fmin * 2 ** (n_octaves - 1)
+    
+    # Calculate kernel parameters
+    if fmax is not None:
+        # If fmax is specified, adjust n_bins
+        n_bins = int(np.ceil(bins_per_octave * np.log2(fmax / fmin)))
+        n_octaves = int(np.ceil(float(n_bins) / bins_per_octave))
+        fmin_t = fmin * 2 ** (n_octaves - 1)
+    
+    # Check remainder to calculate top bin frequency
+    remainder = n_bins % bins_per_octave
+    if remainder == 0:
+        fmax_t = fmin_t * 2 ** ((bins_per_octave - 1) / bins_per_octave)
+    else:
+        fmax_t = fmin_t * 2 ** ((remainder - 1) / bins_per_octave)
+        
+    # Adjust fmin_t
+    fmin_t = fmax_t / 2 ** (1 - 1 / bins_per_octave)
+    
+    # Check Nyquist
+    if fmax_t > sr / 2:
+        raise ValueError(f"The top bin {fmax_t}Hz exceeds Nyquist frequency")
+        
+    # Get early downsample parameters if enabled
+    sample_rate = sr
+    hop = hop_length
+    downsample_factor = 1.0
+    early_downsample_filter = None
+    
+    if earlydownsample:
+        sample_rate, hop, downsample_factor, early_downsample_filter = _get_early_downsample_params(
+            sr, hop_length, fmax_t, Q, n_octaves, dtype=jnp.float32
+        )
+        
+    # Create CQT kernels for top octave only
+    cqt_kernels, n_fft, lengths, freqs = _create_cqt_kernels(
+        Q=Q,
+        sr=sample_rate,
+        fmin=fmin_t,
+        n_bins=n_filters,
+        bins_per_octave=bins_per_octave,
+        norm=norm,
+        window=window,
+    )
+    
+    # Create lowpass filter for octave downsampling
+    lowpass_filter = _create_lowpass_filter(
+        band_center=0.5,
+        kernel_length=256, 
+        transition_bandwidth=0.001
+    )
+    
+    # Track if we need to squeeze the batch dimension later
+    squeeze_batch = False
+    if y.ndim == 1:
+        y = y[jnp.newaxis, :]
+        squeeze_batch = True
+    
+    # Convert to float32 if needed to match kernel dtype
+    if y.dtype != jnp.float32:
+        y = y.astype(jnp.float32)
+        
+    # Apply early downsampling if enabled
+    if earlydownsample and early_downsample_filter is not None:
+        # Process each batch element
+        if y.shape[0] == 1:
+            y = _downsample_by_n(y[0], early_downsample_filter, int(downsample_factor))[jnp.newaxis, :]
+        else:
+            # Use vmap for batch processing
+            downsample_fn = lambda y_single: _downsample_by_n(y_single, early_downsample_filter, int(downsample_factor))
+            y = jax.vmap(downsample_fn)(y)
+        
+    # Split kernels
+    cqt_kernels_real = jnp.real(cqt_kernels)[:, jnp.newaxis, :]
+    cqt_kernels_imag = jnp.imag(cqt_kernels)[:, jnp.newaxis, :]
+    
+    # Get CQT for top octave
+    CQT = _get_cqt_complex(y, cqt_kernels_real, cqt_kernels_imag, hop, n_fft // 2, pad_mode)
+    
+    # Process remaining octaves
+    y_down = y
+    for i in range(n_octaves - 1):
+        hop = hop // 2
+        # Downsample by 2
+        if y_down.shape[0] == 1:
+            y_down = _downsample_by_n(y_down[0], lowpass_filter, 2)[jnp.newaxis, :]
+        else:
+            # Use vmap for batch processing
+            downsample_fn = lambda y_single: _downsample_by_n(y_single, lowpass_filter, 2)
+            y_down = jax.vmap(downsample_fn)(y_down)
+        
+        # Get CQT for this octave
+        CQT1 = _get_cqt_complex(y_down, cqt_kernels_real, cqt_kernels_imag, hop, n_fft // 2, pad_mode)
+        
+        # Concatenate (lower frequencies first)
+        CQT = jnp.concatenate([CQT1, CQT], axis=1)
+        
+    # Remove unwanted bins
+    CQT = CQT[:, -n_bins:, :]
+    
+    # Apply scaling
+    CQT = CQT * downsample_factor
+    
+    # Get all frequency lengths
+    all_freqs = fmin * 2.0 ** (jnp.arange(n_bins) / float(bins_per_octave))
+    all_lengths = jnp.ceil(Q * sr / all_freqs)
+    
+    # Normalize
+    if scale:
+        CQT = CQT * jnp.sqrt(all_lengths).reshape((-1, 1, 1))
+        
+    # Format output based on requested format
+    if output_format.lower() == "magnitude":
+        result = jnp.sqrt(jnp.sum(CQT ** 2, axis=-1))
+    elif output_format.lower() == "complex":
+        result = CQT[:, :, :, 0] + 1j * CQT[:, :, :, 1]
+    elif output_format.lower() == "phase":
+        phase = jnp.arctan2(CQT[:, :, :, 1], CQT[:, :, :, 0])
+        result = jnp.stack([jnp.cos(phase), jnp.sin(phase)], axis=-1)
+    else:
+        raise ValueError(f"Unknown output format: {output_format}")
+    
+    # Remove batch dimension only if we added it
+    if squeeze_batch:
+        result = result[0]
+        
+    return result
 
 
 def chroma_cqt(
@@ -1418,17 +1821,16 @@ def chroma_cqt(
         fmin = note_to_hz("C1")
 
     if C is None:
-        C = jnp.abs(
-            cqt(
-                y,
-                sr=sr,
-                hop_length=hop_length,
-                fmin=fmin,
-                n_bins=n_octaves * bins_per_octave,
-                bins_per_octave=bins_per_octave,
-                tuning=tuning,
-                **kwargs,
-            )
+        C = cqt(
+            y,
+            sr=sr,
+            hop_length=hop_length,
+            fmin=fmin,
+            n_bins=n_octaves * bins_per_octave,
+            bins_per_octave=bins_per_octave,
+            tuning=tuning,
+            output_format="magnitude",
+            **kwargs,
         )
 
     # Map CQT bins to chroma bins

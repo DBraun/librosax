@@ -1093,73 +1093,6 @@ def test_tonnetz():
     )
 
 
-def test_pseudo_cqt():
-    """Test pseudo_cqt implementation."""
-    # Generate test signal with known frequency content
-    sr = 22050
-    duration = 2.0
-    t = np.linspace(0, duration, int(sr * duration))
-    
-    # Create a signal with multiple harmonics
-    # A4 (440 Hz) with harmonics
-    f0 = 440.0
-    y = (
-        0.5 * np.sin(2 * np.pi * f0 * t) +        # Fundamental
-        0.3 * np.sin(2 * np.pi * 2 * f0 * t) +   # 2nd harmonic
-        0.2 * np.sin(2 * np.pi * 3 * f0 * t)     # 3rd harmonic
-    )
-    
-    # Test parameters
-    hop_length = 512
-    n_bins = 84
-    bins_per_octave = 12
-    
-    # Create JIT-compiled version
-    pseudo_cqt_jit = jax.jit(
-        librosax.feature.pseudo_cqt,
-        static_argnames=('sr', 'hop_length', 'fmin', 'n_bins', 'bins_per_octave',
-                        'tuning', 'filter_scale', 'norm', 'sparsity', 'window',
-                        'scale', 'pad_mode', 'dtype')
-    )
-    
-    # Test basic functionality
-    y_jax = jnp.array(y)
-    C_jax = pseudo_cqt_jit(y_jax, sr=sr, hop_length=hop_length, n_bins=n_bins)
-    
-    # Check output shape
-    expected_frames = 1 + (len(y) - 1) // hop_length
-    assert C_jax.shape == (n_bins, expected_frames) or \
-           C_jax.shape[1] == expected_frames + 1, \
-           f"Shape mismatch: {C_jax.shape}"
-    
-    # Check that we have energy at expected frequencies
-    freqs = librosax.feature.cqt_frequencies(n_bins=n_bins, bins_per_octave=bins_per_octave)
-    
-    # Find bins closest to our test frequencies
-    idx_f0 = np.argmin(np.abs(freqs - f0))
-    idx_2f0 = np.argmin(np.abs(freqs - 2 * f0))
-    idx_3f0 = np.argmin(np.abs(freqs - 3 * f0))
-    
-    # Average energy across time
-    C_mean = np.mean(np.abs(C_jax), axis=1)
-    
-    # Check that we have peaks at the expected frequencies
-    assert C_mean[idx_f0] > np.mean(C_mean) * 2, "No peak at fundamental"
-    assert C_mean[idx_2f0] > np.mean(C_mean) * 1.5, "No peak at 2nd harmonic"
-    assert C_mean[idx_3f0] > np.mean(C_mean), "No peak at 3rd harmonic"
-    
-    # Test with different parameters
-    C_jax_24 = pseudo_cqt_jit(
-        y_jax, sr=sr, hop_length=hop_length, 
-        n_bins=48, bins_per_octave=24
-    )
-    assert C_jax_24.shape[0] == 48
-    
-    # Since librosa's pseudo_cqt uses complex implementation details,
-    # we can't easily compare exact values. Instead, we verify that
-    # our implementation produces reasonable results with expected properties.
-
-
 def test_chroma_cqt():
     """Test chroma_cqt implementation."""
     # Generate test signal - C major scale
@@ -1214,7 +1147,7 @@ def test_chroma_cqt():
             f"Note {i} (chroma {expected_chroma}) not in top 3 chromas"
     
     # Test with pre-computed CQT
-    C_jax = librosax.feature.pseudo_cqt(y_jax, sr=sr)
+    C_jax = librosax.feature.cqt(y_jax, sr=sr)
     chroma_from_cqt = chroma_cqt_jit(C=jnp.abs(C_jax), sr=sr)
     
     # Should have same shape

@@ -4,6 +4,7 @@ import jax
 import librosa
 import numpy as np
 from jax import numpy as jnp
+from jax.scipy import signal as jssignal
 
 from librosax.core.spectrum import fft_frequencies, normalize, power_to_db, stft, _spectrogram
 from librosax.core.convert import note_to_hz
@@ -1337,9 +1338,7 @@ def cqt(
     rect_window = jnp.ones(kernel_width)
     
     # Compute STFT using scipy.signal.stft with no extra scaling
-    from jax.scipy import signal
-    
-    _, _, D = signal.stft(
+    _, _, D = jssignal.stft(
         y_1d,
         window=rect_window,
         nperseg=kernel_width,
@@ -1377,142 +1376,6 @@ def cqt(
     return C
 
 
-def pseudo_cqt(
-    y: jnp.ndarray,
-    *,
-    sr: float = 22050,
-    hop_length: int = 512,
-    fmin: Optional[float] = None,
-    n_bins: int = 84,
-    bins_per_octave: int = 12,
-    tuning: Optional[float] = 0.0,
-    filter_scale: float = 1.0,
-    norm: Optional[float] = 1.0,
-    sparsity: float = 0.01,
-    window: str = "hann",
-    scale: bool = True,
-    pad_mode: str = "constant",
-    dtype: jnp.dtype = jnp.complex64,
-) -> jnp.ndarray:
-    """Compute the pseudo constant-Q transform of an audio signal.
-
-    This is a simplified CQT that uses a single FFT size rather than
-    the recursive sub-sampling of the full CQT. It's faster but less
-    accurate for low frequencies.
-
-    Args:
-        y: Audio time series. Multichannel is supported.
-        sr: Sampling rate
-        hop_length: Number of samples between successive CQT columns
-        fmin: Minimum frequency. Defaults to C1 ~= 32.70 Hz
-        n_bins: Number of frequency bins, starting at fmin
-        bins_per_octave: Number of bins per octave
-        tuning: Tuning offset in fractions of a bin. If None, assumed 0.
-        filter_scale: Filter scale factor. Small values (<1) use shorter windows
-        norm: Type of norm to use for basis function normalization
-        sparsity: Sparsification factor (not implemented yet)
-        window: Window function
-        scale: If True, scale by sqrt(n_fft)
-        pad_mode: Padding mode for frame analysis
-        dtype: Complex data type for calculations
-
-    Returns:
-        jnp.ndarray: Pseudo Constant-Q transform [shape=(..., n_bins, t)]
-    """
-    if fmin is None:
-        # C1 by default
-        fmin = note_to_hz("C1")
-
-    # Apply tuning correction
-    fmin = fmin * 2.0 ** (tuning / bins_per_octave)
-
-    # Get CQT frequencies
-    freqs = cqt_frequencies(
-        n_bins=n_bins,
-        bins_per_octave=bins_per_octave,
-        fmin=fmin,
-        tuning=0.0  # Already applied above
-    )
-
-    # For pseudo-CQT, we use a simple approach with fixed FFT size
-    # This is less accurate than full CQT but much simpler to implement
-
-    # Estimate required FFT size
-    # We need enough frequency resolution for the lowest frequency
-    # and enough time resolution for the highest frequency
-    alpha = 1.0  # Bandwidth factor (simplified)
-
-    # Compute filter lengths for each frequency
-    # Using a simplified version - proper implementation would use
-    # filters.wavelet_lengths from librosa
-    Q = filter_scale / alpha
-    lengths = Q * sr / freqs
-
-    # Use jax.lax.cond to select appropriate FFT size based on requirements
-    # This allows some flexibility while maintaining JIT compatibility
-
-    # Calculate required FFT size based on lowest frequency
-    Q = filter_scale / alpha
-    max_len = Q * sr / jnp.min(freqs)
-    min_required = jnp.maximum(max_len, 2 * hop_length)
-
-    # For JIT compatibility, use a fixed FFT size
-    # This is a limitation of the current implementation
-    # In practice, 16384 is large enough for most use cases
-    n_fft = 16384
-
-    # Compute STFT
-    D = stft(
-        y,
-        n_fft=n_fft,
-        hop_length=hop_length,
-        window=window,
-        center=True,
-        pad_mode=pad_mode,
-    )
-
-    # Get magnitude spectrogram
-    S = jnp.abs(D)
-
-    # Build the CQT kernel (simplified version)
-    # In a full implementation, this would use proper wavelet basis functions
-    n_freqs = 1 + n_fft // 2
-    fft_freqs = fft_frequencies(sr=sr, n_fft=n_fft)
-
-    # Create Gaussian-like filters centered at CQT frequencies
-    # This is a simplified approximation
-    # Width is proportional to the CQT frequency (constant-Q property)
-    sigmas = freqs / (bins_per_octave * 2)  # Simplified bandwidth
-
-    # Vectorized computation of all filters
-    # fft_freqs shape: (n_freqs,)
-    # freqs shape: (n_bins,)
-    # Broadcasting to compute all filters at once
-    diff = fft_freqs[jnp.newaxis, :] - freqs[:, jnp.newaxis]  # (n_bins, n_freqs)
-    weights = jnp.exp(-0.5 * (diff / sigmas[:, jnp.newaxis]) ** 2)
-
-    # Normalize if requested
-    if norm == 1:
-        kernel = weights / jnp.sum(weights, axis=1, keepdims=True)
-    elif norm == 2:
-        kernel = weights / jnp.sqrt(jnp.sum(weights ** 2, axis=1, keepdims=True))
-    elif norm == jnp.inf:
-        kernel = weights / jnp.max(weights, axis=1, keepdims=True)
-    else:
-        kernel = weights
-
-    # Apply CQT kernel to magnitude spectrogram
-    # S shape: (..., n_freqs, time)
-    # kernel shape: (n_bins, n_freqs)
-    # Result shape: (..., n_bins, time)
-    C = jnp.einsum("...ft,bf->...bt", S, kernel)
-
-    if scale:
-        C = C / jnp.sqrt(n_fft)
-
-    return C
-
-
 def chroma_cqt(
     *,
     y: Optional[jnp.ndarray] = None,
@@ -1525,9 +1388,9 @@ def chroma_cqt(
     tuning: Optional[float] = 0.0,
     n_chroma: int = 12,
     n_octaves: int = 7,
-    window: Optional[jnp.ndarray] = None,
+    window: Optional[jnp.ndarray] = None,  # todo: not used yet
     bins_per_octave: int = 36,
-    cqt_mode: str = "full",
+    cqt_mode: str = "full",  # todo: not used yet
     **kwargs,
 ) -> jnp.ndarray:
     """Chromagram from a constant-Q transform.
@@ -1546,7 +1409,7 @@ def chroma_cqt(
         window: Optional weighting window
         bins_per_octave: Number of bins per octave in the CQT
         cqt_mode: CQT mode ('full' or 'hybrid')
-        **kwargs: Additional parameters for pseudo_cqt
+        **kwargs: Additional parameters for cqt
 
     Returns:
         jnp.ndarray: Normalized chroma [shape=(..., n_chroma, t)]
@@ -1555,9 +1418,8 @@ def chroma_cqt(
         fmin = note_to_hz("C1")
 
     if C is None:
-        # Use pseudo_cqt for now (full CQT not implemented yet)
         C = jnp.abs(
-            pseudo_cqt(
+            cqt(
                 y,
                 sr=sr,
                 hop_length=hop_length,

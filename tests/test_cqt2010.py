@@ -81,7 +81,7 @@ def compare_implementations():
         cqt2010_np = np.array(cqt2010_mag)
         
         # Test with different tolerances
-        rtol_values = [1e-1, 1e-2, 1e-3, 1e-4]
+        rtol_values = [1e-3, 1e-4, 1e-5, 1e-6]
         print("\nTesting implementation match with np.allclose:")
         for rtol in rtol_values:
             match = np.allclose(cqt1992_np, cqt2010_np, rtol=rtol, atol=1e-8)
@@ -209,8 +209,8 @@ def test_algorithm_equivalence():
         cqt2010_np = np.array(cqt2010_result)
         
         # Test with allclose
-        tolerances = [(1e-1, "Low precision"), (1e-2, "Medium precision"), 
-                      (1e-3, "High precision"), (1e-4, "Very high precision")]
+        tolerances = [(1e-3, "High precision"), (1e-4, "Very high precision"),
+                      (1e-5, "Ultra high precision"), (1e-6, "Maximum precision")]
         
         for rtol, desc in tolerances:
             match = np.allclose(cqt1992_np, cqt2010_np, rtol=rtol, atol=1e-8)
@@ -344,7 +344,7 @@ def test_librosa_comparison():
     
     # Test librosax CQT1992 vs librosa
     print("\nlibrosax CQT1992 vs librosa:")
-    rtol_values = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
+    rtol_values = [1e-3, 1e-4, 1e-5, 1e-6]
     for rtol in rtol_values:
         match = np.allclose(cqt_librosa, cqt_librosax_np, rtol=rtol, atol=1e-8)
         print(f"  rtol={rtol}: {'PASS' if match else 'FAIL'}")
@@ -360,7 +360,8 @@ def test_librosa_comparison():
     
     # Test librosax CQT2010 vs librosa
     print("\nlibrosax CQT2010 vs librosa:")
-    for rtol in rtol_values:
+    rtol_values_2010 = [1e-3, 1e-4, 1e-5, 1e-6]
+    for rtol in rtol_values_2010:
         match = np.allclose(cqt_librosa, cqt_librosax_2010_np, rtol=rtol, atol=1e-8)
         print(f"  rtol={rtol}: {'PASS' if match else 'FAIL'}")
         if match:
@@ -416,7 +417,7 @@ def test_early_downsampling():
     
     # Test with allclose
     print("\nTesting early downsampling match with np.allclose:")
-    rtol_values = [1e-1, 1e-2, 1e-3, 1e-4]
+    rtol_values = [1e-3, 1e-4, 1e-5, 1e-6]
     for rtol in rtol_values:
         match = np.allclose(cqt_with_np, cqt_without_np, rtol=rtol, atol=1e-8)
         print(f"  rtol={rtol}: {'PASS' if match else 'FAIL'}")

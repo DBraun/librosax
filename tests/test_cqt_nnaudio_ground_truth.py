@@ -76,7 +76,7 @@ def test_cqt_1992_v2_log(cqt_jit):
     # Note: Our implementation uses FFT-based convolution while nnAudio uses direct convolution,
     # which can lead to numerical differences. We check for high correlation instead.
     corr = np.corrcoef(X_log.flatten(), ground_truth.flatten())[0, 1]
-    assert corr > 0.90, f"Low correlation: {corr:.3f}"
+    assert corr > 0.98, f"Low correlation: {corr:.3f}"
     
     # Complex test
     # Our complex output is already in complex format, not stacked real/imag
@@ -92,7 +92,7 @@ def test_cqt_1992_v2_log(cqt_jit):
     # For complex values, check correlation
     corr_real = np.corrcoef(C_stacked[..., 0].flatten(), ground_truth_complex[..., 0].flatten())[0, 1]
     corr_imag = np.corrcoef(C_stacked[..., 1].flatten(), ground_truth_complex[..., 1].flatten())[0, 1]
-    assert corr_real > 0.85 and corr_imag > 0.85, f"Low complex correlation: real={corr_real:.3f}, imag={corr_imag:.3f}"
+    assert corr_real > 0.95 and corr_imag > 0.95, f"Low complex correlation: real={corr_real:.3f}, imag={corr_imag:.3f}"
     
     # Phase test
     ground_truth_phase = np.load(
@@ -152,7 +152,7 @@ def test_cqt_1992_v2_linear(cqt_jit):
     
     assert X_log.shape == ground_truth.shape, f"Shape mismatch: {X_log.shape} vs {ground_truth.shape}"
     corr = np.corrcoef(X_log.flatten(), ground_truth.flatten())[0, 1]
-    assert corr > 0.90, f"Low correlation: {corr:.3f}"
+    assert corr > 0.98, f"Low correlation: {corr:.3f}"
     
     # Complex test
     ground_truth_complex = np.load(
@@ -166,7 +166,7 @@ def test_cqt_1992_v2_linear(cqt_jit):
     # For complex values, check correlation
     corr_real = np.corrcoef(C_stacked[..., 0].flatten(), ground_truth_complex[..., 0].flatten())[0, 1]
     corr_imag = np.corrcoef(C_stacked[..., 1].flatten(), ground_truth_complex[..., 1].flatten())[0, 1]
-    assert corr_real > 0.85 and corr_imag > 0.85, f"Low complex correlation: real={corr_real:.3f}, imag={corr_imag:.3f}"
+    assert corr_real > 0.95 and corr_imag > 0.95, f"Low complex correlation: real={corr_real:.3f}, imag={corr_imag:.3f}"
     
     # Phase test
     ground_truth_phase = np.load(

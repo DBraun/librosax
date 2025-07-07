@@ -60,7 +60,7 @@ def test_cqt_sweep_signals():
         
         # Check correlation
         corr_mag = pearsonr(np.abs(C_librosa).flatten(), np.abs(C_jax).flatten())[0]
-        assert corr_mag > 0.95, f"Low correlation for {name}: {corr_mag}"
+        assert corr_mag > 0.98, f"Low correlation for {name}: {corr_mag}"
         
         # For sweep signals, check that energy follows the sweep
         # The CQT should show a diagonal pattern
@@ -176,7 +176,7 @@ def test_cqt_musical_signal():
     
     # Check correlation
     corr = pearsonr(C_librosa_mean, C_jax_mean)[0]
-    assert corr > 0.95, f"Low correlation: {corr}"
+    assert corr > 0.98, f"Low correlation: {corr}"
 
 
 def test_cqt_normalization():

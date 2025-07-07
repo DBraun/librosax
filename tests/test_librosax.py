@@ -1222,7 +1222,14 @@ def test_chroma_cqt():
 
 
 def test_cqt():
-    """Test improved CQT implementation."""
+    """Test CQT implementation for reasonable behavior and compare with librosa.
+    
+    Note: Since torchlibrosa doesn't have a CQT implementation (though nnAudio does
+    provide a PyTorch CQT), we only compare with librosa. The librosax implementation 
+    is simplified compared to librosa's recursive multi-rate approach, so we use 
+    relaxed comparison criteria and focus on verifying reasonable output properties
+    rather than exact numerical match.
+    """
     # Generate test signal with harmonics
     sr = 22050
     duration = 2.0
@@ -1244,31 +1251,73 @@ def test_cqt():
                         'scale', 'pad_mode', 'res_type', 'dtype')
     )
     
-    # Test basic functionality
-    y_jax = jnp.array(y)
-    C_jax = cqt_jit(y_jax, sr=sr, hop_length=512, n_bins=84)
+    # Test parameters
+    hop_length = 512
+    n_bins = 84
+    bins_per_octave = 12
     
-    # Check output shape
-    assert C_jax.shape[0] == 84
+    # Compute CQT with librosa
+    C_librosa = librosa.cqt(
+        y=y, sr=sr, hop_length=hop_length, n_bins=n_bins, 
+        bins_per_octave=bins_per_octave
+    )
+    
+    # Compute CQT with librosax
+    y_jax = jnp.array(y)
+    C_jax = cqt_jit(y_jax, sr=sr, hop_length=hop_length, n_bins=n_bins)
+    
+    # Check output shape matches
+    assert C_jax.shape == C_librosa.shape, f"Shape mismatch: {C_jax.shape} vs {C_librosa.shape}"
+    
+    # Note: librosax uses a simplified CQT implementation that differs from librosa's
+    # recursive multi-rate approach. We check for reasonable output properties instead
+    # of exact numerical match.
+    
+    # Check that CQT produces non-zero output
+    assert np.max(np.abs(C_jax)) > 0, "CQT output is all zeros"
+    
+    # Check no NaN or Inf values
+    assert not np.any(np.isnan(C_jax)), "CQT contains NaN values"
+    assert not np.any(np.isinf(C_jax)), "CQT contains infinite values"
     
     # Check that we have energy at expected frequencies
-    freqs = librosax.feature.cqt_frequencies(n_bins=84, bins_per_octave=12)
+    freqs = librosax.feature.cqt_frequencies(n_bins=n_bins, bins_per_octave=bins_per_octave)
     
     # Find bins closest to our test frequencies
     idx_f0 = np.argmin(np.abs(freqs - f0))
     idx_2f0 = np.argmin(np.abs(freqs - 2 * f0))
+    idx_3f0 = np.argmin(np.abs(freqs - 3 * f0))
     
     # Average energy across time
     C_mean = np.mean(np.abs(C_jax), axis=1)
     
-    # Check that we have some energy variation (not flat response)
-    energy_std = np.std(C_mean)
-    assert energy_std > 0, "CQT response is flat"
+    # Check that we have peaks at the expected frequencies
+    # Using relaxed criteria since implementation differs from librosa
+    assert C_mean[idx_f0] > np.mean(C_mean), "No energy at fundamental"
+    assert C_mean[idx_2f0] > np.mean(C_mean) * 0.5, "No energy at 2nd harmonic"
     
-    # For now, just check that CQT produces non-zero output
-    assert np.max(np.abs(C_jax)) > 0, "CQT output is all zeros"
+    # For a more strict comparison, we would need to implement the full
+    # librosa algorithm with recursive downsampling and proper wavelet filters
     
+    # Optional: Compare spectral peaks between implementations
+    # This is a weaker test but ensures both detect similar frequency content
+    C_librosa_mean = np.mean(np.abs(C_librosa), axis=1)
     
-    # The CQT should produce reasonable output shapes and values
-    assert not np.any(np.isnan(C_jax)), "CQT contains NaN values"
-    assert not np.any(np.isinf(C_jax)), "CQT contains infinite values"
+    # Find top 10 peaks in each
+    top_indices_jax = np.argsort(C_mean)[-10:]
+    top_indices_librosa = np.argsort(C_librosa_mean)[-10:]
+    
+    # Check that at least some top peaks overlap
+    overlap = len(set(top_indices_jax) & set(top_indices_librosa))
+    assert overlap >= 3, f"Too few overlapping peaks: {overlap}/10"
+    
+    # The implementation is fixed but uses different scaling than librosa
+    # Check that the outputs are highly correlated (shape similarity)
+    from scipy.stats import pearsonr
+    corr_mag = pearsonr(np.abs(C_librosa).flatten(), np.abs(C_jax).flatten())[0]
+    assert corr_mag > 0.95, f"Low correlation between implementations: {corr_mag}"
+    
+    # The actual magnitudes differ due to different normalization conventions
+    # librosa's CQT uses complex multi-rate processing with specific scaling
+    # Our implementation uses a simplified single-rate approach
+    # Both are valid CQT implementations with different trade-offs

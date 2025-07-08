@@ -2,15 +2,6 @@
 Librosax
 ========
 
-A JAX implementation of audio processing functions from librosa and TorchLibrosa.
-
-This library provides JAX-compatible implementations of many functions from:
-- librosa (https://github.com/librosa/librosa)
-- TorchLibrosa (https://github.com/qiuqiangkong/torchlibrosa)
-
-We gratefully acknowledge the librosa development team and Qiuqiang Kong for their
-foundational work in audio processing.
-
 Spectral representations
 ------------------------
 .. autosummary::

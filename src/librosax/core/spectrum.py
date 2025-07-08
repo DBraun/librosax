@@ -210,27 +210,21 @@ def power_to_db(
 
 
 def db_to_power(S_db: jnp.ndarray, *, ref: float = 1.0) -> jnp.ndarray:
-    """Convert dB-scale values to a power values.
+    """Convert dB-scale values to power values.
 
     This effectively inverts ``power_to_db``::
 
         db_to_power(S_db) ~= ref * 10.0**(S_db / 10)
 
-    Parameters
-    ----------
-    S_db : np.ndarray
-        dB-scaled values
-    ref : number > 0
-        Reference power: output will be scaled by this value
+    Args:
+        S_db: dB-scaled values.
+        ref: Reference power. Output will be scaled by this value.
 
-    Returns
-    -------
-    S : np.ndarray
-        Power values
+    Returns:
+        Power values.
 
-    Notes
-    -----
-    This function caches at level 30.
+    Note:
+        This function caches at level 30.
     """
     return ref * jnp.power(10.0, S_db * 0.1)
 
@@ -249,9 +243,9 @@ def amplitude_to_db(
 
     Args:
         S: Input amplitude spectrogram.
-        ref: Reference value for scaling. If scalar, the amplitude |S| is scaled relative
-            to ref: 20 * log10(S / ref). If callable, the reference value is computed
-            as ref(S). Default is 1.0.
+        ref: Reference value for scaling. If scalar, the amplitude ``abs(S)`` is scaled relative
+            to ref: ``20 * log10(S / ref)``. If callable, the reference value is computed
+            as ``ref(S)``. Default is 1.0.
         amin: Minimum threshold for input values. Default is 1e-5.
         top_db: Threshold the output at top_db below the peak. Default is 80.0.
 
@@ -282,21 +276,15 @@ def db_to_amplitude(S_db: jnp.ndarray, *, ref: float = 1.0) -> jnp.ndarray:
 
         db_to_amplitude(S_db) ~= 10.0**(0.5 * S_db/10 + log10(ref))
 
-    Parameters
-    ----------
-    S_db : np.ndarray
-        dB-scaled values
-    ref : number > 0
-        Optional reference amplitude.
+    Args:
+        S_db: dB-scaled values.
+        ref: Optional reference amplitude.
 
-    Returns
-    -------
-    S : np.ndarray
-        Linear magnitude values
+    Returns:
+        Linear magnitude values.
 
-    Notes
-    -----
-    This function caches at level 30.
+    Note:
+        This function caches at level 30.
     """
     return jnp.sqrt(db_to_power(S_db, ref=ref**2))
 

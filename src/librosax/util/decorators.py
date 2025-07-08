@@ -23,6 +23,14 @@ def moved(
     """Mark functions as moved/renamed.
 
     Using the decorated (old) function will result in a warning.
+    
+    Args:
+        moved_from: The old module path the function was moved from.
+        version: The version when the function was moved.
+        version_removed: The version when the old alias will be removed.
+        
+    Returns:
+        A decorator that wraps the function with a deprecation warning.
     """
 
     def __wrapper(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
@@ -48,6 +56,13 @@ def deprecated(
     """Mark a function as deprecated.
 
     Using the decorated (old) function will result in a warning.
+    
+    Args:
+        version: The version when the function was deprecated.
+        version_removed: The version when the function will be removed.
+        
+    Returns:
+        A decorator that wraps the function with a deprecation warning.
     """
 
     def __wrapper(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
@@ -80,6 +95,16 @@ def vectorize(
 
     This function is not quite a decorator, but is used as a wrapper
     to np.vectorize that preserves scalar behavior.
+    
+    Args:
+        otypes: Output data types (passed to np.vectorize).
+        doc: Docstring for the vectorized function.
+        excluded: Set of arguments that should not be vectorized.
+        cache: Enable caching for the vectorized function.
+        signature: Generalized universal function signature.
+        
+    Returns:
+        A decorator that creates a vectorized version of the function.
     """
 
     def __wrapper(function):

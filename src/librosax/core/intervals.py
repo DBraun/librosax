@@ -28,67 +28,51 @@ def interval_frequencies(
     tuning: float = 0.0,
     sort: bool = True
 ) -> jnp.ndarray:
-    """Construct a set of frequencies from an interval set
+    """Construct a set of frequencies from an interval set.
 
-    Parameters
-    ----------
-    n_bins : int
-        The number of frequencies to generate
+    Args:
+        n_bins: The number of frequencies to generate.
+        fmin: The minimum frequency (must be > 0).
+        intervals: Either a string specification or array of floats in [1, 2).
+            If string, must be one of:
+            - 'equal': Equal temperament
+            - 'pythagorean': Pythagorean intervals
+            - 'ji3': 3-limit just intonation
+            - 'ji5': 5-limit just intonation
+            - 'ji7': 7-limit just intonation
+        bins_per_octave: If `intervals` is a string specification, how many bins
+            to generate per octave. If `intervals` is an array, then this
+            parameter is ignored.
+        tuning: Deviation from A440 tuning in fractional bins. This is only
+            used when `intervals == 'equal'`.
+        sort: Sort the intervals in ascending order.
 
-    fmin : float > 0
-        The minimum frequency
+    Returns:
+        Array of frequencies.
 
-    intervals : str or array of floats in [1, 2)
-        If `str`, must be one of the following:
-        - `'equal'` - equal temperament
-        - `'pythagorean'` - Pythagorean intervals
-        - `'ji3'` - 3-limit just intonation
-        - `'ji5'` - 5-limit just intonation
-        - `'ji7'` - 7-limit just intonation
+    Examples:
+        Generate two octaves of Pythagorean intervals starting at 55Hz
 
-        Otherwise, an array of intervals in the range [1, 2) can be provided.
+        >>> librosax.interval_frequencies(24, fmin=55, intervals="pythagorean", bins_per_octave=12)
+        array([ 55.   ,  58.733,  61.875,  66.075,  69.609,  74.334,  78.311,
+                82.5  ,  88.099,  92.812,  99.112, 104.414, 110.   , 117.466,
+               123.75 , 132.149, 139.219, 148.668, 156.621, 165.   , 176.199,
+               185.625, 198.224, 208.828])
 
-    bins_per_octave : int > 0
-        If `intervals` is a string specification, how many bins to
-        generate per octave.
-        If `intervals` is an array, then this parameter is ignored.
+        Generate two octaves of 5-limit intervals starting at 55Hz
 
-    tuning : float
-        Deviation from A440 tuning in fractional bins.
-        This is only used when `intervals == 'equal'`
+        >>> librosax.interval_frequencies(24, fmin=55, intervals="ji5", bins_per_octave=12)
+        array([ 55.   ,  58.667,  61.875,  66.   ,  68.75 ,  73.333,  77.344,
+                82.5  ,  88.   ,  91.667,  99.   , 103.125, 110.   , 117.333,
+               123.75 , 132.   , 137.5  , 146.667, 154.687, 165.   , 176.   ,
+               183.333, 198.   , 206.25 ])
 
-    sort : bool
-        Sort the intervals in ascending order.
+        Generate three octaves using only three intervals
 
-    Returns
-    -------
-    frequencies : array of float
-        The frequencies
-
-    Examples
-    --------
-    Generate two octaves of Pythagorean intervals starting at 55Hz
-
-    >>> librosax.interval_frequencies(24, fmin=55, intervals="pythagorean", bins_per_octave=12)
-    array([ 55.   ,  58.733,  61.875,  66.075,  69.609,  74.334,  78.311,
-            82.5  ,  88.099,  92.812,  99.112, 104.414, 110.   , 117.466,
-           123.75 , 132.149, 139.219, 148.668, 156.621, 165.   , 176.199,
-           185.625, 198.224, 208.828])
-
-    Generate two octaves of 5-limit intervals starting at 55Hz
-
-    >>> librosax.interval_frequencies(24, fmin=55, intervals="ji5", bins_per_octave=12)
-    array([ 55.   ,  58.667,  61.875,  66.   ,  68.75 ,  73.333,  77.344,
-            82.5  ,  88.   ,  91.667,  99.   , 103.125, 110.   , 117.333,
-           123.75 , 132.   , 137.5  , 146.667, 154.687, 165.   , 176.   ,
-           183.333, 198.   , 206.25 ])
-
-    Generate three octaves using only three intervals
-
-    >>> intervals = [1, 4/3, 3/2]
-    >>> librosax.interval_frequencies(9, fmin=55, intervals=intervals)
-    array([ 55.   ,  73.333,  82.5  , 110.   , 146.667, 165.   , 220.   ,
-       293.333, 330.   ])
+        >>> intervals = [1, 4/3, 3/2]
+        >>> librosax.interval_frequencies(9, fmin=55, intervals=intervals)
+        array([ 55.   ,  73.333,  82.5  , 110.   , 146.667, 165.   , 220.   ,
+           293.333, 330.   ])
     """
     if isinstance(intervals, str):
         if intervals == "equal":
@@ -155,70 +139,63 @@ def pythagorean_intervals(
 def pythagorean_intervals(
     *, bins_per_octave: int = 12, sort: bool = True, return_factors: bool = False
 ) -> Union[jnp.ndarray, List[Dict[int, int]]]:
-    """Pythagorean intervals
+    """Pythagorean intervals.
 
-    Intervals are constructed by stacking ratios of 3/2 (i.e.,
-    just perfect fifths) and folding down to a single octave::
+    Intervals are constructed by stacking ratios of 3/2 (i.e., just perfect
+    fifths) and folding down to a single octave::
 
         1, 3/2, 9/8, 27/16, 81/64, ...
 
-    Note that this differs from 3-limit just intonation intervals
-    in that Pythagorean intervals only use positive powers of 3
-    (ascending fifths) while 3-limit intervals use both positive
-    and negative powers (descending fifths).
+    Note that this differs from 3-limit just intonation intervals in that
+    Pythagorean intervals only use positive powers of 3 (ascending fifths)
+    while 3-limit intervals use both positive and negative powers (descending
+    fifths).
 
-    Parameters
-    ----------
-    bins_per_octave : int
-        The number of intervals to generate
-    sort : bool
-        If `True` then intervals are returned in ascending order.
-        If `False`, then intervals are returned in circle-of-fifths order.
-    return_factors : bool
-        If `True` then return a list of dictionaries encoding the prime factorization
-        of each interval as `{2: p2, 3: p3}` (meaning `3**p3 * 2**p2`).
-        If `False` (default), return intervals as an array of floating point numbers.
+    Args:
+        bins_per_octave: The number of intervals to generate.
+        sort: If True then intervals are returned in ascending order.
+            If False, then intervals are returned in circle-of-fifths order.
+        return_factors: If True then return a list of dictionaries encoding
+            the prime factorization of each interval as `{2: p2, 3: p3}`
+            (meaning `3**p3 * 2**p2`). If False (default), return intervals
+            as an array of floating point numbers.
 
-    Returns
-    -------
-    intervals : jnp.ndarray or list of dictionaries
-        The constructed interval set. All intervals are mapped
-        to the range [1, 2).
+    Returns:
+        The constructed interval set. All intervals are mapped to the
+        range [1, 2).
 
-    See Also
-    --------
-    plimit_intervals
+    See Also:
+        plimit_intervals: Construct p-limit intervals.
 
-    Examples
-    --------
-    Generate the first 12 intervals
+    Examples:
+        Generate the first 12 intervals
 
-    >>> librosax.pythagorean_intervals(bins_per_octave=12)
-    array([1.      , 1.067871, 1.125   , 1.201355, 1.265625, 1.351524,
-           1.423828, 1.5     , 1.601807, 1.6875  , 1.802032, 1.898437])
-    >>> # Compare to the 12-tone equal temperament intervals:
-    >>> 2**(jnp.arange(12)/12)
-    array([1.      , 1.059463, 1.122462, 1.189207, 1.259921, 1.33484 ,
-           1.414214, 1.498307, 1.587401, 1.681793, 1.781797, 1.887749])
+        >>> librosax.pythagorean_intervals(bins_per_octave=12)
+        array([1.      , 1.067871, 1.125   , 1.201355, 1.265625, 1.351524,
+               1.423828, 1.5     , 1.601807, 1.6875  , 1.802032, 1.898437])
+        >>> # Compare to the 12-tone equal temperament intervals:
+        >>> 2**(jnp.arange(12)/12)
+        array([1.      , 1.059463, 1.122462, 1.189207, 1.259921, 1.33484 ,
+               1.414214, 1.498307, 1.587401, 1.681793, 1.781797, 1.887749])
 
-    Or the first 7, in circle-of-fifths order
+        Or the first 7, in circle-of-fifths order
 
-    >>> librosax.pythagorean_intervals(bins_per_octave=7, sort=False)
-    array([1.      , 1.5     , 1.125   , 1.6875  , 1.265625, 1.898437,
-           1.423828])
+        >>> librosax.pythagorean_intervals(bins_per_octave=7, sort=False)
+        array([1.      , 1.5     , 1.125   , 1.6875  , 1.265625, 1.898437,
+               1.423828])
 
-    Generate the first 7, in circle-of-fifths other and factored form
+        Generate the first 7, in circle-of-fifths other and factored form
 
-    >>> librosax.pythagorean_intervals(bins_per_octave=7, sort=False, return_factors=True)
-    [
-        {2: 0, 3: 0},
-        {2: -1, 3: 1},
-        {2: -3, 3: 2},
-        {2: -4, 3: 3},
-        {2: -6, 3: 4},
-        {2: -7, 3: 5},
-        {2: -9, 3: 6}
-    ]
+        >>> librosax.pythagorean_intervals(bins_per_octave=7, sort=False, return_factors=True)
+        [
+            {2: 0, 3: 0},
+            {2: -1, 3: 1},
+            {2: -3, 3: 2},
+            {2: -4, 3: 3},
+            {2: -6, 3: 4},
+            {2: -7, 3: 5},
+            {2: -9, 3: 6}
+        ]
     """
     # Generate all powers of 3 in log space
     pow3 = jnp.arange(bins_per_octave)
@@ -346,68 +323,59 @@ def plimit_intervals(
         "Three crystal growth algorithms in 23-limit constrained harmonic space."
         Contemporary Music Review 27, no. 1 (2008): 57-78.
 
-    Parameters
-    ----------
-    primes : array of odd primes
-        Which prime factors are to be used
-    bins_per_octave : int
-        The number of intervals to construct
-    sort : bool
-        If `True` then intervals are returned in ascending order.
-        If `False`, then intervals are returned in crystal growth order.
-    return_factors : bool
-        If `True` then return a list of dictionaries encoding the prime factorization
-        of each interval as `{2: p2, 3: p3, ...}` (meaning `3**p3 * 2**p2`).
-        If `False` (default), return intervals as an array of floating point numbers.
+    Args:
+        primes: Array of odd primes which prime factors are to be used.
+        bins_per_octave: The number of intervals to construct.
+        sort: If `True` then intervals are returned in ascending order.
+            If `False`, then intervals are returned in crystal growth order.
+        return_factors: If `True` then return a list of dictionaries encoding the prime factorization
+            of each interval as `{2: p2, 3: p3, ...}` (meaning `3**p3 * 2**p2`).
+            If `False` (default), return intervals as an array of floating point numbers.
 
-    Returns
-    -------
-    intervals : jnp.ndarray or list of dictionaries
+    Returns:
         The constructed interval set. All intervals are mapped
         to the range [1, 2).
 
-    See Also
-    --------
-    pythagorean_intervals
+    See Also:
+        pythagorean_intervals: Construct Pythagorean intervals.
 
-    Examples
-    --------
-    Compare 3-limit tuning to Pythagorean tuning and 12-TET
+    Examples:
+        Compare 3-limit tuning to Pythagorean tuning and 12-TET
 
-    >>> librosax.plimit_intervals(primes=[3], bins_per_octave=12)
-    array([1.        , 1.05349794, 1.125     , 1.18518519, 1.265625  ,
-           1.33333333, 1.40466392, 1.5       , 1.58024691, 1.6875    ,
-           1.77777778, 1.8984375 ])
-    >>> # Pythagorean intervals:
-    >>> librosax.pythagorean_intervals(bins_per_octave=12)
-    array([1.        , 1.06787109, 1.125     , 1.20135498, 1.265625  ,
-           1.35152435, 1.42382812, 1.5       , 1.60180664, 1.6875    ,
-           1.80203247, 1.8984375 ])
-    >>> # 12-TET intervals:
-    >>> 2**(jnp.arange(12)/12)
-    array([1.        , 1.05946309, 1.12246205, 1.18920712, 1.25992105,
-           1.33483985, 1.41421356, 1.49830708, 1.58740105, 1.68179283,
-           1.78179744, 1.88774863])
+        >>> librosax.plimit_intervals(primes=[3], bins_per_octave=12)
+        array([1.        , 1.05349794, 1.125     , 1.18518519, 1.265625  ,
+               1.33333333, 1.40466392, 1.5       , 1.58024691, 1.6875    ,
+               1.77777778, 1.8984375 ])
+        >>> # Pythagorean intervals:
+        >>> librosax.pythagorean_intervals(bins_per_octave=12)
+        array([1.        , 1.06787109, 1.125     , 1.20135498, 1.265625  ,
+               1.35152435, 1.42382812, 1.5       , 1.60180664, 1.6875    ,
+               1.80203247, 1.8984375 ])
+        >>> # 12-TET intervals:
+        >>> 2**(jnp.arange(12)/12)
+        array([1.        , 1.05946309, 1.12246205, 1.18920712, 1.25992105,
+               1.33483985, 1.41421356, 1.49830708, 1.58740105, 1.68179283,
+               1.78179744, 1.88774863])
 
-    Create a 7-bin, 5-limit interval set
+        Create a 7-bin, 5-limit interval set
 
-    >>> librosax.plimit_intervals(primes=[3, 5], bins_per_octave=7)
-    array([1.        , 1.125     , 1.25      , 1.33333333, 1.5       ,
-           1.66666667, 1.875     ])
+        >>> librosax.plimit_intervals(primes=[3, 5], bins_per_octave=7)
+        array([1.        , 1.125     , 1.25      , 1.33333333, 1.5       ,
+               1.66666667, 1.875     ])
 
-    The same example, but now in factored form
+        The same example, but now in factored form
 
-    >>> librosax.plimit_intervals(primes=[3, 5], bins_per_octave=7,
-    ...                          return_factors=True)
-    [
-        {},
-        {2: -3, 3: 2},
-        {2: -2, 5: 1},
-        {2: 2, 3: -1},
-        {2: -1, 3: 1},
-        {3: -1, 5: 1},
-        {2: -3, 3: 1, 5: 1}
-    ]
+        >>> librosax.plimit_intervals(primes=[3, 5], bins_per_octave=7,
+        ...                          return_factors=True)
+        [
+            {},
+            {2: -3, 3: 2},
+            {2: -2, 5: 1},
+            {2: 2, 3: -1},
+            {2: -1, 3: 1},
+            {3: -1, 5: 1},
+            {2: -3, 3: 1, 5: 1}
+        ]
     """
     primes = jnp.atleast_1d(primes)
     logs = jnp.log2(primes, dtype=jnp.float64)

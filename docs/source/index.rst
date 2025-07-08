@@ -48,7 +48,7 @@ If you use librosax in your research, please cite:
 
 Additionally, please consider citing the original libraries that librosax is based on:
 
-**librosa** - For the design principles and algorithms:
+**librosa** - For the design principles and most algorithms:
 
 .. code-block:: bibtex
 
@@ -60,7 +60,7 @@ Additionally, please consider citing the original libraries that librosax is bas
      year={2015}
    }
 
-**nnAudio** - For GPU-accelerated spectral processing:
+**nnAudio** - For Constant-Q Transform (CQT) implementations:
 
 .. code-block:: bibtex
 
@@ -74,18 +74,18 @@ Additionally, please consider citing the original libraries that librosax is bas
      doi={10.1109/ACCESS.2020.3019084}
    }
 
-**TorchLibrosa** - While TorchLibrosa doesn't have a specific paper, the author's PANNs work provides context:
+**TorchLibrosa** - For augmentations and neural network layers:
 
 .. code-block:: bibtex
 
    @article{kong2020panns,
-     title={PANNs: Large-Scale Pretrained Audio Neural Networks for Audio Pattern Recognition},
+     title={{PANNs: Large-Scale Pretrained Audio Neural Networks for Audio Pattern Recognition}},
      author={Kong, Qiuqiang and Cao, Yin and Iqbal, Turab and Wang, Yuxuan and Wang, Wenwu and Plumbley, Mark D.},
      journal={IEEE/ACM Transactions on Audio, Speech, and Language Processing},
      volume={28},
      pages={2880--2894},
      year={2020},
-     publisher={IEEE}
+     publisher={{IEEE}}
    }
 
 

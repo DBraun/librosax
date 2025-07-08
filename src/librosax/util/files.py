@@ -41,6 +41,13 @@ def _resource_file(package: str, resource: str):
 
     It acts as a shim to provide a consistent interface for accessing resources
     since the 3.9 series deprecated the "path" method in favor of the "files" method.
+    
+    Args:
+        package: The package name containing the resource.
+        resource: The name of the resource file.
+        
+    Yields:
+        The path to the resource file.
     """
     if sys.version_info < (3, 9):
         with resources.path(package, resource) as path:
@@ -78,34 +85,27 @@ def example(key: str, *, hq: bool = False) -> str:
     >>> os.environ['LIBROSA_DATA_DIR'] = '/path/to/store/data'
     >>> import librosa
 
-    Parameters
-    ----------
-    key : str
-        The identifier for the track to load
-    hq : bool
-        If ``True``, return the high-quality version of the recording.
-        If ``False``, return the 22KHz mono version of the recording.
+    Args:
+        key: The identifier for the track to load.
+        hq: If True, return the high-quality version of the recording.
+            If False, return the 22KHz mono version of the recording.
 
-    Returns
-    -------
-    path : str
-        The path to the requested example file
+    Returns:
+        The path to the requested example file.
 
-    Examples
-    --------
-    Load "Hungarian Dance #5" by Johannes Brahms
+    See Also:
+        librosax.util.list_examples: List available examples.
+        pooch.os_cache: Information about cache directories.
 
-    >>> y, sr = librosax.load(librosax.example('brahms'))
+    Examples:
+        Load "Hungarian Dance #5" by Johannes Brahms
 
-    Load "Vibe Ace" by Kevin MacLeod (the example previously packaged with librosa)
-    in high-quality mode
+        >>> y, sr = librosax.load(librosax.example('brahms'))
 
-    >>> y, sr = librosax.load(librosax.example('vibeace', hq=True))
+        Load "Vibe Ace" by Kevin MacLeod (the example previously packaged with librosa)
+        in high-quality mode
 
-    See Also
-    --------
-    librosax.util.list_examples
-    pooch.os_cache
+        >>> y, sr = librosax.load(librosax.example('vibeace', hq=True))
     """
     if key not in __TRACKMAP:
         raise ParameterError(f"Unknown example key: {key}")
@@ -130,10 +130,9 @@ def list_examples() -> None:
 
     A brief description is provided in the second column.
 
-    See Also
-    --------
-    util.example
-    util.example_info
+    See Also:
+        util.example: Retrieve an example recording.
+        util.example_info: Display licensing info for an example.
     """
     print("AVAILABLE EXAMPLES")
     print("-" * 68)
@@ -157,16 +156,13 @@ def example_info(key: str) -> None:
     `pooch.os_cache('librosa')`.  You can override this by setting
     an environment variable ``LIBROSA_DATA_DIR`` prior to importing librosax.
 
-    Parameters
-    ----------
-    key : str
-        The identifier for the recording (see `list_examples`)
+    Args:
+        key: The identifier for the recording (see `list_examples`).
 
-    See Also
-    --------
-    librosax.util.example
-    librosax.util.list_examples
-    pooch.os_cache
+    See Also:
+        librosax.util.example: Retrieve an example recording.
+        librosax.util.list_examples: List available examples.
+        pooch.os_cache: Information about cache directories.
     """
     if key not in __TRACKMAP:
         raise ParameterError(f"Unknown example key: {key}")
@@ -191,63 +187,45 @@ def find_files(
 ) -> List[str]:
     """Get a sorted list of (audio) files in a directory or directory sub-tree.
 
-    Examples
-    --------
-    >>> # Get all audio files in a directory sub-tree
-    >>> files = librosax.util.find_files('~/Music')
+    Args:
+        directory: Path to look for files.
+        ext: A file extension or list of file extensions to include in the search.
+            Default: ``['aac', 'au', 'flac', 'm4a', 'mp3', 'ogg', 'wav']``
+        recurse: If True, then all subfolders of ``directory`` will be searched.
+            Otherwise, only ``directory`` will be searched.
+        case_sensitive: If False, files matching upper-case version of
+            extensions will be included.
+        limit: Return at most ``limit`` files. If None, all files are returned.
+        offset: Return files starting at ``offset`` within the list.
+            Use negative values to offset from the end of the list.
 
-    >>> # Look only within a specific directory, not the sub-tree
-    >>> files = librosax.util.find_files('~/Music', recurse=False)
-
-    >>> # Only look for mp3 files
-    >>> files = librosax.util.find_files('~/Music', ext='mp3')
-
-    >>> # Or just mp3 and ogg
-    >>> files = librosax.util.find_files('~/Music', ext=['mp3', 'ogg'])
-
-    >>> # Only get the first 10 files
-    >>> files = librosax.util.find_files('~/Music', limit=10)
-
-    >>> # Or last 10 files
-    >>> files = librosax.util.find_files('~/Music', offset=-10)
-
-    >>> # Avoid including search patterns in the path string
-    >>> import glob
-    >>> directory = '~/[202206] Music'
-    >>> directory = glob.escape(directory)  # Escape the special characters
-    >>> files = librosax.util.find_files(directory)
-
-    Parameters
-    ----------
-    directory : str
-        Path to look for files
-
-    ext : str or list of str
-        A file extension or list of file extensions to include in the search.
-
-        Default: ``['aac', 'au', 'flac', 'm4a', 'mp3', 'ogg', 'wav']``
-
-    recurse : boolean
-        If ``True``, then all subfolders of ``directory`` will be searched.
-
-        Otherwise, only ``directory`` will be searched.
-
-    case_sensitive : boolean
-        If ``False``, files matching upper-case version of
-        extensions will be included.
-
-    limit : int > 0 or None
-        Return at most ``limit`` files. If ``None``, all files are returned.
-
-    offset : int
-        Return files starting at ``offset`` within the list.
-
-        Use negative values to offset from the end of the list.
-
-    Returns
-    -------
-    files : list of str
+    Returns:
         The list of audio files.
+
+    Examples:
+        >>> # Get all audio files in a directory sub-tree
+        >>> files = librosax.util.find_files('~/Music')
+
+        >>> # Look only within a specific directory, not the sub-tree
+        >>> files = librosax.util.find_files('~/Music', recurse=False)
+
+        >>> # Only look for mp3 files
+        >>> files = librosax.util.find_files('~/Music', ext='mp3')
+
+        >>> # Or just mp3 and ogg
+        >>> files = librosax.util.find_files('~/Music', ext=['mp3', 'ogg'])
+
+        >>> # Only get the first 10 files
+        >>> files = librosax.util.find_files('~/Music', limit=10)
+
+        >>> # Or last 10 files
+        >>> files = librosax.util.find_files('~/Music', offset=-10)
+
+        >>> # Avoid including search patterns in the path string
+        >>> import glob
+        >>> directory = '~/[202206] Music'
+        >>> directory = glob.escape(directory)  # Escape the special characters
+        >>> files = librosax.util.find_files(directory)
     """
     if ext is None:
         ext = ["aac", "au", "flac", "m4a", "mp3", "ogg", "wav"]
@@ -283,7 +261,15 @@ def find_files(
 
 
 def __get_files(dir_name: Union[str, os.PathLike[Any]], extensions: Set[str]):
-    """Get a list of files in a single directory"""
+    """Get a list of files in a single directory.
+    
+    Args:
+        dir_name: Directory path to search.
+        extensions: Set of file extensions to look for.
+        
+    Returns:
+        Set of file paths matching the given extensions.
+    """
     # Expand out the directory
     dir_name = os.path.abspath(os.path.expanduser(dir_name))
 
@@ -299,25 +285,18 @@ def __get_files(dir_name: Union[str, os.PathLike[Any]], extensions: Set[str]):
 def cite(version: Optional[str]=None) -> str:
     """Print the citation information for librosax.
 
-    Parameters
-    ----------
-    version : str or None
-        The version of librosa to cite. If None, the current version is used.
+    Args:
+        version: The version of librosa to cite. If None, the current version is used.
 
-    Returns
-    -------
-    doi : str
+    Returns:
         The DOI for the given version of librosax.
 
-    Raises
-    ------
-    ParameterError
-        If the requested version is not found in the citation index.
+    Raises:
+        ParameterError: If the requested version is not found in the citation index.
 
-    Examples
-    --------
-    >>> librosax.cite("0.10.1")
-    "https://doi.org/10.5281/zenodo.8252662"
+    Examples:
+        >>> librosax.cite("0.10.1")
+        "https://doi.org/10.5281/zenodo.8252662"
     """
     if version is None:
         version = librosax_version

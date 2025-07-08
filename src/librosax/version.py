@@ -5,6 +5,14 @@ import sys
 import importlib
 
 def __get_mod_version(modname):
+    """Get the version string of a module.
+    
+    Args:
+        modname: Name of the module to check.
+        
+    Returns:
+        Version string of the module, or None if not installed.
+    """
     try:
         if modname in sys.modules:
             mod = sys.modules[modname]
@@ -20,7 +28,11 @@ def __get_mod_version(modname):
 
 
 def show_versions() -> None:
-    """Return the version information for all librosa dependencies."""
+    """Return the version information for all librosa dependencies.
+    
+    Prints a formatted list of all core and extra dependencies along with
+    their installed versions.
+    """
     core_deps = [
         "audioread",
         "numpy",

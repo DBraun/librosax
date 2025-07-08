@@ -21,12 +21,11 @@ _F = TypeVar("_F", bound=Callable[..., Any])
 
 
 class CacheManager(object):
-    """The librosa cache manager class wraps joblib.Memory
-    with a __call__ attribute, so that it may act as a function.
-
-    Additionally, it provides a caching level filter, so that
-    different functions can be cached or not depending on the user's
-    preference for speed vs. storage usage.
+    """The librosa cache manager class wraps joblib.Memory with a __call__ attribute.
+    
+    This allows it to act as a function. Additionally, it provides a caching level filter,
+    so that different functions can be cached or not depending on the user's preference
+    for speed vs. storage usage.
     """
 
     def __init__(self, *args: Any, **kwargs: Any):
@@ -39,18 +38,29 @@ class CacheManager(object):
         self.level: int = level
 
     def __call__(self, level: int) -> Callable[[_F], _F]:
-        """
-        Cache with an explicitly defined level.
-
-        Example usage:
-
-        @cache(level=2)
-        def semi_important_function(some_arguments):
-            ...
+        """Cache with an explicitly defined level.
+        
+        Args:
+            level: The caching level for the decorated function.
+        
+        Returns:
+            A decorator function that applies caching at the specified level.
+        
+        Example:
+            @cache(level=2)
+            def semi_important_function(some_arguments):
+                ...
         """
 
         def wrapper(function):
-            """Add an input/output cache to the specified function."""
+            """Add an input/output cache to the specified function.
+            
+            Args:
+                function: The function to be cached.
+                
+            Returns:
+                The cached function if caching is enabled, otherwise the original function.
+            """
             if self.memory.location is not None and self.level >= level:
                 return _decorator_apply(self.memory.cache, function)
 
@@ -60,23 +70,54 @@ class CacheManager(object):
         return wrapper
 
     def clear(self, *args: Any, **kwargs: Any) -> None:
-        """Clear the cache"""
+        """Clear the cache.
+        
+        Args:
+            *args: Positional arguments passed to memory.clear.
+            **kwargs: Keyword arguments passed to memory.clear.
+        """
         self.memory.clear(*args, **kwargs)
 
     def eval(self, *args: Any, **kwargs: Any) -> Any:
-        """Evaluate a function"""
+        """Evaluate a function.
+        
+        Args:
+            *args: Positional arguments passed to memory.eval.
+            **kwargs: Keyword arguments passed to memory.eval.
+            
+        Returns:
+            The result of memory.eval.
+        """
         return self.memory.eval(*args, **kwargs)
 
     def format(self, *args: Any, **kwargs: Any) -> Any:
-        """Return the formatted representation of an object"""
+        """Return the formatted representation of an object.
+        
+        Args:
+            *args: Positional arguments passed to memory.format.
+            **kwargs: Keyword arguments passed to memory.format.
+            
+        Returns:
+            The result of memory.format.
+        """
         return self.memory.format(*args, **kwargs)
 
     def reduce_size(self, *args: Any, **kwargs: Any) -> None:
-        """Reduce the size of the cache"""
+        """Reduce the size of the cache.
+        
+        Args:
+            *args: Positional arguments passed to memory.reduce_size.
+            **kwargs: Keyword arguments passed to memory.reduce_size.
+        """
         self.memory.reduce_size(*args, **kwargs)  # pragma: no cover
 
     def warn(self, *args: Any, **kwargs: Any) -> None:
-        """Raise a warning"""
+        """Raise a warning.
+        
+        Args:
+            *args: Positional arguments passed to memory.warn.
+            **kwargs: Keyword arguments passed to memory.warn.
+        """
         self.memory.warn(*args, **kwargs)  # pragma: no cover
 
 

@@ -87,34 +87,26 @@ def frames_to_samples(
 ) -> Union[jnp.integer[Any], jnp.ndarray]:
     """Convert frame indices to audio sample indices.
 
-    Parameters
-    ----------
-    frames : number or jnp.ndarray [shape=(n,)]
-        frame index or vector of frame indices
-    hop_length : int > 0 [scalar]
-        number of samples between successive frames
-    n_fft : None or int > 0 [scalar]
-        Optional: length of the FFT window.
-        If given, time conversion will include an offset of ``n_fft // 2``
-        to counteract windowing effects when using a non-centered STFT.
+    Args:
+        frames: Frame index or vector of frame indices.
+        hop_length: Number of samples between successive frames.
+        n_fft: Optional length of the FFT window. If given, time conversion will
+            include an offset of ``n_fft // 2`` to counteract windowing effects
+            when using a non-centered STFT.
 
-    Returns
-    -------
-    times : number or jnp.ndarray
-        time (in samples) of each given frame number::
+    Returns:
+        Time (in samples) of each given frame number::
 
             times[i] = frames[i] * hop_length
 
-    See Also
-    --------
-    frames_to_time : convert frame indices to time values
-    samples_to_frames : convert sample indices to frame indices
+    See Also:
+        frames_to_time: Convert frame indices to time values.
+        samples_to_frames: Convert sample indices to frame indices.
 
-    Examples
-    --------
-    >>> y, sr = librosax.load(librosax.ex('choice'))
-    >>> tempo, beats = librosax.beat.beat_track(y=y, sr=sr)
-    >>> beat_samples = librosax.frames_to_samples(beats, sr=sr)
+    Examples:
+        >>> y, sr = librosax.load(librosax.ex('choice'))
+        >>> tempo, beats = librosax.beat.beat_track(y=y, sr=sr)
+        >>> beat_samples = librosax.frames_to_samples(beats, sr=sr)
     """
     offset = 0
     if n_fft is not None:
@@ -158,44 +150,35 @@ def samples_to_frames(
 ) -> Union[jnp.integer[Any], jnp.ndarray]:
     """Convert sample indices into STFT frames.
 
-    Examples
-    --------
-    >>> # Get the frame numbers for every 256 samples
-    >>> librosax.samples_to_frames(jnp.arange(0, 22050, 256))
-    array([ 0,  0,  1,  1,  2,  2,  3,  3,  4,  4,  5,  5,  6,  6,
-            7,  7,  8,  8,  9,  9, 10, 10, 11, 11, 12, 12, 13, 13,
-           14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20,
-           21, 21, 22, 22, 23, 23, 24, 24, 25, 25, 26, 26, 27, 27,
-           28, 28, 29, 29, 30, 30, 31, 31, 32, 32, 33, 33, 34, 34,
-           35, 35, 36, 36, 37, 37, 38, 38, 39, 39, 40, 40, 41, 41,
-           42, 42, 43])
+    Args:
+        samples: Sample index or vector of sample indices.
+        hop_length: Number of samples between successive frames.
+        n_fft: Optional length of the FFT window. If given, time conversion will
+            include an offset of ``- n_fft // 2`` to counteract windowing effects
+            in STFT.
 
-    Parameters
-    ----------
-    samples : int or jnp.ndarray [shape=(n,)]
-        sample index or vector of sample indices
+            Note:
+                This may result in negative frame indices.
 
-    hop_length : int > 0 [scalar]
-        number of samples between successive frames
-
-    n_fft : None or int > 0 [scalar]
-        Optional: length of the FFT window.
-        If given, time conversion will include an offset of ``- n_fft // 2``
-        to counteract windowing effects in STFT.
-
-        .. note:: This may result in negative frame indices.
-
-    Returns
-    -------
-    frames : int or jnp.ndarray [shape=(n,), dtype=int]
+    Returns:
         Frame numbers corresponding to the given times::
 
             frames[i] = floor( samples[i] / hop_length )
 
-    See Also
-    --------
-    samples_to_time : convert sample indices to time values
-    frames_to_samples : convert frame indices to sample indices
+    See Also:
+        samples_to_time: Convert sample indices to time values.
+        frames_to_samples: Convert frame indices to sample indices.
+
+    Examples:
+        >>> # Get the frame numbers for every 256 samples
+        >>> librosax.samples_to_frames(jnp.arange(0, 22050, 256))
+        array([ 0,  0,  1,  1,  2,  2,  3,  3,  4,  4,  5,  5,  6,  6,
+                7,  7,  8,  8,  9,  9, 10, 10, 11, 11, 12, 12, 13, 13,
+               14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20,
+               21, 21, 22, 22, 23, 23, 24, 24, 25, 25, 26, 26, 27, 27,
+               28, 28, 29, 29, 30, 30, 31, 31, 32, 32, 33, 33, 34, 34,
+               35, 35, 36, 36, 37, 37, 38, 38, 39, 39, 40, 40, 41, 41,
+               42, 42, 43])
     """
     offset = 0
     if n_fft is not None:
@@ -247,36 +230,27 @@ def frames_to_time(
 ) -> Union[jnp.floating[Any], jnp.ndarray]:
     """Convert frame counts to time (seconds).
 
-    Parameters
-    ----------
-    frames : jnp.ndarray [shape=(n,)]
-        frame index or vector of frame indices
-    sr : number > 0 [scalar]
-        audio sampling rate
-    hop_length : int > 0 [scalar]
-        number of samples between successive frames
-    n_fft : None or int > 0 [scalar]
-        Optional: length of the FFT window.
-        If given, time conversion will include an offset of ``n_fft // 2``
-        to counteract windowing effects when using a non-centered STFT.
+    Args:
+        frames: Frame index or vector of frame indices.
+        sr: Audio sampling rate.
+        hop_length: Number of samples between successive frames.
+        n_fft: Optional length of the FFT window. If given, time conversion will
+            include an offset of ``n_fft // 2`` to counteract windowing effects
+            when using a non-centered STFT.
 
-    Returns
-    -------
-    times : jnp.ndarray [shape=(n,)]
-        time (in seconds) of each given frame number::
+    Returns:
+        Time (in seconds) of each given frame number::
 
             times[i] = frames[i] * hop_length / sr
 
-    See Also
-    --------
-    time_to_frames : convert time values to frame indices
-    frames_to_samples : convert frame indices to sample indices
+    See Also:
+        time_to_frames: Convert time values to frame indices.
+        frames_to_samples: Convert frame indices to sample indices.
 
-    Examples
-    --------
-    >>> y, sr = librosax.load(librosax.ex('choice'))
-    >>> tempo, beats = librosax.beat.beat_track(y=y, sr=sr)
-    >>> beat_times = librosax.frames_to_time(beats, sr=sr)
+    Examples:
+        >>> y, sr = librosax.load(librosax.ex('choice'))
+        >>> tempo, beats = librosax.beat.beat_track(y=y, sr=sr)
+        >>> beat_times = librosax.frames_to_time(beats, sr=sr)
     """
     samples = frames_to_samples(frames, hop_length=hop_length, n_fft=n_fft)
 
@@ -325,43 +299,32 @@ def time_to_frames(
 ) -> Union[jnp.integer[Any], jnp.ndarray]:
     """Convert time stamps into STFT frames.
 
-    Parameters
-    ----------
-    times : jnp.ndarray [shape=(n,)]
-        time (in seconds) or vector of time values
+    Args:
+        times: Time (in seconds) or vector of time values.
+        sr: Audio sampling rate.
+        hop_length: Number of samples between successive frames.
+        n_fft: Optional length of the FFT window. If given, time conversion will
+            include an offset of ``- n_fft // 2`` to counteract windowing effects
+            in STFT.
 
-    sr : number > 0 [scalar]
-        audio sampling rate
+            Note:
+                This may result in negative frame indices.
 
-    hop_length : int > 0 [scalar]
-        number of samples between successive frames
-
-    n_fft : None or int > 0 [scalar]
-        Optional: length of the FFT window.
-        If given, time conversion will include an offset of ``- n_fft // 2``
-        to counteract windowing effects in STFT.
-
-        .. note:: This may result in negative frame indices.
-
-    Returns
-    -------
-    frames : jnp.ndarray [shape=(n,), dtype=int]
+    Returns:
         Frame numbers corresponding to the given times::
 
             frames[i] = floor( times[i] * sr / hop_length )
 
-    See Also
-    --------
-    frames_to_time : convert frame indices to time values
-    time_to_samples : convert time values to sample indices
+    See Also:
+        frames_to_time: Convert frame indices to time values.
+        time_to_samples: Convert time values to sample indices.
 
-    Examples
-    --------
-    Get the frame numbers for every 100ms
+    Examples:
+        Get the frame numbers for every 100ms
 
-    >>> librosax.time_to_frames(jnp.arange(0, 1, 0.1),
-    ...                         sr=22050, hop_length=512)
-    array([ 0,  4,  8, 12, 17, 21, 25, 30, 34, 38])
+        >>> librosax.time_to_frames(jnp.arange(0, 1, 0.1),
+        ...                         sr=22050, hop_length=512)
+        array([ 0,  4,  8, 12, 17, 21, 25, 30, 34, 38])
     """
     samples = time_to_samples(times, sr=sr)
 
@@ -392,11 +355,9 @@ def time_to_samples(
 ) -> Union[jnp.integer[Any], jnp.ndarray]:
     """Convert timestamps (in seconds) to sample indices.
 
-    Parameters
-    ----------
-    times : number or jnp.ndarray
-        Time value or array of time values (in seconds)
-    sr : number > 0
+    Args:
+        times: Time value or array of time values (in seconds).
+        sr: Sampling rate.
         Sampling rate
 
     Returns
@@ -442,35 +403,28 @@ def samples_to_time(
 ) -> Union[jnp.floating[Any], jnp.ndarray]:
     """Convert sample indices to time (in seconds).
 
-    Parameters
-    ----------
-    samples : jnp.ndarray
-        Sample index or array of sample indices
-    sr : number > 0
-        Sampling rate
+    Args:
+        samples: Sample index or array of sample indices.
+        sr: Sampling rate.
 
-    Returns
-    -------
-    times : jnp.ndarray [shape=samples.shape]
-        Time values corresponding to ``samples`` (in seconds)
+    Returns:
+        Time values corresponding to ``samples`` (in seconds).
 
-    See Also
-    --------
-    samples_to_frames : convert sample indices to frame indices
-    time_to_samples : convert time values to sample indices
+    See Also:
+        samples_to_frames: Convert sample indices to frame indices.
+        time_to_samples: Convert time values to sample indices.
 
-    Examples
-    --------
-    Get timestamps corresponding to every 512 samples
+    Examples:
+        Get timestamps corresponding to every 512 samples
 
-    >>> librosax.samples_to_time(jnp.arange(0, 22050, 512), sr=22050)
-    array([ 0.   ,  0.023,  0.046,  0.07 ,  0.093,  0.116,  0.139,
-            0.163,  0.186,  0.209,  0.232,  0.255,  0.279,  0.302,
-            0.325,  0.348,  0.372,  0.395,  0.418,  0.441,  0.464,
-            0.488,  0.511,  0.534,  0.557,  0.58 ,  0.604,  0.627,
-            0.65 ,  0.673,  0.697,  0.72 ,  0.743,  0.766,  0.789,
-            0.813,  0.836,  0.859,  0.882,  0.906,  0.929,  0.952,
-            0.975,  0.998])
+        >>> librosax.samples_to_time(jnp.arange(0, 22050, 512), sr=22050)
+        array([ 0.   ,  0.023,  0.046,  0.07 ,  0.093,  0.116,  0.139,
+                0.163,  0.186,  0.209,  0.232,  0.255,  0.279,  0.302,
+                0.325,  0.348,  0.372,  0.395,  0.418,  0.441,  0.464,
+                0.488,  0.511,  0.534,  0.557,  0.58 ,  0.604,  0.627,
+                0.65 ,  0.673,  0.697,  0.72 ,  0.743,  0.766,  0.789,
+                0.813,  0.836,  0.859,  0.882,  0.906,  0.929,  0.952,
+                0.975,  0.998])
     """
     return jnp.asanyarray(samples) / float(sr)
 
@@ -497,33 +451,26 @@ def blocks_to_frames(
 def blocks_to_frames(
     blocks: _ScalarOrSequence[_IntLike_co], *, block_length: int
 ) -> Union[jnp.integer[Any], jnp.ndarray]:
-    """Convert block indices to frame indices
+    """Convert block indices to frame indices.
 
-    Parameters
-    ----------
-    blocks : jnp.ndarray
-        Block index or array of block indices
-    block_length : int > 0
-        The number of frames per block
+    Args:
+        blocks: Block index or array of block indices.
+        block_length: The number of frames per block.
 
-    Returns
-    -------
-    frames : jnp.ndarray [shape=samples.shape, dtype=int]
+    Returns:
         The index or indices of frames corresponding to the beginning
         of each provided block.
 
-    See Also
-    --------
-    blocks_to_samples
-    blocks_to_time
+    See Also:
+        blocks_to_samples: Convert block indices to sample indices.
+        blocks_to_time: Convert block indices to time.
 
-    Examples
-    --------
-    Get frame indices for each block in a stream
+    Examples:
+        Get frame indices for each block in a stream
 
-    >>> filename = librosax.ex('brahms')
-    >>> sr = librosax.get_samplerate(filename)
-    >>> stream = librosax.stream(filename, block_length=16,
+        >>> filename = librosax.ex('brahms')
+        >>> sr = librosax.get_samplerate(filename)
+        >>> stream = librosax.stream(filename, block_length=16,
     ...                         frame_length=2048, hop_length=512)
     >>> for n, y in enumerate(stream):
     ...     n_frame = librosax.blocks_to_frames(n, block_length=16)
@@ -556,43 +503,35 @@ def blocks_to_samples(
 def blocks_to_samples(
     blocks: _ScalarOrSequence[_IntLike_co], *, block_length: int, hop_length: int
 ) -> Union[jnp.integer[Any], jnp.ndarray]:
-    """Convert block indices to sample indices
+    """Convert block indices to sample indices.
 
-    Parameters
-    ----------
-    blocks : jnp.ndarray
-        Block index or array of block indices
-    block_length : int > 0
-        The number of frames per block
-    hop_length : int > 0
-        The number of samples to advance between frames
+    Args:
+        blocks: Block index or array of block indices.
+        block_length: The number of frames per block.
+        hop_length: The number of samples to advance between frames.
 
-    Returns
-    -------
-    samples : jnp.ndarray [shape=samples.shape, dtype=int]
+    Returns:
         The index or indices of samples corresponding to the beginning
         of each provided block.
 
-        Note that these correspond to the *first* sample index in
-        each block, and are not frame-centered.
+        Note:
+            These correspond to the *first* sample index in each block,
+            and are not frame-centered.
 
-    See Also
-    --------
-    blocks_to_frames
-    blocks_to_time
+    See Also:
+        blocks_to_frames: Convert block indices to frame indices.
+        blocks_to_time: Convert block indices to time.
 
-    Examples
-    --------
-    Get sample indices for each block in a stream
+    Examples:
+        Get sample indices for each block in a stream
 
-    >>> filename = librosax.ex('brahms')
-    >>> sr = librosax.get_samplerate(filename)
-    >>> stream = librosax.stream(filename, block_length=16,
-    ...                         frame_length=2048, hop_length=512)
-    >>> for n, y in enumerate(stream):
-    ...     n_sample = librosax.blocks_to_samples(n, block_length=16,
-    ...                                          hop_length=512)
-
+        >>> filename = librosax.ex('brahms')
+        >>> sr = librosax.get_samplerate(filename)
+        >>> stream = librosax.stream(filename, block_length=16,
+        ...                         frame_length=2048, hop_length=512)
+        >>> for n, y in enumerate(stream):
+        ...     n_sample = librosax.blocks_to_samples(n, block_length=16,
+        ...                                          hop_length=512)
     """
     frames = blocks_to_frames(blocks, block_length=block_length)
     return frames_to_samples(frames, hop_length=hop_length)
@@ -630,45 +569,36 @@ def blocks_to_time(
     hop_length: int,
     sr: float,
 ) -> Union[jnp.floating[Any], jnp.ndarray]:
-    """Convert block indices to time (in seconds)
+    """Convert block indices to time (in seconds).
 
-    Parameters
-    ----------
-    blocks : jnp.ndarray
-        Block index or array of block indices
-    block_length : int > 0
-        The number of frames per block
-    hop_length : int > 0
-        The number of samples to advance between frames
-    sr : int > 0
-        The sampling rate (samples per second)
+    Args:
+        blocks: Block index or array of block indices.
+        block_length: The number of frames per block.
+        hop_length: The number of samples to advance between frames.
+        sr: The sampling rate (samples per second).
 
-    Returns
-    -------
-    times : jnp.ndarray [shape=samples.shape]
+    Returns:
         The time index or indices (in seconds) corresponding to the
         beginning of each provided block.
 
-        Note that these correspond to the time of the *first* sample
-        in each block, and are not frame-centered.
+        Note:
+            These correspond to the time of the *first* sample in each block,
+            and are not frame-centered.
 
-    See Also
-    --------
-    blocks_to_frames
-    blocks_to_samples
+    See Also:
+        blocks_to_frames: Convert block indices to frame indices.
+        blocks_to_samples: Convert block indices to sample indices.
 
-    Examples
-    --------
-    Get time indices for each block in a stream
+    Examples:
+        Get time indices for each block in a stream
 
-    >>> filename = librosax.ex('brahms')
-    >>> sr = librosax.get_samplerate(filename)
-    >>> stream = librosax.stream(filename, block_length=16,
-    ...                         frame_length=2048, hop_length=512)
-    >>> for n, y in enumerate(stream):
-    ...     n_time = librosax.blocks_to_time(n, block_length=16,
-    ...                                     hop_length=512, sr=sr)
-
+        >>> filename = librosax.ex('brahms')
+        >>> sr = librosax.get_samplerate(filename)
+        >>> stream = librosax.stream(filename, block_length=16,
+        ...                         frame_length=2048, hop_length=512)
+        >>> for n, y in enumerate(stream):
+        ...     n_time = librosax.blocks_to_time(n, block_length=16,
+        ...                                     hop_length=512, sr=sr)
     """
     samples = blocks_to_samples(
         blocks, block_length=block_length, hop_length=hop_length
@@ -696,37 +626,30 @@ def note_to_hz(
 def note_to_hz(
     note: Union[str, _IterableLike[str], Iterable[str]], **kwargs: Any
 ) -> Union[jnp.floating[Any], jnp.ndarray]:
-    """Convert one or more note names to frequency (Hz)
+    """Convert one or more note names to frequency (Hz).
 
-    Examples
-    --------
-    >>> # Get the frequency of a note
-    >>> librosax.note_to_hz('C')
-    array([ 16.352])
-    >>> # Or multiple notes
-    >>> librosax.note_to_hz(['A3', 'A4', 'A5'])
-    array([ 220.,  440.,  880.])
-    >>> # Or notes with tuning deviations
-    >>> librosax.note_to_hz('C2-32', round_midi=False)
-    array([ 64.209])
+    Args:
+        note: One or more note names to convert.
+        **kwargs: Additional parameters to `note_to_midi`.
 
-    Parameters
-    ----------
-    note : str or iterable of str
-        One or more note names to convert
-    **kwargs : additional keyword arguments
-        Additional parameters to `note_to_midi`
+    Returns:
+        Array of frequencies (in Hz) corresponding to ``note``.
 
-    Returns
-    -------
-    frequencies : number or jnp.ndarray [shape=(len(note),)]
-        Array of frequencies (in Hz) corresponding to ``note``
+    See Also:
+        midi_to_hz: Convert MIDI note numbers to frequencies.
+        note_to_midi: Convert note names to MIDI numbers.
+        hz_to_note: Convert frequencies to note names.
 
-    See Also
-    --------
-    midi_to_hz
-    note_to_midi
-    hz_to_note
+    Examples:
+        >>> # Get the frequency of a note
+        >>> librosax.note_to_hz('C')
+        array([ 16.352])
+        >>> # Or multiple notes
+        >>> librosax.note_to_hz(['A3', 'A4', 'A5'])
+        array([ 220.,  440.,  880.])
+        >>> # Or notes with tuning deviations
+        >>> librosax.note_to_hz('C2-32', round_midi=False)
+        array([ 64.209])
     """
     return midi_to_hz(note_to_midi(note, **kwargs))
 
@@ -754,59 +677,48 @@ def note_to_midi(
     """Convert one or more spelled notes to MIDI number(s).
 
     Notes may be spelled out with optional accidentals or octave numbers.
-
     The leading note name is case-insensitive.
-
     Sharps are indicated with ``#``, flats may be indicated with ``!`` or ``b``.
 
-    Parameters
-    ----------
-    note : str or iterable of str
-        One or more note names.
-    round_midi : bool
-        - If ``True``, midi numbers are rounded to the nearest integer.
-        - If ``False``, allow fractional midi numbers.
+    Args:
+        note: One or more note names.
+        round_midi: If ``True``, midi numbers are rounded to the nearest integer.
+            If ``False``, allow fractional midi numbers.
 
-    Returns
-    -------
-    midi : float or jnp.array
+    Returns:
         Midi note numbers corresponding to inputs.
 
-    Raises
-    ------
-    ParameterError
-        If the input is not in valid note format
+    Raises:
+        ParameterError: If the input is not in valid note format.
 
-    See Also
-    --------
-    midi_to_note
-    note_to_hz
+    See Also:
+        midi_to_note: Convert MIDI numbers to note names.
+        note_to_hz: Convert note names to frequencies.
 
-    Examples
-    --------
-    >>> librosax.note_to_midi('C')
-    12
-    >>> librosax.note_to_midi('C#3')
-    49
-    >>> librosax.note_to_midi('C♯3')  # Using Unicode sharp
-    49
-    >>> librosax.note_to_midi('C♭3')  # Using Unicode flat
-    47
-    >>> librosax.note_to_midi('f4')
-    65
-    >>> librosax.note_to_midi('Bb-1')
-    10
-    >>> librosax.note_to_midi('A!8')
-    116
-    >>> librosax.note_to_midi('G𝄪6')  # Double-sharp
-    93
-    >>> librosax.note_to_midi('B𝄫6')  # Double-flat
-    93
-    >>> librosax.note_to_midi('C♭𝄫5')  # Triple-flats also work
-    69
-    >>> # Lists of notes also work
-    >>> librosax.note_to_midi(['C', 'E', 'G'])
-    array([12, 16, 19])
+    Examples:
+        >>> librosax.note_to_midi('C')
+        12
+        >>> librosax.note_to_midi('C#3')
+        49
+        >>> librosax.note_to_midi('C♯3')  # Using Unicode sharp
+        49
+        >>> librosax.note_to_midi('C♭3')  # Using Unicode flat
+        47
+        >>> librosax.note_to_midi('f4')
+        65
+        >>> librosax.note_to_midi('Bb-1')
+        10
+        >>> librosax.note_to_midi('A!8')
+        116
+        >>> librosax.note_to_midi('G𝄪6')  # Double-sharp
+        93
+        >>> librosax.note_to_midi('B𝄫6')  # Double-flat
+        93
+        >>> librosax.note_to_midi('C♭𝄫5')  # Triple-flats also work
+        69
+        >>> # Lists of notes also work
+        >>> librosax.note_to_midi(['C', 'E', 'G'])
+        array([12, 16, 19])
     """
     if not isinstance(note, str):
         if note and isinstance(note[0], np.ndarray):

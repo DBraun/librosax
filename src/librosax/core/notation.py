@@ -150,67 +150,56 @@ ACC_MAP = {"#": 1, "♮": 0, "": 0, "n": 0, "b": -1, "!": -1, "♯": 1, "♭": -
 
 
 def thaat_to_degrees(thaat: str) -> jnp.ndarray:
-    """Construct the svara indices (degrees) for a given thaat
+    """Construct the svara indices (degrees) for a given thaat.
 
-    Parameters
-    ----------
-    thaat : str
-        The name of the thaat
+    Args:
+        thaat: The name of the thaat.
 
-    Returns
-    -------
-    indices : jnp.ndarray
+    Returns:
         A list of the seven svara indices (starting from 0=Sa)
-        contained in the specified thaat
+        contained in the specified thaat.
 
-    See Also
-    --------
-    key_to_degrees
-    mela_to_degrees
-    list_thaat
+    See Also:
+        key_to_degrees: Construct diatonic scale degrees for a key.
+        mela_to_degrees: Construct svara indices for a melakarta raga.
+        list_thaat: List supported thaats.
 
-    Examples
-    --------
-    >>> librosax.thaat_to_degrees('bilaval')
-    array([ 0,  2,  4,  5,  7,  9, 11])
+    Examples:
+        >>> librosax.thaat_to_degrees('bilaval')
+        array([ 0,  2,  4,  5,  7,  9, 11])
 
-    >>> librosax.thaat_to_degrees('todi')
-    array([ 0,  1,  3,  6,  7,  8, 11])
+        >>> librosax.thaat_to_degrees('todi')
+        array([ 0,  1,  3,  6,  7,  8, 11])
     """
     return jnp.asarray(THAAT_MAP[thaat.lower()])
 
 
 def mela_to_degrees(mela: Union[str, int]) -> jnp.ndarray:
-    """Construct the svara indices (degrees) for a given melakarta raga
+    """Construct the svara indices (degrees) for a given melakarta raga.
 
-    Parameters
-    ----------
-    mela : str or int
-        Either the name or integer index ([1, 2, ..., 72]) of the melakarta raga
+    Args:
+        mela: Either the name or integer index ([1, 2, ..., 72]) of the
+            melakarta raga.
 
-    Returns
-    -------
-    degrees : jnp.ndarray
+    Returns:
         A list of the seven svara indices (starting from 0=Sa)
-        contained in the specified raga
+        contained in the specified raga.
 
-    See Also
-    --------
-    thaat_to_degrees
-    key_to_degrees
-    list_mela
+    See Also:
+        thaat_to_degrees: Construct svara indices for a thaat.
+        key_to_degrees: Construct diatonic scale degrees for a key.
+        list_mela: List melakarta ragas.
 
-    Examples
-    --------
-    Melakarta #1 (kanakangi):
+    Examples:
+        Melakarta #1 (kanakangi):
 
-    >>> librosax.mela_to_degrees(1)
-    array([0, 1, 2, 5, 7, 8, 9])
+        >>> librosax.mela_to_degrees(1)
+        array([0, 1, 2, 5, 7, 8, 9])
 
-    Or using a name directly:
+        Or using a name directly:
 
-    >>> librosax.mela_to_degrees('kanakangi')
-    array([0, 1, 2, 5, 7, 8, 9])
+        >>> librosax.mela_to_degrees('kanakangi')
+        array([0, 1, 2, 5, 7, 8, 9])
     """
     if isinstance(mela, str):
         index = MELAKARTA_MAP[mela.lower()] - 1
@@ -282,7 +271,7 @@ def mela_to_degrees(mela: Union[str, int]) -> jnp.ndarray:
 def mela_to_svara(
         mela: Union[str, int], *, abbr: bool = True, unicode: bool = True
 ) -> List[str]:
-    """Spell the Carnatic svara names for a given melakarta raga
+    """Spell the Carnatic svara names for a given melakarta raga.
 
     This function exists to resolve enharmonic equivalences between
     pitch classes:
@@ -295,64 +284,51 @@ def mela_to_svara(
     For svara outside the raga, names are chosen to preserve orderings
     so that all Ri precede all Ga, and all Dha precede all Ni.
 
-    Parameters
-    ----------
-    mela : str or int
-        the name or numerical index of the melakarta raga
+    Args:
+        mela: The name or numerical index of the melakarta raga.
+        abbr: If True, use single-letter svara names: S, R, G, ...
+            If False, use full names: Sa, Ri, Ga, ...
+        unicode: If True, use unicode symbols for numberings, e.g., Ri\u2081
+            If False, use low-order ASCII, e.g., Ri1.
 
-    abbr : bool
-        If `True`, use single-letter svara names: S, R, G, ...
-
-        If `False`, use full names: Sa, Ri, Ga, ...
-
-    unicode : bool
-        If `True`, use unicode symbols for numberings, e.g., Ri\u2081
-
-        If `False`, use low-order ASCII, e.g., Ri1.
-
-    Returns
-    -------
-    svara : list of strings
-
+    Returns:
         The svara names for each of the 12 pitch classes.
 
-    See Also
-    --------
-    key_to_notes
-    mela_to_degrees
-    list_mela
+    See Also:
+        key_to_notes: Spell note names for a given key.
+        mela_to_degrees: Construct svara indices for a melakarta raga.
+        list_mela: List melakarta ragas.
 
-    Examples
-    --------
-    Melakarta #1 (Kanakangi) uses R1, G1, D1, N1
+    Examples:
+        Melakarta #1 (Kanakangi) uses R1, G1, D1, N1
 
-    >>> librosax.mela_to_svara(1)
-    ['S', 'R₁', 'G₁', 'G₂', 'G₃', 'M₁', 'M₂', 'P', 'D₁', 'N₁', 'N₂', 'N₃']
+        >>> librosax.mela_to_svara(1)
+        ['S', 'R₁', 'G₁', 'G₂', 'G₃', 'M₁', 'M₂', 'P', 'D₁', 'N₁', 'N₂', 'N₃']
 
-    #19 (Jhankaradhwani) uses R2 and G2 so the third svara are Ri:
+        #19 (Jhankaradhwani) uses R2 and G2 so the third svara are Ri:
 
-    >>> librosax.mela_to_svara(19)
-    ['S', 'R₁', 'R₂', 'G₂', 'G₃', 'M₁', 'M₂', 'P', 'D₁', 'N₁', 'N₂', 'N₃']
+        >>> librosax.mela_to_svara(19)
+        ['S', 'R₁', 'R₂', 'G₂', 'G₃', 'M₁', 'M₂', 'P', 'D₁', 'N₁', 'N₂', 'N₃']
 
-    #31 (Yagapriya) uses R3 and G3, so third and fourth svara are Ri:
+        #31 (Yagapriya) uses R3 and G3, so third and fourth svara are Ri:
 
-    >>> librosax.mela_to_svara(31)
-    ['S', 'R₁', 'R₂', 'R₃', 'G₃', 'M₁', 'M₂', 'P', 'D₁', 'N₁', 'N₂', 'N₃']
+        >>> librosax.mela_to_svara(31)
+        ['S', 'R₁', 'R₂', 'R₃', 'G₃', 'M₁', 'M₂', 'P', 'D₁', 'N₁', 'N₂', 'N₃']
 
-    #34 (Vagadheeswari) uses D2 and N2, so Ni1 becomes Dha2:
+        #34 (Vagadheeswari) uses D2 and N2, so Ni1 becomes Dha2:
 
-    >>> librosax.mela_to_svara(34)
-    ['S', 'R₁', 'R₂', 'R₃', 'G₃', 'M₁', 'M₂', 'P', 'D₁', 'D₂', 'N₂', 'N₃']
+        >>> librosax.mela_to_svara(34)
+        ['S', 'R₁', 'R₂', 'R₃', 'G₃', 'M₁', 'M₂', 'P', 'D₁', 'D₂', 'N₂', 'N₃']
 
-    #36 (Chalanatta) uses D3 and N3, so Ni2 becomes Dha3:
+        #36 (Chalanatta) uses D3 and N3, so Ni2 becomes Dha3:
 
-    >>> librosax.mela_to_svara(36)
-    ['S', 'R₁', 'R₂', 'R₃', 'G₃', 'M₁', 'M₂', 'P', 'D₁', 'D₂', 'D₃', 'N₃']
+        >>> librosax.mela_to_svara(36)
+        ['S', 'R₁', 'R₂', 'R₃', 'G₃', 'M₁', 'M₂', 'P', 'D₁', 'D₂', 'D₃', 'N₃']
 
-    # You can also query by raga name instead of index:
+        You can also query by raga name instead of index:
 
-    >>> librosax.mela_to_svara('chalanatta')
-    ['S', 'R₁', 'R₂', 'R₃', 'G₃', 'M₁', 'M₂', 'P', 'D₁', 'D₂', 'D₃', 'N₃']
+        >>> librosax.mela_to_svara('chalanatta')
+        ['S', 'R₁', 'R₂', 'R₃', 'G₃', 'M₁', 'M₂', 'P', 'D₁', 'D₂', 'D₃', 'N₃']
     """
     # The following will be constant for all ragas
     svara_map = [
@@ -430,29 +406,26 @@ def list_mela() -> Dict[str, int]:
     Melakarta raga names are transcribed from [#]_, with the exception of #45
     (subhapanthuvarali).
 
-    .. [#] Bhagyalekshmy, S. (1990).
-        Ragas in Carnatic music.
-        South Asia Books.
+    Returns:
+        A dictionary mapping melakarta raga names to indices (1, 2, ..., 72).
 
-    Returns
-    -------
-    mela_map : dict
-        A dictionary mapping melakarta raga names to indices (1, 2, ..., 72)
+    References:
+        .. [#] Bhagyalekshmy, S. (1990).
+            Ragas in Carnatic music.
+            South Asia Books.
 
-    Examples
-    --------
-    >>> librosax.list_mela()
-    {'kanakangi': 1,
-     'ratnangi': 2,
-     'ganamurthi': 3,
-     'vanaspathi': 4,
-     ...}
+    See Also:
+        mela_to_degrees: Construct svara indices for a melakarta raga.
+        mela_to_svara: Spell svara names for a melakarta raga.
+        list_thaat: List supported thaats.
 
-    See Also
-    --------
-    mela_to_degrees
-    mela_to_svara
-    list_thaat
+    Examples:
+        >>> librosax.list_mela()
+        {'kanakangi': 1,
+         'ratnangi': 2,
+         'ganamurthi': 3,
+         'vanaspathi': 4,
+         ...}
     """
     return MELAKARTA_MAP.copy()
 
@@ -460,29 +433,25 @@ def list_mela() -> Dict[str, int]:
 def list_thaat() -> List[str]:
     """List supported thaats by name.
 
-    Returns
-    -------
-    thaats : list
-        A list of supported thaats
+    Returns:
+        A list of supported thaats.
 
-    Examples
-    --------
-    >>> librosax.list_thaat()
-    ['bilaval',
-     'khamaj',
-     'kafi',
-     'asavari',
-     'bhairavi',
-     'kalyan',
-     'marva',
-     'poorvi',
-     'todi',
-     'bhairav']
+    See Also:
+        list_mela: List melakarta ragas.
+        thaat_to_degrees: Construct svara indices for a thaat.
 
-    See Also
-    --------
-    list_mela
-    thaat_to_degrees
+    Examples:
+        >>> librosax.list_thaat()
+        ['bilaval',
+         'khamaj',
+         'kafi',
+         'asavari',
+         'bhairavi',
+         'kalyan',
+         'marva',
+         'poorvi',
+         'todi',
+         'bhairav']
     """
     return list(THAAT_MAP.keys())
 
@@ -503,17 +472,25 @@ def __note_to_degree(key: Union[str, _IterableLike[str], Iterable[str]]) -> Unio
 
 
 def __note_to_degree(key: Union[str, _IterableLike[str], Iterable[str]]) -> Union[int, jnp.ndarray]:
-    """Take a note name and return the degree of that note (e.g. 'C#' -> 1). We allow possibilities like "C#b".
+    """Take a note name and return the degree of that note.
+    
+    We allow possibilities like "C#b" (e.g. 'C#' -> 1).
 
-    >>> librosax.__note_to_degree('B#')
-    0
+    Args:
+        key: Note name(s) to convert.
+        
+    Returns:
+        Degree of the note(s) as integer(s) from 0 to 11.
 
-    >>> librosax.__note_to_degree('D♮##b')
-    3
+    Examples:
+        >>> librosax.__note_to_degree('B#')
+        0
 
-    >>> librosax.__note_to_degree(['B#','D♮##b'])
-    array([0,3])
+        >>> librosax.__note_to_degree('D♮##b')
+        3
 
+        >>> librosax.__note_to_degree(['B#','D♮##b'])
+        array([0,3])
     """
     if not isinstance(key, str):
         return jnp.array([__note_to_degree(n) for n in key])
@@ -548,17 +525,27 @@ def __simplify_note(key: Union[str, _IterableLike[str], Iterable[str]], addition
 
 def __simplify_note(key: Union[str, _IterableLike[str], Iterable[str]], additional_acc: str = '',
                     unicode: bool = True) -> Union[str, jnp.ndarray]:
-    """Take in a note name and simplify by canceling sharp-flat pairs, and doubling accidentals as appropriate.
+    """Take in a note name and simplify by canceling sharp-flat pairs.
+    
+    Also handles doubling accidentals as appropriate.
 
-    >>> librosax.__simplify_note('C♭♯')
-    'C'
+    Args:
+        key: Note name(s) to simplify.
+        additional_acc: Additional accidentals to apply.
+        unicode: If True, use Unicode symbols for accidentals.
+        
+    Returns:
+        Simplified note name(s).
 
-    >>> librosax.__simplify_note('C♭♭♭')
-    'C♭𝄫'
+    Examples:
+        >>> librosax.__simplify_note('C♭♯')
+        'C'
 
-    >>> librosax.__simplify_note(['C♭♯', 'C♭♭♭'])
-    array(['C', 'C♭𝄫'], dtype='<U3')
+        >>> librosax.__simplify_note('C♭♭♭')
+        'C♭𝄫'
 
+        >>> librosax.__simplify_note(['C♭♯', 'C♭♭♭'])
+        array(['C', 'C♭𝄫'], dtype='<U3')
     """
     if not isinstance(key, str):
         return jnp.array([__simplify_note(n + additional_acc, unicode=unicode) for n in key])
@@ -587,14 +574,22 @@ def __simplify_note(key: Union[str, _IterableLike[str], Iterable[str]], addition
 
 
 def __mode_to_key(signature: str, unicode: bool = True) -> str:
-    """Translate a mode (eg D:dorian) into its equivalent major key. If unicode==True, return the accidentals as unicode symbols, regardless of nature of accidentals in signature. Otherwise, return accidentals as ASCII symbols.
+    """Translate a mode (eg D:dorian) into its equivalent major key.
+    
+    Args:
+        signature: Mode signature to translate.
+        unicode: If True, return accidentals as unicode symbols.
+            Otherwise, return accidentals as ASCII symbols.
+            
+    Returns:
+        Equivalent major key signature.
 
-    >>> librosax.__mode_to_key('Db:loc')
-    'E𝄫:maj'
+    Examples:
+        >>> librosax.__mode_to_key('Db:loc')
+        'E𝄫:maj'
 
-    >>> librosax.__mode_to_key('D♭:loc', unicode = False)
-    'Ebb:maj'
-
+        >>> librosax.__mode_to_key('D♭:loc', unicode = False)
+        'Ebb:maj'
     """
     match = KEY_RE.match(signature)
 
@@ -635,96 +630,78 @@ def key_to_notes(key: str, *, unicode: bool = True, natural: bool = False) -> Li
 
     3. If there is a tie (e.g., in the case of C:maj vs A:min), sharps will be preferred.
 
-    Parameters
-    ----------
-    key : string
-        Must be in the form TONIC:key.  Tonic must be upper case (``CDEFGAB``),
-        key must be lower-case
-        (``major``, ``minor``, ``ionian``, ``dorian``, ``phrygian``, ``lydian``, ``mixolydian``, ``aeolian``, ``locrian``).
+    Args:
+        key: Must be in the form TONIC:key.  Tonic must be upper case (``CDEFGAB``),
+            key must be lower-case
+            (``major``, ``minor``, ``ionian``, ``dorian``, ``phrygian``, ``lydian``, ``mixolydian``, ``aeolian``, ``locrian``).
+            The following abbreviations are supported for the modes: either the first three letters of the mode name
+            (e.g. "mix") or the mode name without "ian" (e.g. "mixolyd").
+            Both ``major`` and ``maj`` are supported as mode abbreviations.
+            Single and multiple accidentals (``b!♭`` for flat, ``#♯`` for sharp, ``𝄪𝄫`` for double-accidentals, or any combination thereof) are supported.
+            Examples: ``C:maj, C:major, Dbb:min, A♭:min, D:aeo, E𝄪:phryg``.
+        unicode: If ``True`` (default), use Unicode symbols (♯𝄪♭𝄫)for accidentals.
+            If ``False``, Unicode symbols will be mapped to low-order ASCII representations::
+                ♯ -> #, 𝄪 -> ##, ♭ -> b, 𝄫 -> bb, ♮ -> n
+        natural: If ``True'', mark natural accidentals with a natural symbol (♮).
+            If ``False`` (default), do not print natural symbols.
+            For example, `note_to_degrees('D:maj')[0]` is `C` if `natural=False` (default) and `C♮` if `natural=True`.
 
-        The following abbreviations are supported for the modes: either the first three letters of the mode name
-        (e.g. "mix") or the mode name without "ian" (e.g. "mixolyd").
-
-        Both ``major`` and ``maj`` are supported as mode abbreviations.
-
-        Single and multiple accidentals (``b!♭`` for flat, ``#♯`` for sharp, ``𝄪𝄫`` for double-accidentals, or any combination thereof) are supported.
-
-        Examples: ``C:maj, C:major, Dbb:min, A♭:min, D:aeo, E𝄪:phryg``.
-
-    unicode : bool
-        If ``True`` (default), use Unicode symbols (♯𝄪♭𝄫)for accidentals.
-
-        If ``False``, Unicode symbols will be mapped to low-order ASCII representations::
-
-            ♯ -> #, 𝄪 -> ##, ♭ -> b, 𝄫 -> bb, ♮ -> n
-
-    natural : bool
-        If ``True'', mark natural accidentals with a natural symbol (♮).
-
-        If ``False`` (default), do not print natural symbols.
-
-        For example, `note_to_degrees('D:maj')[0]` is `C` if `natural=False` (default) and `C♮` if `natural=True`.
-
-    Returns
-    -------
-    notes : list
+    Returns:
         ``notes[k]`` is the name for semitone ``k`` (starting from C)
         under the given key.  All chromatic notes (0 through 11) are
         included.
 
-    See Also
-    --------
-    midi_to_note
+    See Also:
+        midi_to_note: Convert MIDI note numbers to pitch names.
 
-    Examples
-    --------
-    `C:maj` will use all sharps
+    Examples:
+        `C:maj` will use all sharps
 
-    >>> librosax.key_to_notes('C:maj')
-    ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
+        >>> librosax.key_to_notes('C:maj')
+        ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 
-    `A:min` has the same notes
+        `A:min` has the same notes
 
-    >>> librosax.key_to_notes('A:min')
-    ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
+        >>> librosax.key_to_notes('A:min')
+        ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 
-    `A♯:min` will use sharps, but spell note 0 (`C`) as `B♯`
+        `A♯:min` will use sharps, but spell note 0 (`C`) as `B♯`
 
-    >>> librosax.key_to_notes('A#:min')
-    ['B♯', 'C♯', 'D', 'D♯', 'E', 'E♯', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
+        >>> librosax.key_to_notes('A#:min')
+        ['B♯', 'C♯', 'D', 'D♯', 'E', 'E♯', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 
-    `G♯:maj` will use a double-sharp to spell note 7 (`G`) as `F𝄪`:
+        `G♯:maj` will use a double-sharp to spell note 7 (`G`) as `F𝄪`:
 
-    >>> librosax.key_to_notes('G#:maj')
-    ['B♯', 'C♯', 'D', 'D♯', 'E', 'E♯', 'F♯', 'F𝄪', 'G♯', 'A', 'A♯', 'B']
+        >>> librosax.key_to_notes('G#:maj')
+        ['B♯', 'C♯', 'D', 'D♯', 'E', 'E♯', 'F♯', 'F𝄪', 'G♯', 'A', 'A♯', 'B']
 
-    `F♭:min` will use double-flats
+        `F♭:min` will use double-flats
 
-    >>> librosax.key_to_notes('Fb:min')
-    ['D𝄫', 'D♭', 'E𝄫', 'E♭', 'F♭', 'F', 'G♭', 'A𝄫', 'A♭', 'B𝄫', 'B♭', 'C♭']
+        >>> librosax.key_to_notes('Fb:min')
+        ['D𝄫', 'D♭', 'E𝄫', 'E♭', 'F♭', 'F', 'G♭', 'A𝄫', 'A♭', 'B𝄫', 'B♭', 'C♭']
 
-    `G:loc` uses flats
+        `G:loc` uses flats
 
-    >>> librosax.key_to_notes('G:loc')
-    ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B']
+        >>> librosax.key_to_notes('G:loc')
+        ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B']
 
-    If `natural=True`, print natural accidentals.
+        If `natural=True`, print natural accidentals.
 
-    >>> librosax.key_to_notes('G:loc', natural=True)
-    ['C', 'D♭', 'D♮', 'E♭', 'E♮', 'F', 'G♭', 'G', 'A♭', 'A♮', 'B♭', 'B♮']
+        >>> librosax.key_to_notes('G:loc', natural=True)
+        ['C', 'D♭', 'D♮', 'E♭', 'E♮', 'F', 'G♭', 'G', 'A♭', 'A♮', 'B♭', 'B♮']
 
-    >>> librosax.key_to_notes('D:maj', natural=True)
-    ['C♮', 'C♯', 'D', 'D♯', 'E', 'F♮', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
+        >>> librosax.key_to_notes('D:maj', natural=True)
+        ['C♮', 'C♯', 'D', 'D♯', 'E', 'F♮', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 
-    >>> librosax.key_to_notes('G#:maj', unicode = False, natural = True)
-    ['B#', 'C#', 'Dn', 'D#', 'En', 'E#', 'F#', 'F##', 'G#', 'An', 'A#', 'B']
+        >>> librosax.key_to_notes('G#:maj', unicode = False, natural = True)
+        ['B#', 'C#', 'Dn', 'D#', 'En', 'E#', 'F#', 'F##', 'G#', 'An', 'A#', 'B']
 
-    We can combine this with ``key_to_degrees`` to get the notes for a given scale:
+        We can combine this with ``key_to_degrees`` to get the notes for a given scale:
 
-    >>> notes = librosax.key_to_notes('D:maj')
-    >>> degrees = librosax.key_to_degrees('D:maj')
-    >>> print([notes[d] for d in degrees])
-    ['D', 'E', 'F♯', 'G', 'A', 'B', 'C♯']
+        >>> notes = librosax.key_to_notes('D:maj')
+        >>> degrees = librosax.key_to_degrees('D:maj')
+        >>> print([notes[d] for d in degrees])
+        ['D', 'E', 'F♯', 'G', 'A', 'B', 'C♯']
     """
     # Parse the key signature
     match = KEY_RE.match(key)
@@ -864,46 +841,36 @@ def key_to_notes(key: str, *, unicode: bool = True, natural: bool = False) -> Li
 def key_to_degrees(key: str) -> jnp.ndarray:
     """Construct the diatonic scale degrees for a given key.
 
-    Parameters
-    ----------
-    key : str
-        Must be in the form TONIC:key.  Tonic must be upper case (``CDEFGAB``),
-        key must be lower-case
-        (``maj``, ``min``, ``ionian``, ``dorian``, ``phrygian``, ``lydian``, ``mixolydian``, ``aeolian``, ``locrian``).
+    Args:
+        key: Must be in the form TONIC:key.  Tonic must be upper case (``CDEFGAB``),
+            key must be lower-case
+            (``maj``, ``min``, ``ionian``, ``dorian``, ``phrygian``, ``lydian``, ``mixolydian``, ``aeolian``, ``locrian``).
+            The following abbreviations are supported for the modes: either the first three letters of the mode name
+            (e.g. "mix") or the mode name without "ian" (e.g. "mixolyd").
+            Both ``major`` and ``maj`` are supported as abbreviations.
+            Single and multiple accidentals (``b!♭`` for flat, or ``#♯`` for sharp) are supported.
+            Examples: ``C:maj, C:major, Dbb:min, A♭:min, D:aeo, E𝄪:phryg``.
 
-        The following abbreviations are supported for the modes: either the first three letters of the mode name
-        (e.g. "mix") or the mode name without "ian" (e.g. "mixolyd").
-
-        Both ``major`` and ``maj`` are supported as abbreviations.
-
-        Single and multiple accidentals (``b!♭`` for flat, or ``#♯`` for sharp) are supported.
-
-        Examples: ``C:maj, C:major, Dbb:min, A♭:min, D:aeo, E𝄪:phryg``.
-
-    Returns
-    -------
-    degrees : jnp.ndarray
+    Returns:
         An array containing the semitone numbers (0=C, 1=C#, ... 11=B)
         for each of the seven scale degrees in the given key, starting
         from the tonic.
 
-    See Also
-    --------
-    key_to_notes
+    See Also:
+        key_to_notes: List note names for a given key.
 
-    Examples
-    --------
-    >>> librosax.key_to_degrees('C:maj')
-    array([ 0,  2,  4,  5,  7,  9, 11])
+    Examples:
+        >>> librosax.key_to_degrees('C:maj')
+        array([ 0,  2,  4,  5,  7,  9, 11])
 
-    >>> librosax.key_to_degrees('C#:maj')
-    array([ 1,  3,  5,  6,  8, 10,  0])
+        >>> librosax.key_to_degrees('C#:maj')
+        array([ 1,  3,  5,  6,  8, 10,  0])
 
-    >>> librosax.key_to_degrees('A:min')
-    array([ 9, 11,  0,  2,  4,  5,  7])
+        >>> librosax.key_to_degrees('A:min')
+        array([ 9, 11,  0,  2,  4,  5,  7])
 
-    >>> librosax.key_to_degrees('A:min')
-    array([ 9, 11,  0,  2,  4,  5,  7])
+        >>> librosax.key_to_degrees('A:min')
+        array([ 9, 11,  0,  2,  4,  5,  7])
 
     """
     notes = dict(
@@ -943,37 +910,26 @@ def fifths_to_note(*, unison: str, fifths: int, unicode: bool = True) -> str:
     so 12 fifths will not generally produce a note of the same pitch class
     due to the accumulation of accidentals.
 
-    Parameters
-    ----------
-    unison : str
-        The name of the starting (unison) note, e.g., 'C' or 'Bb'.
-        Unicode accidentals are supported.
+    Args:
+        unison: The name of the starting (unison) note, e.g., 'C' or 'Bb'.
+            Unicode accidentals are supported.
+        fifths: The number of perfect fifths to deviate from unison.
+        unicode: If ``True`` (default), use Unicode symbols (♯𝄪♭𝄫)for accidentals.
+            If ``False``, accidentals will be encoded as low-order ASCII representations::
+                ♯ -> #, 𝄪 -> ##, ♭ -> b, 𝄫 -> bb
 
-    fifths : integer
-        The number of perfect fifths to deviate from unison.
+    Returns:
+        The name of the requested note.
 
-    unicode : bool
-        If ``True`` (default), use Unicode symbols (♯𝄪♭𝄫)for accidentals.
+    Examples:
+        >>> librosax.fifths_to_note(unison='C', fifths=6)
+        'F♯'
 
-        If ``False``, accidentals will be encoded as low-order ASCII representations::
+        >>> librosax.fifths_to_note(unison='G', fifths=-3)
+        'B♭'
 
-            ♯ -> #, 𝄪 -> ##, ♭ -> b, 𝄫 -> bb
-
-    Returns
-    -------
-    note : str
-        The name of the requested note
-
-    Examples
-    --------
-    >>> librosax.fifths_to_note(unison='C', fifths=6)
-    'F♯'
-
-    >>> librosax.fifths_to_note(unison='G', fifths=-3)
-    'B♭'
-
-    >>> librosax.fifths_to_note(unison='Eb', fifths=11, unicode=False)
-    'G#'
+        >>> librosax.fifths_to_note(unison='Eb', fifths=11, unicode=False)
+        'G#'
 
     """
     # Starting the circle of fifths at F makes accidentals easier to count
@@ -1126,73 +1082,55 @@ def interval_to_fjs(
     then the remaining factors are encoded as superscripts for otonal
     (increasing) intervals and subscripts for utonal (decreasing) intervals.
 
-    Parameters
-    ----------
-    interval : float > 0 or iterable of floats
-        A (just) interval to notate in FJS.
+    Args:
+        interval: A (just) interval to notate in FJS.
+        unison: The name of the unison note (corresponding to `interval=1`).
+        tolerance: The tolerance threshold for identifying the core note name.
+        unicode: If ``True`` (default), use Unicode symbols (♯𝄪♭𝄫)for accidentals,
+            and superscripts/subscripts for otonal and utonal accidentals.
+            If ``False``, accidentals will be encoded as low-order ASCII representations::
+                ♯ -> #, 𝄪 -> ##, ♭ -> b, 𝄫 -> bb
+            Otonal and utonal accidentals will be denoted by `^##` and `_##`
+            respectively (see examples below).
 
-    unison : str
-        The name of the unison note (corresponding to `interval=1`).
-
-    tolerance : float
-        The tolerance threshold for identifying the core note name.
-
-    unicode : bool
-        If ``True`` (default), use Unicode symbols (♯𝄪♭𝄫)for accidentals,
-        and superscripts/subscripts for otonal and utonal accidentals.
-
-        If ``False``, accidentals will be encoded as low-order ASCII representations::
-
-            ♯ -> #, 𝄪 -> ##, ♭ -> b, 𝄫 -> bb
-
-        Otonal and utonal accidentals will be denoted by `^##` and `_##`
-        respectively (see examples below).
-
-    Raises
-    ------
-    ParameterError
-        If the provided interval is not positive
-
-        If the provided interval cannot be identified with a
-        just intonation prime factorization.
-
-    Returns
-    -------
-    note_fjs : str or jnp.ndarray(dtype=str)
+    Returns:
         The interval(s) relative to the given unison in FJS notation.
 
-    Examples
-    --------
-    Pythagorean intervals appear as expected, with no otonal
-    or utonal extensions:
+    Raises:
+        ParameterError: If the provided interval is not positive or if the provided interval
+            cannot be identified with a just intonation prime factorization.
 
-    >>> librosax.interval_to_fjs(3/2, unison='C')
-    'G'
-    >>> librosax.interval_to_fjs(4/3, unison='F')
-    'B♭'
+    Examples:
+        Pythagorean intervals appear as expected, with no otonal
+        or utonal extensions:
 
-    A ptolemaic major third will appear with an otonal '5':
+        >>> librosax.interval_to_fjs(3/2, unison='C')
+        'G'
+        >>> librosax.interval_to_fjs(4/3, unison='F')
+        'B♭'
 
-    >>> librosax.interval_to_fjs(5/4, unison='A')
-    'C♯⁵'
+        A ptolemaic major third will appear with an otonal '5':
 
-    And a ptolemaic minor third will appear with utonal '5':
+        >>> librosax.interval_to_fjs(5/4, unison='A')
+        'C♯⁵'
 
-    >>> librosax.interval_to_fjs(6/5, unison='A')
-    'C₅'
+        And a ptolemaic minor third will appear with utonal '5':
 
-    More complex intervals will have compound accidentals.
-    For example:
+        >>> librosax.interval_to_fjs(6/5, unison='A')
+        'C₅'
 
-    >>> librosax.interval_to_fjs(25/14, unison='F#')
-    'E²⁵₇'
-    >>> librosax.interval_to_fjs(25/14, unison='F#', unicode=False)
-    'E^25_7'
+        More complex intervals will have compound accidentals.
+        For example:
 
-    Array inputs are also supported:
+        >>> librosax.interval_to_fjs(25/14, unison='F#')
+        'E²⁵₇'
+        >>> librosax.interval_to_fjs(25/14, unison='F#', unicode=False)
+        'E^25_7'
 
-    >>> librosax.interval_to_fjs([3/2, 4/3, 5/3])
-    array(['G', 'F', 'A⁵'], dtype='<U2')
+        Array inputs are also supported:
+
+        >>> librosax.interval_to_fjs([3/2, 4/3, 5/3])
+        array(['G', 'F', 'A⁵'], dtype='<U2')
 
     """
     # suppressing the type check here because mypy won't introspect through

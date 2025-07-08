@@ -232,11 +232,15 @@ def test_cqt_edge_cases():
     # Test 3: Different number of bins per octave
     for bins_per_octave in [12, 24]:
         # Reduce octaves for higher resolution to avoid memory issues
-        n_octaves = 7 if bins_per_octave <= 12 else 4
+        # Further reduce for bins_per_octave=24 to avoid memory issues
+        n_octaves = 7 if bins_per_octave <= 12 else 3
+        # Also increase fmin for higher resolution to reduce kernel sizes
+        fmin = 32.70 if bins_per_octave <= 12 else 65.41  # C2 instead of C1
         C = librosax.feature.cqt(
             jnp.array(y), sr=sr, 
             n_bins=n_octaves * bins_per_octave,
             bins_per_octave=bins_per_octave,
+            fmin=fmin,
             n_fft=4096 if bins_per_octave <= 12 else 2048
         )
         assert C.shape[0] == n_octaves * bins_per_octave

@@ -3,6 +3,7 @@
 """Unit conversion utilities"""
 from __future__ import annotations
 from jax import numpy as jnp
+import numpy as np
 from . import notation
 from ..util.exceptions import ParameterError
 from ..util.decorators import vectorize
@@ -743,13 +744,13 @@ def note_to_midi(note: _IterableLike[str], *, round_midi: bool = ...) -> jnp.nda
 @overload
 def note_to_midi(
     note: Union[str, _IterableLike[str], Iterable[str]], *, round_midi: bool = ...
-) -> Union[float, int, jnp.ndarray]:
+) -> Union[float, int, jnp.ndarray, np.ndarray]:
     ...
 
 
 def note_to_midi(
     note: Union[str, _IterableLike[str], Iterable[str]], *, round_midi: bool = True
-) -> Union[float, jnp.ndarray]:
+) -> Union[float, jnp.ndarray, np.ndarray]:
     """Convert one or more spelled notes to MIDI number(s).
 
     Notes may be spelled out with optional accidentals or octave numbers.
@@ -808,7 +809,10 @@ def note_to_midi(
     array([12, 16, 19])
     """
     if not isinstance(note, str):
-        return jnp.array([note_to_midi(n, round_midi=round_midi) for n in note])
+        if note and isinstance(note[0], np.ndarray):
+            return np.array([note_to_midi(n, round_midi=round_midi) for n in note])
+        else:
+            return jnp.array([note_to_midi(n, round_midi=round_midi) for n in note])
 
     pitch_map: Dict[str, int] = {
         "C": 0,
@@ -855,10 +859,13 @@ def note_to_midi(
     else:
         cents = int(cents) * 1e-2
 
-    note_value: float = 12 * (octave + 1) + pitch_map[pitch] + offset + cents
+    note_value = 12 * (octave + 1) + pitch_map[pitch] + offset + cents
 
     if round_midi:
-        return jnp.round(note_value).astype(jnp.int32)
+        if isinstance(note_value, (float, int, np.ndarray)):
+            return np.round(note_value).astype(np.int32)
+        else:
+            return jnp.round(note_value).astype(jnp.int32)
     else:
         return note_value
 
@@ -1047,7 +1054,9 @@ def midi_to_hz(
     hz_to_midi
     note_to_hz
     """
-    return 440.0 * (2.0 ** ((jnp.asarray(notes) - 69.0) / 12.0))
+    if isinstance(notes, (int, list)):
+        notes = np.asarray(notes)
+    return 440.0 * (2.0 ** ((notes - 69.0) / 12.0))
 
 
 @overload

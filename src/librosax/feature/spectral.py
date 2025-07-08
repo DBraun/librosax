@@ -1295,7 +1295,7 @@ def cqt(
         CQT matrix [shape=(n_bins, t)] format depends on output_format
     """
     if fmin is None:
-        fmin = 32.70  # C1 frequency, matching nnAudio's default
+        fmin = note_to_hz("C1")
 
     # Apply tuning correction
     fmin = fmin * 2.0 ** (tuning / bins_per_octave)
@@ -1320,24 +1320,14 @@ def cqt(
     if y.ndim == 1:
         y = y[jnp.newaxis, :]
         squeeze_batch = True
-    
-    # Ensure y is 2D (batch, time)
-    batch_size = y.shape[0]
-    
+    # y is now 2D (batch, time)
+
     # Pad the signal if center is True
     if pad_mode == "constant":
         y = jnp.pad(y, ((0, 0), (kernel_width // 2, kernel_width // 2)), mode="constant")
     elif pad_mode == "reflect":
         y = jnp.pad(y, ((0, 0), (kernel_width // 2, kernel_width // 2)), mode="reflect")
 
-    # Split kernels into real and imaginary parts
-    cqt_kernels_real = jnp.real(cqt_kernels)[:, jnp.newaxis, :]
-    cqt_kernels_imag = jnp.imag(cqt_kernels)[:, jnp.newaxis, :]
-
-    # Process each batch element
-    # Create rectangular window since CQT kernels already have windows
-    rect_window = jnp.ones(kernel_width)
-    
     # Take FFT of kernels once
     cqt_kernels_fft = jnp.fft.fft(cqt_kernels, axis=1)
     # Extract only the positive frequencies
@@ -1348,7 +1338,7 @@ def cqt(
         # Compute STFT for this signal
         _, _, D = jssignal.stft(
             y_single,
-            window=rect_window,
+            window="boxcar", # rectangular window since CQT kernels already have windows
             nperseg=kernel_width,
             noverlap=kernel_width - hop_length,
             nfft=kernel_width,
@@ -1364,8 +1354,7 @@ def cqt(
     
     # Apply to all batch elements
     C = jax.vmap(process_single)(y)
-
-    # C is already complex from the einsum operation
+    # C is complex from the einsum operation
 
     # Apply normalization based on type
     if normalization_type == "librosa":
@@ -1637,7 +1626,7 @@ def cqt2010(
         CQT matrix
     """
     if fmin is None:
-        fmin = 32.70  # C1
+        fmin = note_to_hz("C1")
         
     # Apply tuning
     fmin = fmin * 2.0 ** (tuning / bins_per_octave)

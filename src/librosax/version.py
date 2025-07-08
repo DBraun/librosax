@@ -1,5 +1,5 @@
-version = "0.0.5"
-short_version = "0.0"
+version = "0.1.0"
+short_version = "0.1"
 
 import sys
 import importlib

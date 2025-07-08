@@ -18,7 +18,7 @@ import librosax.feature
 # Path to nnAudio ground truth files
 ground_truth_dir = os.path.join(
     os.path.dirname(__file__),
-    "../src/nnAudio/Installation/tests/ground-truths"
+    "data/ground_truths"
 )
 
 

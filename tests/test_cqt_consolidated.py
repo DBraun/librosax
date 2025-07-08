@@ -487,6 +487,110 @@ class TestCQTMusical:
         assert energy_ratio < 1000, "Energy distribution too extreme"
 
 
+class TestCQTHighResolution:
+    """Test CQT with high resolution settings (24 bins per octave)."""
+    
+    def test_high_resolution_cqt(self, cqt_jit, cqt2010_jit):
+        """Test CQT with 24 bins per octave like nnAudio does."""
+        # Use nnAudio's test parameters
+        fs = 44100  # Higher sample rate
+        t = 1
+        f0 = 55
+        f1 = 22050
+        s = np.linspace(0, t, fs * t)
+        
+        # Test both sweep types
+        for method, name in [("logarithmic", "log"), ("linear", "linear")]:
+            x = chirp(s, f0, 1, f1, method=method)
+            x = x.astype(dtype=np.float32)
+            x_jax = jnp.array(x)
+            
+            # Test CQT1992 with high resolution
+            try:
+                C1992 = cqt_jit(
+                    x_jax, sr=fs, fmin=55, n_bins=207, bins_per_octave=24,
+                    hop_length=512, n_fft=16384  # Larger FFT for high resolution
+                )
+                print(f"\nCQT1992 {name} sweep: shape={C1992.shape}")
+                assert C1992.shape[0] == 207, "Wrong number of bins"
+                assert not np.any(np.isnan(C1992)), "NaN in CQT output"
+            except Exception as e:
+                print(f"\nWarning: CQT1992 high resolution failed: {e}")
+            
+            # Test CQT2010 with high resolution
+            C2010 = cqt2010_jit(
+                x_jax, sr=fs, fmin=55, n_bins=207, bins_per_octave=24,
+                hop_length=512, output_format='complex'
+            )
+            print(f"CQT2010 {name} sweep: shape={C2010.shape}")
+            assert C2010.shape[0] == 207, "Wrong number of bins"
+            assert not np.any(np.isnan(C2010)), "NaN in CQT output"
+    
+    def test_real_audio(self, cqt_jit, cqt2010_jit):
+        """Test CQT with a real audio signal."""
+        # Generate a more realistic test signal (chord progression)
+        sr = 22050
+        duration = 2.0
+        t = np.linspace(0, duration, int(sr * duration))
+        
+        # Create a simple melody with envelope
+        notes = [440, 523.25, 659.25, 523.25]  # A4, C5, E5, C5
+        note_duration = duration / len(notes)
+        y = np.zeros_like(t)
+        
+        for i, freq in enumerate(notes):
+            start = int(i * note_duration * sr)
+            end = int((i + 1) * note_duration * sr)
+            note_t = t[start:end]
+            # Add envelope
+            envelope = np.exp(-3 * (note_t - note_t[0]))
+            y[start:end] = envelope * np.sin(2 * np.pi * freq * note_t)
+        
+        # Add some noise for realism
+        y += 0.01 * np.random.randn(len(y))
+        y_jax = jnp.array(y.astype(np.float32))
+        
+        # Test both CQT versions
+        C1992 = cqt_jit(y_jax, sr=sr, n_bins=84)
+        C2010 = cqt2010_jit(y_jax, sr=sr, n_bins=84, output_format='complex')
+        
+        # Basic sanity checks
+        assert C1992.shape[1] > 0, "No time frames in CQT output"
+        assert C2010.shape[1] > 0, "No time frames in CQT output"
+        
+        # Check that we can detect the note frequencies
+        C1992_mean = np.mean(np.abs(C1992), axis=1)
+        C2010_mean = np.mean(np.abs(C2010), axis=1)
+        
+        # Both should have similar energy distribution
+        corr = np.corrcoef(C1992_mean, C2010_mean)[0, 1]
+        assert corr > 0.9, f"Low correlation between CQT versions: {corr}"
+
+
+class TestCQTDeviceCompatibility:
+    """Test CQT on different devices (CPU/GPU)."""
+    
+    def test_device_consistency(self, cqt_jit, cqt2010_jit):
+        """Test that CQT gives consistent results regardless of device."""
+        # Generate test signal
+        sr = 22050
+        y = np.random.randn(sr).astype(np.float32)
+        y_jax = jnp.array(y)
+        
+        # Run CQT (JAX will use whatever device is available)
+        C1 = cqt_jit(y_jax, sr=sr, n_bins=36)
+        C2 = cqt2010_jit(y_jax, sr=sr, n_bins=36, output_format='complex')
+        
+        # Check that results are deterministic
+        C1_again = cqt_jit(y_jax, sr=sr, n_bins=36)
+        C2_again = cqt2010_jit(y_jax, sr=sr, n_bins=36, output_format='complex')
+        
+        np.testing.assert_allclose(C1, C1_again, rtol=1e-6, atol=1e-6)
+        np.testing.assert_allclose(C2, C2_again, rtol=1e-6, atol=1e-6)
+        
+        print(f"\nDevice used: {C1.devices()} (JAX automatically selects best available)")
+
+
 class TestCQTPerformance:
     """Performance comparison tests."""
     

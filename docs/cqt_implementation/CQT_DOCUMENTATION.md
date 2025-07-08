@@ -1,6 +1,6 @@
 # CQT Implementation in librosax
 
-This document describes the Constant-Q Transform (CQT) implementation in librosax, which provides compatibility with nnAudio and basic_pitch while leveraging JAX for efficient computation.
+This document provides a quick reference for the Constant-Q Transform (CQT) implementation in librosax. For comprehensive documentation including testing coverage and detailed comparisons, see [CQT_COMPREHENSIVE.md](CQT_COMPREHENSIVE.md).
 
 ## Overview
 
@@ -145,16 +145,15 @@ cqt_jit = jit(cqt, static_argnames=['sr', 'hop_length', 'n_bins', 'output_format
 
 ## Testing
 
-Comprehensive tests are available in the `tests/` directory:
-- `test_cqt2010.py`: Comparison of implementations and performance benchmarks
-- `test_cqt_dimensions.py`: Dimension consistency tests
-- `test_cqt_comprehensive.py`: Extensive validation against known signals
+Comprehensive tests are consolidated in:
+- `test_cqt_consolidated.py`: All CQT tests including performance, dimensions, and comprehensive validation
+- `test_cqt_nnaudio_ground_truth.py`: Ground truth comparison with nnAudio
 
 Run tests with:
 ```bash
 cd tests
-python test_cqt2010.py
-python test_cqt_dimensions.py
+pytest test_cqt_consolidated.py -v
+pytest test_cqt_nnaudio_ground_truth.py -v
 ```
 
 ## Choosing the Right Implementation

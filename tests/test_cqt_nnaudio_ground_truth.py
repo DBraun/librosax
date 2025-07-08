@@ -6,6 +6,9 @@ small numerical differences, but high correlation (>0.90).
 """
 import os
 import jax
+# Enable JAX 64-bit mode for better precision
+jax.config.update("jax_platform_name", "cpu")
+jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 import numpy as np
 import pytest

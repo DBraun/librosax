@@ -2,12 +2,12 @@
 """Test CQT2010 implementation for dimension consistency."""
 
 import jax
+# Enable JAX 64-bit mode for better precision
+jax.config.update("jax_platform_name", "cpu")
+jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 import numpy as np
 from librosax.feature.spectral import cqt2010
-
-# Enable JAX 64-bit mode
-jax.config.update("jax_enable_x64", True)
 
 
 def test_basic_pitch_settings():

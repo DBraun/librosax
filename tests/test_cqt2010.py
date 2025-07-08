@@ -2,6 +2,9 @@
 """Test script for the new CQT2010 implementation in librosax."""
 
 import jax
+# Enable JAX 64-bit mode for better precision
+jax.config.update("jax_platform_name", "cpu")
+jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 import numpy as np
 import time
@@ -9,8 +12,7 @@ import matplotlib.pyplot as plt
 from librosax.feature.spectral import cqt, cqt2010
 import librosa
 
-# Enable JAX 64-bit mode for better precision
-jax.config.update("jax_enable_x64", True)
+
 
 
 def generate_test_signal(sr=22050, duration=2.0):

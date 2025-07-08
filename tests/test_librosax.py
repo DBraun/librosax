@@ -1,9 +1,9 @@
 from itertools import product
 
 import jax
-import platform
-if platform.system() == "Darwin":
-    jax.config.update('jax_platform_name', 'cpu')
+# Enable JAX 64-bit mode for better precision
+jax.config.update("jax_platform_name", "cpu")
+jax.config.update("jax_enable_x64", True)
 from jax import numpy as jnp, random
 import librosa
 import librosa.feature

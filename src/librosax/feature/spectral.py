@@ -1333,28 +1333,23 @@ def cqt(
     # Extract only the positive frequencies
     cqt_kernels_fft = cqt_kernels_fft[:, :kernel_width // 2 + 1]
     
-    # Process batch using vmap for efficiency
-    def process_single(y_single):
-        # Compute STFT for this signal
-        _, _, D = jssignal.stft(
-            y_single,
-            window="boxcar", # rectangular window since CQT kernels already have windows
-            nperseg=kernel_width,
-            noverlap=kernel_width - hop_length,
-            nfft=kernel_width,
-            boundary=None,  # No padding, we already padded
-            padded=False,
-            axis=-1,
-        )
-        
-        # Multiply in frequency domain
-        # D shape: (freq_bins, time_frames)
-        # cqt_kernels_fft shape: (n_bins, freq_bins)
-        return jnp.einsum('bf,ft->bt', cqt_kernels_fft.conj(), D)
+    # Compute STFT for all batch elements at once
+    _, _, D = jssignal.stft(
+        y,
+        window="boxcar",  # rectangular window since CQT kernels already have windows
+        nperseg=kernel_width,
+        noverlap=kernel_width - hop_length,
+        nfft=kernel_width,
+        boundary=None,  # No padding, we already padded
+        padded=False,
+        axis=-1,
+    )
     
-    # Apply to all batch elements
-    C = jax.vmap(process_single)(y)
-    # C is complex from the einsum operation
+    # Multiply in frequency domain
+    # D shape: (batch, freq_bins, time_frames) for batched input
+    # cqt_kernels_fft shape: (n_bins, freq_bins)
+    # Result shape: (batch, n_bins, time_frames)
+    C = jnp.einsum('bf,...ft->...bt', cqt_kernels_fft.conj(), D)
 
     # Apply normalization based on type
     if normalization_type == "librosa":

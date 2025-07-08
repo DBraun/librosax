@@ -38,6 +38,7 @@ Constant-Q transform
     :toctree: generated/
 
     cqt
+    cqt2010
     cqt_frequencies
 
 Tonal features
@@ -78,6 +79,7 @@ from .spectral import (
     note_to_hz,
     cqt_frequencies,
     cqt,
+    cqt2010,
 )
 
 __all__ = [
@@ -101,4 +103,5 @@ __all__ = [
     "note_to_hz",
     "cqt_frequencies",
     "cqt",
+    "cqt2010",
 ]

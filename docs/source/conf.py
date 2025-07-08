@@ -33,12 +33,16 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
-    "numpydoc",
+    "sphinx.ext.napoleon",
 ]
 
 # Autosummary settings
 autosummary_generate = True
 autodoc_member_order = 'bysource'
+
+# Napoleon settings
+napoleon_google_docstring = True
+napoleon_numpy_docstring = False
 
 # Intersphinx mappings
 intersphinx_mapping = {

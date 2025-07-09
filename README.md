@@ -17,7 +17,8 @@ Documentation is [here](http://dirt.design/librosax).
 This library is heavily inspired by and borrows code from:
 
 - **[librosa](https://github.com/librosa/librosa)** - The excellent Python library for audio and music analysis by the librosa development team
-- **[TorchLibrosa](https://github.com/qiuqiangkong/torchlibrosa)** - PyTorch implementation of librosa functions by Qiuqiang Kong
+- **[TorchLibrosa](https://github.com/qiuqiangkong/torchlibrosa)** - PyTorch implementations of librosa functions and neural net layers by Qiuqiang Kong
+- **[nnAudio](https://github.com/KinWaiCheuk/nnAudio)** - PyTorch implementations of CQT and other functions by Kin Wai Cheuk
 
 ## License
 

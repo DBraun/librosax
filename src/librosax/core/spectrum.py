@@ -184,8 +184,6 @@ def power_to_db(
 ) -> jnp.ndarray:
     """Convert a power spectrogram to decibel (dB) units.
 
-    This function is a JAX implementation of ``librosax.power_to_db``.
-
     Args:
         x: Input power spectrogram.
         amin: Minimum threshold for input values. Default is 1e-10.

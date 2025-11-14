@@ -13,6 +13,11 @@ Librosax follows `Effort-based Versioning <https://jacobtomlinson.dev/effver/>`_
 Getting started
 ---------------
 
+New to librosax? Check out the installation guide and changelog:
+
+* :doc:`install` - Installation instructions for librosax and JAX
+* :doc:`changelog` - See what's new in recent releases
+
 .. toctree::
    :maxdepth: 1
    :hidden:
@@ -23,6 +28,12 @@ Getting started
 
 API documentation
 -----------------
+
+Librosax provides audio processing functions and neural network layers:
+
+* :doc:`librosax` - Core functions (STFT, iSTFT, magnitude scaling)
+* :doc:`feature` - Feature extraction (spectral features, mel-frequency, chromagram, CQT)
+* :doc:`layers` - Neural network layers (Spectrogram, MFCC, data augmentation)
 
 .. toctree::
    :maxdepth: 2

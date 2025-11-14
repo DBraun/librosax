@@ -15,6 +15,7 @@ Getting started
 
 .. toctree::
    :maxdepth: 1
+   :hidden:
 
    install
    changelog
@@ -25,6 +26,7 @@ API documentation
 
 .. toctree::
    :maxdepth: 2
+   :hidden:
 
    librosax
    feature

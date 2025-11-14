@@ -19,20 +19,38 @@ project = "Librosax"
 copyright = "2025, David Braun"
 author = "David Braun"
 first_line = open(
-    os.path.join(pathlib.Path(__file__).parents[2], "src/librosax/__init__.py"), "r"
+    os.path.join(pathlib.Path(__file__).parents[2], "src/librosax/version.py"), "r"
 ).readline()
-# first_line is '__version__ = "1.2.3"'
-assert first_line.startswith("__version__ = ")
+# first_line is 'version = "1.2.3"'
+assert first_line.startswith("version = ")
 release = first_line.split("=")[1].strip()[1:-1]
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    "sphinx.ext.napoleon",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.napoleon",
+    "m2r2",
 ]
+
+# Autosummary settings
+autosummary_generate = True
+autodoc_member_order = 'bysource'
+
+# Napoleon settings
+napoleon_google_docstring = True
+napoleon_numpy_docstring = False
+
+# Intersphinx mappings
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3/', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    'jax': ('https://jax.readthedocs.io/en/latest/', None),
+}
 
 templates_path = ["_templates"]
 exclude_patterns = []

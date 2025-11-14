@@ -1,8 +1,8 @@
-from dataclasses import field
-from typing import Optional
-
 from einops import rearrange
-from flax import linen as nn
+from flax import nnx
+from flax.nnx import Module
+from flax.nnx.module import first_from
+from flax.nnx import rnglib
 import jax
 from jax import numpy as jnp, random
 from jax.scipy.fft import dct
@@ -11,38 +11,71 @@ import librosa
 from librosax import stft, power_to_db
 
 
-class DropStripes(nn.Module):
+class DropStripes(Module):
     """A module that randomly drops stripes (time or frequency bands) from a spectrogram.
 
     This module is used for data augmentation in audio tasks by randomly masking
-    time frames or frequency bands in the spectrogram.
+    contiguous blocks along either the time or frequency dimension. Each stripe
+    is a rectangular mask that spans the entire height (for time masking) or 
+    width (for frequency masking) of the spectrogram.
 
     Attributes:
-        axis: Axis along which to drop stripes. 2 for time, 3 for frequency.
-        drop_width: Maximum width of stripes to drop.
-        stripes_num: Number of stripes to drop.
-        deterministic: If ``True``, no dropping is performed. Default is ``None``.
+        axis: Axis along which to drop stripes. 
+            - ``axis=2``: Drop vertical stripes (time masking) - masks entire frequency range for selected time frames
+            - ``axis=3``: Drop horizontal stripes (frequency masking) - masks entire time range for selected frequency bins
+        drop_width: Maximum width of each stripe to drop. Each stripe will have a 
+            random width between 0 and this value. For time masking, this is the
+            maximum number of consecutive time frames to mask. For frequency masking,
+            this is the maximum number of consecutive frequency bins to mask.
+        stripes_num: Number of stripes to drop. Each stripe is independently
+            positioned and sized. Multiple stripes may overlap.
+        deterministic: If ``True``, no dropping is performed. Default is ``False``.
+        rng_collection: The rng collection name to use when requesting an rng key.
+            Default is ``"dropout"``.
+        rngs: Random number generator key for generating random masks.
+    
+    Implementation Details:
+        - Each stripe has a random width sampled from [0, drop_width)
+        - Each stripe has a random starting position that ensures it fits within bounds
+        - Stripes are applied multiplicatively (regions set to 0)
+        - Each item in a batch receives different random stripes
+        - Overlapping stripes do not create additional masking effect
     """
 
-    axis: int
-    drop_width: int
-    stripes_num: int
-    deterministic: Optional[bool] = None
+    def __init__(
+        self,
+        axis: int,
+        drop_width: int,
+        stripes_num: int,
+        deterministic: bool = False,
+        rng_collection: str = "dropout",
+        rngs: rnglib.Rngs | rnglib.RngStream | None = None,
+    ):
+        self.axis = axis
+        self.drop_width = drop_width
+        self.stripes_num = stripes_num
+        self.deterministic = deterministic
+        self.rng_collection = rng_collection
+        self.rngs = nnx.data(None) if rngs is None else rngs.fork()
 
-    def __post_init__(self):
         if self.axis < 0:
             self.axis += 4
         assert self.axis in [2, 3]  # axis 2: time; axis 3: frequency
-        super().__post_init__()
 
-    @nn.compact
-    def __call__(self, inputs: jnp.ndarray, deterministic=None) -> jnp.ndarray:
+    def __call__(
+        self,
+        inputs: jnp.ndarray,
+        deterministic: bool | None = None,
+        rngs: rnglib.Rngs | rnglib.RngStream | jax.Array | None = None,
+    ) -> jnp.ndarray:
         """Apply random stripe dropping to the input spectrogram.
 
         Args:
             inputs: Input tensor of shape ``(batch_size, channels, time_steps, freq_bins)``.
             deterministic: If ``True``, no dropping is performed. Overrides the module attribute
                 if provided. Default is ``None``.
+            rngs: an optional key, RngStream, or Rngs object used to generate the dropout mask.
+                If given it will take precedence over the rngs passed into the constructor.
 
         Returns:
             jnp.ndarray: Transformed tensor with same shape as input.
@@ -52,18 +85,36 @@ class DropStripes(nn.Module):
         """
         assert inputs.ndim == 4
 
-        deterministic = nn.merge_param(
-            "deterministic", self.deterministic, deterministic
+        deterministic = first_from(
+            deterministic,
+            self.deterministic,
+            error_msg="""No `deterministic` argument was provided to DropStripes as either a __call__ argument or class attribute""",
         )
 
         if deterministic:
             return inputs
 
+        rngs = first_from(  # type: ignore[assignment]
+            rngs,
+            self.rngs,
+            error_msg="""`deterministic` is False, but no `rngs` argument was provided to DropStripes
+              as either a __call__ argument or class attribute.""",
+        )
+
+        if isinstance(rngs, rnglib.Rngs):
+            key = rngs[self.rng_collection]()
+        elif isinstance(rngs, rnglib.RngStream):
+            key = rngs()
+        elif isinstance(rngs, jax.Array):
+            key = rngs
+        else:
+            raise TypeError(
+                f"rngs must be a Rngs, RngStream or jax.Array, but got {type(rngs)}."
+            )
+
         # Get shape information
         batch_size = inputs.shape[0]
         total_width = inputs.shape[self.axis]
-
-        key = self.make_rng("dropout")
 
         # Create a separate key for each element in the batch
         batch_keys = random.split(key, batch_size)
@@ -125,28 +176,96 @@ class DropStripes(nn.Module):
         return e * mask
 
 
-class SpecAugmentation(nn.Module):
+class SpecAugmentation(Module):
     """A module that applies SpecAugment data augmentation to spectrograms.
 
     SpecAugment is a data augmentation technique that applies both time
-    and frequency masking to spectrograms for audio tasks.
+    and frequency masking to spectrograms for audio tasks. It randomly masks
+    rectangular blocks along the time and frequency dimensions by setting
+    values to zero.
 
     Attributes:
-        time_drop_width: Maximum width of time stripes to drop.
-        time_stripes_num: Number of time stripes to drop.
-        freq_drop_width: Maximum width of frequency stripes to drop.
-        freq_stripes_num: Number of frequency stripes to drop.
-        deterministic: If ``True``, no augmentation is applied. Default is ``None``.
+        time_drop_width: Maximum width (in time frames) of each time mask. 
+            Each mask will have a random width between 0 and this value.
+            For example, if ``time_drop_width=30`` and your spectrogram has 
+            200 time frames, each mask can be 0-30 frames wide.
+        time_stripes_num: Number of time masks to apply. Each mask is 
+            independently positioned and sized.
+        freq_drop_width: Maximum width (in frequency bins) of each frequency mask.
+            Each mask will have a random width between 0 and this value.
+            For example, if ``freq_drop_width=20`` and your spectrogram has 
+            128 frequency bins, each mask can be 0-20 bins wide.
+        freq_stripes_num: Number of frequency masks to apply. Each mask is
+            independently positioned and sized.
+        deterministic: If ``True``, no augmentation is applied. Default is ``False``.
+        rng_collection: The rng collection name to use when requesting an rng key.
+            Default is ``"dropout"``.
+        rngs: Random number generator key for generating random masks.
+    
+    Example:
+        >>> import jax
+        >>> from flax import nnx
+        >>> from librosax.layers import SpecAugmentation
+        >>> 
+        >>> # Create augmentation layer
+        >>> spec_aug = SpecAugmentation(
+        ...     time_drop_width=64,  # Max 64 time frames per mask
+        ...     time_stripes_num=2,   # Apply 2 time masks
+        ...     freq_drop_width=16,   # Max 16 freq bins per mask  
+        ...     freq_stripes_num=2,   # Apply 2 frequency masks
+        ...     rngs=nnx.Rngs(jax.random.key(0))
+        ... )
+        >>> 
+        >>> # Apply to spectrogram (batch_size, channels, time, freq)
+        >>> spec = jnp.ones((4, 1, 200, 128))
+        >>> augmented = spec_aug(spec, deterministic=False)
+    
+    Note:
+        The masks are applied multiplicatively (by setting regions to 0), so
+        overlapping masks will not create additional effect. Each batch item
+        receives different random masks for better augmentation diversity.
     """
 
-    time_drop_width: int
-    time_stripes_num: int
-    freq_drop_width: int
-    freq_stripes_num: int
-    deterministic: Optional[bool] = None
+    def __init__(
+        self,
+        time_drop_width: int,
+        time_stripes_num: int,
+        freq_drop_width: int,
+        freq_stripes_num: int,
+        deterministic: bool = False,
+        rng_collection: str = "dropout",
+        rngs: rnglib.Rngs | rnglib.RngStream | None = None,
+    ):
+        self.time_drop_width = time_drop_width
+        self.time_stripes_num = time_stripes_num
+        self.freq_drop_width = freq_drop_width
+        self.freq_stripes_num = freq_stripes_num
+        self.deterministic = deterministic
+        self.rng_collection = rng_collection
+        self.rngs = nnx.data(None) if rngs is None else rngs.fork()
 
-    @nn.compact
-    def __call__(self, x: jnp.ndarray, deterministic=None) -> jnp.ndarray:
+        self.time_drop = DropStripes(
+            axis=2,
+            drop_width=time_drop_width,
+            stripes_num=time_stripes_num,
+            deterministic=deterministic,
+            rng_collection=rng_collection,
+            rngs=rngs,
+        )
+        self.freq_drop = DropStripes(
+            axis=3,
+            drop_width=freq_drop_width,
+            stripes_num=freq_stripes_num,
+            deterministic=deterministic,
+            rng_collection=rng_collection,
+            rngs=rngs,
+        )
+
+    def __call__(
+        self,
+        x: jnp.ndarray,
+        deterministic: bool | None = None,
+    ) -> jnp.ndarray:
         """Apply SpecAugment to the input spectrogram.
 
         Args:
@@ -158,30 +277,22 @@ class SpecAugmentation(nn.Module):
         Returns:
             jnp.ndarray: Augmented tensor with same shape as input.
         """
-        deterministic = nn.merge_param(
-            "deterministic", self.deterministic, deterministic
+
+        deterministic = first_from(
+            deterministic,
+            self.deterministic,
+            error_msg="""No `deterministic` argument was provided to DropStripes as either a __call__ argument or class attribute""",
         )
+
+        if deterministic:
+            return x
+
         did_expand = x.ndim == 3
         if did_expand:
             x = jnp.expand_dims(x, axis=1)
 
-        # Apply time dropping
-        x = DropStripes(
-            axis=2,
-            drop_width=self.time_drop_width,
-            stripes_num=self.time_stripes_num,
-            deterministic=deterministic,
-            name="time_dropper",
-        )(x)
-
-        # Apply frequency dropping
-        x = DropStripes(
-            axis=3,
-            drop_width=self.freq_drop_width,
-            stripes_num=self.freq_stripes_num,
-            deterministic=deterministic,
-            name="freq_dropper",
-        )(x)
+        x = self.time_drop(x)
+        x = self.freq_drop(x)
 
         if did_expand:
             x = jnp.squeeze(x, axis=1)
@@ -189,7 +300,7 @@ class SpecAugmentation(nn.Module):
         return x
 
 
-class Spectrogram(nn.Module):
+class Spectrogram(Module):
     """A module that computes a spectrogram from a waveform using JAX.
 
     This module transforms audio time-domain signals into time-frequency representation.
@@ -205,25 +316,33 @@ class Spectrogram(nn.Module):
         freeze_parameters: If ``True``, parameters are not updated during training. Default is ``True``.
     """
 
-    n_fft: int = 2048
-    hop_length: int = None
-    win_length: int = None
-    window: str = "hann"
-    center: Optional[bool] = field(default=True)
-    pad_mode: str = "reflect"
-    power: float = 2.0
-    freeze_parameters: Optional[bool] = field(default=True)
+    def __init__(
+        self,
+        n_fft: int = 2048,
+        hop_length: int = None,
+        win_length: int = None,
+        window: str = "hann",
+        center: bool = True,
+        pad_mode: str = "reflect",
+        power: float = 2.0,
+        freeze_parameters: bool = True,
+    ):
+        self.n_fft = n_fft
+        self.hop_length = hop_length
+        self.win_length = win_length
+        self.window = window
+        self.center = center
+        self.pad_mode = pad_mode
+        self.power = power
+        self.freeze_parameters = freeze_parameters
 
-    def __post_init__(self):
         assert (
             self.freeze_parameters
-        ), "This has only been tested with `freeze_parameters==True`."
+        ), "Spectrogram has only been tested with `freeze_parameters==True`."
 
         if self.hop_length is None:
             self.hop_length = self.n_fft // 4
-        super().__post_init__()
 
-    @nn.compact
     def __call__(self, waveform: jnp.ndarray) -> jnp.ndarray:
         """Compute a spectrogram from a signal using JAX.
 
@@ -268,7 +387,7 @@ class Spectrogram(nn.Module):
         return S
 
 
-class LogMelFilterBank(nn.Module):
+class LogMelFilterBank(Module):
     """A module that converts spectrograms to (log) mel spectrograms.
 
     This module applies mel filterbank on spectrogram and optionally converts
@@ -287,23 +406,44 @@ class LogMelFilterBank(nn.Module):
         freeze_parameters: If ``True``, parameters are not updated during training. Default is ``True``.
     """
 
-    sr: int = 22_050
-    n_fft: int = 2048
-    n_mels: int = 64
-    fmin: float = 0.0
-    fmax: float = None
-    is_log: Optional[bool] = field(default=True)
-    ref: float = 1.0
-    amin: float = 1e-10
-    top_db: float | None = 80.0
-    freeze_parameters: Optional[bool] = field(default=True)
+    def __init__(
+        self,
+        sr: int = 22_050,
+        n_fft: int = 2048,
+        n_mels: int = 64,
+        fmin: float = 0.0,
+        fmax: float = None,
+        is_log: bool = True,
+        ref: float = 1.0,
+        amin: float = 1e-10,
+        top_db: float | None = 80.0,
+        freeze_parameters: bool = True,
+    ):
+        self.sr = sr
+        self.n_fft = n_fft
+        self.n_mels = n_mels
+        self.fmin = fmin
+        self.fmax = fmax
+        self.is_log = is_log
+        self.ref = ref
+        self.amin = amin
+        self.top_db = top_db
+        self.freeze_parameters = freeze_parameters
 
-    def __post_init__(self):
         if self.fmax is None:
             self.fmax = self.sr // 2
-        super().__post_init__()
 
-    @nn.compact
+        if not self.freeze_parameters:
+            melW = librosa.filters.mel(
+                sr=self.sr,
+                n_fft=self.n_fft,
+                n_mels=self.n_mels,
+                fmin=self.fmin,
+                fmax=self.fmax,
+            ).T  # (n_fft // 2 + 1, mel_bins)
+
+            self.melW = nnx.Param(melW)
+
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
         """Calculate (log) mel spectrogram from spectrogram.
 
@@ -313,16 +453,16 @@ class LogMelFilterBank(nn.Module):
         Returns:
             jnp.ndarray: (Log) mel spectrogram of shape ``(*, frames, mel_bins)``.
         """
-        melW = librosa.filters.mel(
-            sr=self.sr,
-            n_fft=self.n_fft,
-            n_mels=self.n_mels,
-            fmin=self.fmin,
-            fmax=self.fmax,
-        ).T  # (n_fft // 2 + 1, mel_bins)
-
-        if not self.freeze_parameters:
-            melW = self.param("melW", lambda key: melW)
+        if self.freeze_parameters:
+            melW = librosa.filters.mel(
+                sr=self.sr,
+                n_fft=self.n_fft,
+                n_mels=self.n_mels,
+                fmin=self.fmin,
+                fmax=self.fmax,
+            ).T  # (n_fft // 2 + 1, mel_bins)
+        else:
+            melW = self.melW
 
         # Mel spectrogram
         mel_spectrogram = jnp.matmul(x, melW)
@@ -355,21 +495,44 @@ class MFCC(LogMelFilterBank):
         Inherits all attributes from LogMelFilterBank.
     """
 
-    n_mfcc: int = 20  # Number of MFCCs to return
-    dct_type: int = 2  # DCT type (2 is the most common for MFCCs)
-    norm: str = "ortho"  # Normalization mode for DCT
-    lifter: int = 0  # Apply liftering; 0 = no lifter
-    is_log: Optional[bool] = field(default=True)
+    def __init__(
+        self,
+        sr: int = 22_050,
+        n_fft: int = 2048,
+        n_mels: int = 64,
+        fmin: float = 0.0,
+        fmax: float = None,
+        ref: float = 1.0,
+        amin: float = 1e-10,
+        top_db: float | None = 80.0,
+        freeze_parameters: bool = True,
+        n_mfcc: int = 20,  # Number of MFCCs to return
+        dct_type: int = 2,  # DCT type (2 is the most common for MFCCs)
+        norm: str = "ortho",  # Normalization mode for DCT
+        lifter: int = 0,  # Apply liftering; 0 = no lifter
+    ):
+        super().__init__(
+            sr=sr,
+            n_fft=n_fft,
+            n_mels=n_mels,
+            fmin=fmin,
+            fmax=fmax,
+            is_log=True,  # MFCC requires log-mel spectrograms
+            ref=ref,
+            amin=amin,
+            top_db=top_db,
+            freeze_parameters=freeze_parameters,
+        )
+        self.n_mfcc = n_mfcc
+        self.dct_type = dct_type
+        self.norm = norm
+        self.lifter = lifter
 
-    def __post_init__(self):
-        assert self.is_log, "MFCC requires log-mel spectrograms (is_log must be True)"
         # Validate DCT type (jax.scipy.fft.dct supports types 1-4)
         assert (
             1 <= self.dct_type <= 4
         ), f"DCT type must be 1, 2, 3, or 4, got {self.dct_type}"
-        super().__post_init__()
 
-    @nn.compact
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
         """Compute MFCCs from a spectrogram.
 

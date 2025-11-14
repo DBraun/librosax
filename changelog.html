@@ -172,7 +172,7 @@
           <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
         </button>
       </div>
-      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
         <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
       </label>
     </div>
@@ -193,6 +193,7 @@
   <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#id2">Changelog</a></li>
 </ul>
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="librosax.html">Librosax</a><input aria-label="Toggle navigation of Librosax" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
@@ -288,24 +289,27 @@
               <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
             </button>
           </div>
-          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
             <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
           </label>
         </div>
         <article role="main" id="furo-main-content">
           <section id="changelog">
 <span id="id1"></span><h1>Changelog<a class="headerlink" href="#changelog" title="Link to this heading">¶</a></h1>
+</section>
+<section id="id2">
+<h1>Changelog<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h1>
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a class="reference external" href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a class="reference external" href="https://jacobtomlinson.dev/effver/">Effort-based Versioning</a>.</p>
-<section id="id2">
-<h2>[0.1.1] - 2025-11-14<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h2>
+<section id="id3">
+<h2>[0.1.1] - 2025-11-14<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h2>
 <ul class="simple">
 <li><p>Fix GitHub Action for docs.</p></li>
 </ul>
 </section>
-<section id="id3">
-<h2>[0.1.0] - 2025-11-14<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h2>
+<section id="id4">
+<h2>[0.1.0] - 2025-11-14<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h2>
 <section id="added">
 <h3>Added<a class="headerlink" href="#added" title="Link to this heading">¶</a></h3>
 <ul class="simple">
@@ -386,10 +390,10 @@ and this project adheres to <a class="reference external" href="https://jacobtom
 </ul>
 </section>
 </section>
-<section id="id4">
-<h2>[0.0.4] - 2025-07-06<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h2>
 <section id="id5">
-<h3>Added<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
+<h2>[0.0.4] - 2025-07-06<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h2>
+<section id="id6">
+<h3>Added<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p>Initial release with basic audio processing functions</p></li>
 <li><p>STFT and inverse STFT</p></li>
@@ -398,8 +402,8 @@ and this project adheres to <a class="reference external" href="https://jacobtom
 <li><p>Basic Flax Linen layers for spectrograms</p></li>
 </ul>
 </section>
-<section id="id6">
-<h3>Changed<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
+<section id="id7">
+<h3>Changed<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p>Initial project structure</p></li>
 </ul>
@@ -409,12 +413,12 @@ and this project adheres to <a class="reference external" href="https://jacobtom
 <h2>[0.0.3] - Earlier<a class="headerlink" href="#earlier" title="Link to this heading">¶</a></h2>
 <p>(Previous versions not documented)</p>
 </section>
-<section id="id7">
-<h2>[0.0.2] - Earlier<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h2>
+<section id="id8">
+<h2>[0.0.2] - Earlier<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h2>
 <p>(Previous versions not documented)</p>
 </section>
-<section id="id8">
-<h2>[0.0.1] - Earlier<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h2>
+<section id="id9">
+<h2>[0.0.1] - Earlier<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h2>
 <p>(Previous versions not documented)</p>
 </section>
 </section>
@@ -462,42 +466,8 @@ and this project adheres to <a class="reference external" href="https://jacobtom
         
       </footer>
     </div>
-    <aside class="toc-drawer">
+    <aside class="toc-drawer no-toc">
       
-      
-      <div class="toc-sticky toc-scroll">
-        <div class="toc-title-container">
-          <span class="toc-title">
-            On this page
-          </span>
-        </div>
-        <div class="toc-tree-container">
-          <div class="toc-tree">
-            <ul>
-<li><a class="reference internal" href="#">Changelog</a><ul>
-<li><a class="reference internal" href="#id2">[0.1.1] - 2025-11-14</a></li>
-<li><a class="reference internal" href="#id3">[0.1.0] - 2025-11-14</a><ul>
-<li><a class="reference internal" href="#added">Added</a></li>
-<li><a class="reference internal" href="#changed">Changed</a></li>
-<li><a class="reference internal" href="#fixed">Fixed</a></li>
-<li><a class="reference internal" href="#removed">Removed</a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#id4">[0.0.4] - 2025-07-06</a><ul>
-<li><a class="reference internal" href="#id5">Added</a></li>
-<li><a class="reference internal" href="#id6">Changed</a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#earlier">[0.0.3] - Earlier</a></li>
-<li><a class="reference internal" href="#id7">[0.0.2] - Earlier</a></li>
-<li><a class="reference internal" href="#id8">[0.0.1] - Earlier</a></li>
-</ul>
-</li>
-</ul>
-
-          </div>
-        </div>
-      </div>
       
       
     </aside>

@@ -193,6 +193,7 @@
   <ul class="current">
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html#id2">Changelog</a></li>
 </ul>
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="librosax.html">Librosax</a><input aria-label="Toggle navigation of Librosax" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
@@ -295,41 +296,30 @@
         <article role="main" id="furo-main-content">
           <section id="installation">
 <span id="install"></span><h1>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h1>
-<section id="installing-jax-optional-but-recommended">
-<h2>Installing JAX (Optional but Recommended)<a class="headerlink" href="#installing-jax-optional-but-recommended" title="Link to this heading">¶</a></h2>
-<p>Although optional, we recommend first installing the <a class="reference external" href="https://github.com/jax-ml/jax-ai-stack">jax-ai-stack</a> with one of these three options:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>jax-ai-stack<span class="w">              </span><span class="c1"># JAX CPU</span>
-pip<span class="w"> </span>install<span class="w"> </span>jax-ai-stack<span class="w"> </span><span class="s2">&quot;jax[cuda]&quot;</span><span class="w">  </span><span class="c1"># JAX + AI stack with GPU/CUDA support</span>
-pip<span class="w"> </span>install<span class="w"> </span>jax-ai-stack<span class="w"> </span><span class="s2">&quot;jax[tpu]&quot;</span><span class="w">   </span><span class="c1"># JAX + AI stack with TPU support</span>
+<p>The latest stable release is available on PyPI, and you can install it by running:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">librosax</span>
 </pre></div>
 </div>
-<p>For more specific JAX installation options, please refer to the <a class="reference external" href="https://docs.jax.dev/en/latest/installation.html#installation">JAX installation guide</a>.</p>
-</section>
-<section id="installing-librosax">
-<h2>Installing librosax<a class="headerlink" href="#installing-librosax" title="Link to this heading">¶</a></h2>
-<p><strong>Required:</strong> Then install librosax from PyPI:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>librosax
+<p>To build librosax from source, use:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">DBraun</span><span class="o">/</span><span class="n">librosax</span><span class="o">.</span><span class="n">git</span>
+<span class="n">cd</span> <span class="n">librosax</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="o">.</span>
 </pre></div>
 </div>
-</section>
-<section id="installing-from-source">
-<h2>Installing from Source<a class="headerlink" href="#installing-from-source" title="Link to this heading">¶</a></h2>
-<p>To build librosax from source:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/DBraun/librosax.git
-<span class="nb">cd</span><span class="w"> </span>librosax
-pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
-</pre></div>
-</div>
-<p>For development work, you can install additional dependencies:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span><span class="w">      </span><span class="c1"># Install with testing dependencies</span>
-pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[docs]&quot;</span><span class="w">     </span><span class="c1"># Install with documentation dependencies</span>
-pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev,docs]&quot;</span><span class="w"> </span><span class="c1"># Install with both</span>
-</pre></div>
-</div>
-</section>
 <section id="dependencies">
 <h2>Dependencies<a class="headerlink" href="#dependencies" title="Link to this heading">¶</a></h2>
-<p>Librosax automatically installs its required dependencies (JAX, Flax, librosa, NumPy, SciPy, and others) when you install it via pip. For the complete list of dependencies and their version requirements, see the <a class="reference external" href="https://github.com/DBraun/librosax/blob/main/setup.cfg">setup.cfg</a> file in the repository.</p>
+<p>Librosax requires the following packages:</p>
+<ul class="simple">
+<li><p>jax-ai-stack &gt;= 2025.2.5</p></li>
+<li><p>librosa &gt;= 0.10.1</p></li>
+<li><p>numpy</p></li>
+<li><p>scipy</p></li>
+<li><p>einops</p></li>
+</ul>
+</section>
+<section id="jax-installation">
+<h2>JAX Installation<a class="headerlink" href="#jax-installation" title="Link to this heading">¶</a></h2>
+<p>For specific JAX installation options (CPU-only, GPU, TPU), please refer to the <a class="reference external" href="https://docs.jax.dev/en/latest/installation.html#installation">JAX installation guide</a>.</p>
 </section>
 </section>
 
@@ -389,10 +379,8 @@ pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </s
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">Installation</a><ul>
-<li><a class="reference internal" href="#installing-jax-optional-but-recommended">Installing JAX (Optional but Recommended)</a></li>
-<li><a class="reference internal" href="#installing-librosax">Installing librosax</a></li>
-<li><a class="reference internal" href="#installing-from-source">Installing from Source</a></li>
 <li><a class="reference internal" href="#dependencies">Dependencies</a></li>
+<li><a class="reference internal" href="#jax-installation">JAX Installation</a></li>
 </ul>
 </li>
 </ul>

@@ -1,0 +1,6 @@
+﻿librosax.feature.mfcc
+=====================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: mfcc

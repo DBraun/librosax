@@ -1,0 +1,6 @@
+librosax.feature.hz\_to\_octs
+=============================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: hz_to_octs

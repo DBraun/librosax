@@ -1,0 +1,6 @@
+﻿librosax.feature.melspectrogram
+===============================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: melspectrogram

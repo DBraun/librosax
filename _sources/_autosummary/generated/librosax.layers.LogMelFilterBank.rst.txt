@@ -1,0 +1,29 @@
+librosax.layers.LogMelFilterBank
+================================
+
+.. currentmodule:: librosax.layers
+
+.. autoclass:: LogMelFilterBank
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~LogMelFilterBank.__init__
+      ~LogMelFilterBank.eval
+      ~LogMelFilterBank.iter_children
+      ~LogMelFilterBank.iter_modules
+      ~LogMelFilterBank.perturb
+      ~LogMelFilterBank.set_attributes
+      ~LogMelFilterBank.sow
+      ~LogMelFilterBank.train
+   
+   
+
+   
+   
+   

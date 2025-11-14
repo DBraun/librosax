@@ -1,0 +1,29 @@
+﻿librosax.layers.DropStripes
+===========================
+
+.. currentmodule:: librosax.layers
+
+.. autoclass:: DropStripes
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~DropStripes.__init__
+      ~DropStripes.eval
+      ~DropStripes.iter_children
+      ~DropStripes.iter_modules
+      ~DropStripes.perturb
+      ~DropStripes.set_attributes
+      ~DropStripes.sow
+      ~DropStripes.train
+   
+   
+
+   
+   
+   

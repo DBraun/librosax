@@ -1,0 +1,6 @@
+﻿librosax.stft
+=============
+
+.. currentmodule:: librosax
+
+.. autofunction:: stft

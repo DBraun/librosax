@@ -1,0 +1,6 @@
+﻿librosax.feature.spectral\_contrast
+===================================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: spectral_contrast

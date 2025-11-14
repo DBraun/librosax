@@ -1,0 +1,6 @@
+﻿librosax.feature.zero\_crossing\_rate
+=====================================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: zero_crossing_rate

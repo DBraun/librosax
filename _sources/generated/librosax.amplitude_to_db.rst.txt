@@ -1,0 +1,6 @@
+﻿librosax.amplitude\_to\_db
+==========================
+
+.. currentmodule:: librosax
+
+.. autofunction:: amplitude_to_db

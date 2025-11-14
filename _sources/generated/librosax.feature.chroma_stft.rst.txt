@@ -1,0 +1,6 @@
+﻿librosax.feature.chroma\_stft
+=============================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: chroma_stft

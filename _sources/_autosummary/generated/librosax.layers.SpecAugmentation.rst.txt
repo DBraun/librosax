@@ -1,0 +1,29 @@
+librosax.layers.SpecAugmentation
+================================
+
+.. currentmodule:: librosax.layers
+
+.. autoclass:: SpecAugmentation
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SpecAugmentation.__init__
+      ~SpecAugmentation.eval
+      ~SpecAugmentation.iter_children
+      ~SpecAugmentation.iter_modules
+      ~SpecAugmentation.perturb
+      ~SpecAugmentation.set_attributes
+      ~SpecAugmentation.sow
+      ~SpecAugmentation.train
+   
+   
+
+   
+   
+   

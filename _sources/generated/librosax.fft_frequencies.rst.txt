@@ -1,0 +1,6 @@
+﻿librosax.fft\_frequencies
+=========================
+
+.. currentmodule:: librosax
+
+.. autofunction:: fft_frequencies

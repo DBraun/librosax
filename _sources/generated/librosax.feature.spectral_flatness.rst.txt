@@ -1,0 +1,6 @@
+﻿librosax.feature.spectral\_flatness
+===================================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: spectral_flatness

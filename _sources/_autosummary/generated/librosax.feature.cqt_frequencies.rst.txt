@@ -1,0 +1,6 @@
+librosax.feature.cqt\_frequencies
+=================================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: cqt_frequencies

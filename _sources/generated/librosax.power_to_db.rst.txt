@@ -1,0 +1,6 @@
+﻿librosax.power\_to\_db
+======================
+
+.. currentmodule:: librosax
+
+.. autofunction:: power_to_db

@@ -1,0 +1,6 @@
+librosax.feature.note\_to\_hz
+=============================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: note_to_hz

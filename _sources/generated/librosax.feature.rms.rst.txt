@@ -1,0 +1,6 @@
+﻿librosax.feature.rms
+====================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: rms

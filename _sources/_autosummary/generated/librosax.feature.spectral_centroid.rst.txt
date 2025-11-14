@@ -1,0 +1,6 @@
+librosax.feature.spectral\_centroid
+===================================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: spectral_centroid

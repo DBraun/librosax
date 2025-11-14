@@ -1,0 +1,29 @@
+﻿librosax.layers.MFCC
+====================
+
+.. currentmodule:: librosax.layers
+
+.. autoclass:: MFCC
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~MFCC.__init__
+      ~MFCC.eval
+      ~MFCC.iter_children
+      ~MFCC.iter_modules
+      ~MFCC.perturb
+      ~MFCC.set_attributes
+      ~MFCC.sow
+      ~MFCC.train
+   
+   
+
+   
+   
+   

@@ -1,0 +1,6 @@
+﻿librosax.feature.tonnetz
+========================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: tonnetz

@@ -1,0 +1,6 @@
+﻿librosax.feature.spectral\_rolloff
+==================================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: spectral_rolloff

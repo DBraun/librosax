@@ -1,0 +1,29 @@
+librosax.layers.Spectrogram
+===========================
+
+.. currentmodule:: librosax.layers
+
+.. autoclass:: Spectrogram
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Spectrogram.__init__
+      ~Spectrogram.eval
+      ~Spectrogram.iter_children
+      ~Spectrogram.iter_modules
+      ~Spectrogram.perturb
+      ~Spectrogram.set_attributes
+      ~Spectrogram.sow
+      ~Spectrogram.train
+   
+   
+
+   
+   
+   

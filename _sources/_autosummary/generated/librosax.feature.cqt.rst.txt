@@ -1,0 +1,6 @@
+librosax.feature.cqt
+====================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: cqt

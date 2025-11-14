@@ -17,6 +17,7 @@ Getting started
    :maxdepth: 1
 
    install
+   changelog
 
 
 API documentation

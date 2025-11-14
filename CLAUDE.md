@@ -26,6 +26,9 @@ python scripts/download_test_data.py
 
 ### Documentation
 ```bash
+# Install documentation dependencies
+pip install -e ".[docs]"
+
 # Build documentation
 cd docs
 make html

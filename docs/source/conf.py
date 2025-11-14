@@ -34,6 +34,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
+    "m2r2",
 ]
 
 # Autosummary settings

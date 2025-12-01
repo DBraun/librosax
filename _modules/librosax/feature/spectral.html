@@ -192,7 +192,6 @@
   <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html#id2">Changelog</a></li>
 </ul>
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../../librosax.html">Librosax</a><input aria-label="Toggle navigation of Librosax" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
@@ -358,9 +357,13 @@
 <span class="sd">    Users should ensure S is real-valued and non-negative.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        y: Audio time series. Multichannel is supported.</span>
+<span class="sd">        y: Audio time series. The last axis must be time.</span>
+
+<span class="sd">            - ``(T,)`` - single waveform</span>
+<span class="sd">            - ``(B, T)`` - batch of waveforms</span>
+
 <span class="sd">        sr: Audio sampling rate</span>
-<span class="sd">        S: (optional) Pre-computed spectrogram magnitude</span>
+<span class="sd">        S: (optional) Pre-computed spectrogram magnitude with shape ``(..., F, N)``</span>
 <span class="sd">        n_fft: FFT window size</span>
 <span class="sd">        hop_length: Hop length for STFT</span>
 <span class="sd">        freq: Center frequencies for spectrogram bins. If None, FFT bin center</span>
@@ -371,7 +374,11 @@
 <span class="sd">        pad_mode: Padding mode</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: Spectral centroid frequencies [shape=(..., 1, t)]</span>
+<span class="sd">        Spectral centroid frequencies with shape ``(..., 1, N)`` where N is the</span>
+<span class="sd">        number of frames. The frequency axis is reduced to size 1.</span>
+
+<span class="sd">        - ``(T,)`` → ``(1, N)``</span>
+<span class="sd">        - ``(B, T)`` → ``(B, 1, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">S</span><span class="p">,</span> <span class="n">n_fft</span> <span class="o">=</span> <span class="n">_spectrogram</span><span class="p">(</span>
         <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
@@ -428,9 +435,13 @@
 <span class="sd">    Users should ensure S is real-valued and non-negative.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        y: Audio time series. Multichannel is supported.</span>
+<span class="sd">        y: Audio time series. The last axis must be time.</span>
+
+<span class="sd">            - ``(T,)`` - single waveform</span>
+<span class="sd">            - ``(B, T)`` - batch of waveforms</span>
+
 <span class="sd">        sr: Audio sampling rate</span>
-<span class="sd">        S: (optional) Pre-computed spectrogram magnitude</span>
+<span class="sd">        S: (optional) Pre-computed spectrogram magnitude with shape ``(..., F, N)``</span>
 <span class="sd">        n_fft: FFT window size</span>
 <span class="sd">        hop_length: Hop length for STFT</span>
 <span class="sd">        win_length: Window length</span>
@@ -444,7 +455,10 @@
 <span class="sd">        p: Power to raise deviation from spectral centroid</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: Frequency bandwidth for each frame [shape=(..., 1, t)]</span>
+<span class="sd">        Frequency bandwidth with shape ``(..., 1, N)``.</span>
+
+<span class="sd">        - ``(T,)`` → ``(1, N)``</span>
+<span class="sd">        - ``(B, T)`` → ``(B, 1, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">S</span><span class="p">,</span> <span class="n">n_fft</span> <span class="o">=</span> <span class="n">_spectrogram</span><span class="p">(</span>
         <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
@@ -512,9 +526,13 @@
 <span class="sd">    the bins below. Users should ensure S is real-valued and non-negative.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        y: Audio time series. Multichannel is supported.</span>
+<span class="sd">        y: Audio time series. The last axis must be time.</span>
+
+<span class="sd">            - ``(T,)`` - single waveform</span>
+<span class="sd">            - ``(B, T)`` - batch of waveforms</span>
+
 <span class="sd">        sr: Audio sampling rate</span>
-<span class="sd">        S: (optional) Pre-computed spectrogram magnitude</span>
+<span class="sd">        S: (optional) Pre-computed spectrogram magnitude with shape ``(..., F, N)``</span>
 <span class="sd">        n_fft: FFT window size</span>
 <span class="sd">        hop_length: Hop length for STFT</span>
 <span class="sd">        win_length: Window length</span>
@@ -526,7 +544,10 @@
 <span class="sd">        roll_percent: Roll-off percentage (0 &lt; roll_percent &lt; 1)</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: Roll-off frequency for each frame [shape=(..., 1, t)]</span>
+<span class="sd">        Roll-off frequency with shape ``(..., 1, N)``.</span>
+
+<span class="sd">        - ``(T,)`` → ``(1, N)``</span>
+<span class="sd">        - ``(B, T)`` → ``(B, 1, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="mf">0.0</span> <span class="o">&lt;</span> <span class="n">roll_percent</span> <span class="o">&lt;</span> <span class="mf">1.0</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;roll_percent must lie in the range (0, 1)&quot;</span><span class="p">)</span>
@@ -595,8 +616,12 @@
 <span class="sd">    non-negative.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        y: Audio time series. Multichannel is supported.</span>
-<span class="sd">        S: (optional) Pre-computed spectrogram magnitude</span>
+<span class="sd">        y: Audio time series. The last axis must be time.</span>
+
+<span class="sd">            - ``(T,)`` - single waveform</span>
+<span class="sd">            - ``(B, T)`` - batch of waveforms</span>
+
+<span class="sd">        S: (optional) Pre-computed spectrogram magnitude with shape ``(..., F, N)``</span>
 <span class="sd">        n_fft: FFT window size</span>
 <span class="sd">        hop_length: Hop length for STFT</span>
 <span class="sd">        win_length: Window length</span>
@@ -607,7 +632,10 @@
 <span class="sd">        power: Exponent for the magnitude spectrogram (e.g., 1 for energy, 2 for power)</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: Spectral flatness for each frame [shape=(..., 1, t)]</span>
+<span class="sd">        Spectral flatness with shape ``(..., 1, N)``.</span>
+
+<span class="sd">        - ``(T,)`` → ``(1, N)``</span>
+<span class="sd">        - ``(B, T)`` → ``(B, 1, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">amin</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;amin must be strictly positive&quot;</span><span class="p">)</span>
@@ -726,8 +754,12 @@
 <span class="sd">    representation of energy over time because its frames can be windowed.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        y: (optional) Audio time series. Required if S is not input.</span>
-<span class="sd">        S: (optional) Spectrogram magnitude. Required if y is not input.</span>
+<span class="sd">        y: (optional) Audio time series. The last axis must be time.</span>
+
+<span class="sd">            - ``(T,)`` - single waveform</span>
+<span class="sd">            - ``(B, T)`` - batch of waveforms</span>
+
+<span class="sd">        S: (optional) Spectrogram magnitude with shape ``(..., F, N)``</span>
 <span class="sd">        frame_length: Length of analysis frame (in samples) for energy calculation</span>
 <span class="sd">        hop_length: Hop length for STFT</span>
 <span class="sd">        center: If True and operating on time-domain input (y), pad the signal</span>
@@ -736,7 +768,10 @@
 <span class="sd">        dtype: Data type of the output array</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: RMS value for each frame [shape=(..., 1, t)]</span>
+<span class="sd">        RMS value with shape ``(..., 1, N)``.</span>
+
+<span class="sd">        - ``(T,)`` → ``(1, N)``</span>
+<span class="sd">        - ``(B, T)`` → ``(B, 1, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">center</span><span class="p">:</span>
@@ -856,7 +891,11 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute the zero-crossing rate of an audio time series.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        y: Audio time series. Multichannel is supported.</span>
+<span class="sd">        y: Audio time series. The last axis must be time.</span>
+
+<span class="sd">            - ``(T,)`` - single waveform</span>
+<span class="sd">            - ``(B, T)`` - batch of waveforms</span>
+
 <span class="sd">        frame_length: Length of the frame over which to compute zero crossing rates</span>
 <span class="sd">        hop_length: Number of samples to advance for each frame</span>
 <span class="sd">        center: If True, frames are centered by padding the edges of y.</span>
@@ -864,7 +903,10 @@
 <span class="sd">        **kwargs: Additional keyword arguments to pass to zero_crossings</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: Zero crossing rate for each frame [shape=(..., 1, t)]</span>
+<span class="sd">        Zero crossing rate with shape ``(..., 1, N)``.</span>
+
+<span class="sd">        - ``(T,)`` → ``(1, N)``</span>
+<span class="sd">        - ``(B, T)`` → ``(B, 1, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">center</span><span class="p">:</span>
         <span class="c1"># Pad with edge values</span>
@@ -918,9 +960,13 @@
 <span class="sd">    correspond to broad-band noise.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        y: Audio time series. Multichannel is supported.</span>
+<span class="sd">        y: Audio time series. The last axis must be time.</span>
+
+<span class="sd">            - ``(T,)`` - single waveform</span>
+<span class="sd">            - ``(B, T)`` - batch of waveforms</span>
+
 <span class="sd">        sr: Audio sampling rate</span>
-<span class="sd">        S: (optional) Pre-computed spectrogram magnitude</span>
+<span class="sd">        S: (optional) Pre-computed spectrogram magnitude with shape ``(..., F, N)``</span>
 <span class="sd">        n_fft: FFT window size</span>
 <span class="sd">        hop_length: Hop length for STFT</span>
 <span class="sd">        win_length: Window length</span>
@@ -937,7 +983,10 @@
 <span class="sd">            If False, return the logarithmic difference: log(peaks) - log(valleys).</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: Spectral contrast values [shape=(..., n_bands + 1, t)]</span>
+<span class="sd">        Spectral contrast with shape ``(..., n_bands + 1, N)``.</span>
+
+<span class="sd">        - ``(T,)`` → ``(n_bands + 1, N)``</span>
+<span class="sd">        - ``(B, T)`` → ``(B, n_bands + 1, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">S</span><span class="p">,</span> <span class="n">n_fft</span> <span class="o">=</span> <span class="n">_spectrogram</span><span class="p">(</span>
         <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
@@ -1139,9 +1188,13 @@
 <span class="sd">        ``power``, ``n_mels``, ``fmin``, ``fmax``, ``htk``, ``norm``, ``dtype``</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        y: Audio time series. Multichannel is supported.</span>
+<span class="sd">        y: Audio time series. The last axis must be time.</span>
+
+<span class="sd">            - ``(T,)`` - single waveform</span>
+<span class="sd">            - ``(B, T)`` - batch of waveforms</span>
+
 <span class="sd">        sr: Audio sampling rate</span>
-<span class="sd">        S: (optional) Pre-computed spectrogram magnitude</span>
+<span class="sd">        S: (optional) Pre-computed spectrogram magnitude with shape ``(..., F, N)``</span>
 <span class="sd">        n_fft: FFT window size</span>
 <span class="sd">        hop_length: Hop length for STFT</span>
 <span class="sd">        win_length: Window length</span>
@@ -1163,7 +1216,10 @@
 <span class="sd">        dtype: Data type of the output array</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: Mel spectrogram [shape=(..., n_mels, t)]</span>
+<span class="sd">        Mel spectrogram with shape ``(..., n_mels, N)``.</span>
+
+<span class="sd">        - ``(T,)`` → ``(n_mels, N)``</span>
+<span class="sd">        - ``(B, T)`` → ``(B, n_mels, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">fmax</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">fmax</span> <span class="o">=</span> <span class="n">sr</span> <span class="o">/</span> <span class="mi">2</span>
@@ -1251,9 +1307,13 @@
 <span class="sd">        ``sr``, ``n_mfcc``, ``dct_type``, ``norm``, ``lifter``, plus all other kwargs.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        y: Audio time series. Multichannel is supported.</span>
+<span class="sd">        y: Audio time series. The last axis must be time.</span>
+
+<span class="sd">            - ``(T,)`` - single waveform</span>
+<span class="sd">            - ``(B, T)`` - batch of waveforms</span>
+
 <span class="sd">        sr: Audio sampling rate</span>
-<span class="sd">        S: (optional) log-power mel spectrogram</span>
+<span class="sd">        S: (optional) log-power mel spectrogram with shape ``(..., n_mels, N)``</span>
 <span class="sd">        n_mfcc: Number of MFCCs to return (default: 20)</span>
 <span class="sd">        dct_type: Discrete cosine transform (DCT) type (default: 2)</span>
 <span class="sd">        norm: If &quot;ortho&quot;, use orthonormal DCT basis. Default: &quot;ortho&quot;</span>
@@ -1274,7 +1334,10 @@
 <span class="sd">            (used if y is provided)</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: MFCC sequence [shape=(..., n_mfcc, t)]</span>
+<span class="sd">        MFCCs with shape ``(..., n_mfcc, N)``.</span>
+
+<span class="sd">        - ``(T,)`` → ``(n_mfcc, N)``</span>
+<span class="sd">        - ``(B, T)`` → ``(B, n_mfcc, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">S</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="c1"># Compute mel spectrogram if not provided</span>
@@ -1605,7 +1668,11 @@
 <span class="sd">        ``normalization_type``</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        y: Audio time series</span>
+<span class="sd">        y: Audio time series. The last axis must be time.</span>
+
+<span class="sd">            - ``(T,)`` - single waveform</span>
+<span class="sd">            - ``(B, T)`` - batch of waveforms</span>
+
 <span class="sd">        sr: Sampling rate</span>
 <span class="sd">        hop_length: Number of samples between successive CQT columns</span>
 <span class="sd">        fmin: Minimum frequency (default: C1 = 32.70 Hz)</span>
@@ -1626,7 +1693,10 @@
 <span class="sd">        normalization_type: Normalization type (&#39;librosa&#39;, &#39;convolutional&#39;, &#39;wrap&#39;)</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        CQT matrix [shape=(n_bins, t)] format depends on output_format</span>
+<span class="sd">        CQT matrix with shape ``(..., n_bins, N)``. Format depends on output_format.</span>
+
+<span class="sd">        - ``(T,)`` → ``(n_bins, N)``</span>
+<span class="sd">        - ``(B, T)`` → ``(B, n_bins, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">fmin</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">fmin</span> <span class="o">=</span> <span class="n">note_to_hz</span><span class="p">(</span><span class="s2">&quot;C1&quot;</span><span class="p">)</span>
@@ -2123,9 +2193,13 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Chromagram from a constant-Q transform.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        y: Audio time series. Multichannel is supported.</span>
+<span class="sd">        y: Audio time series. The last axis must be time.</span>
+
+<span class="sd">            - ``(T,)`` - single waveform</span>
+<span class="sd">            - ``(B, T)`` - batch of waveforms</span>
+
 <span class="sd">        sr: Sampling rate</span>
-<span class="sd">        C: Pre-computed CQT spectrogram</span>
+<span class="sd">        C: Pre-computed CQT spectrogram with shape ``(..., n_cqt_bins, N)``</span>
 <span class="sd">        hop_length: Number of samples between successive CQT columns</span>
 <span class="sd">        fmin: Minimum frequency. Default: C1 ~= 32.70 Hz</span>
 <span class="sd">        norm: Normalization mode for chroma</span>
@@ -2139,7 +2213,10 @@
 <span class="sd">        **kwargs: Additional parameters for cqt</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: Normalized chroma [shape=(..., n_chroma, t)]</span>
+<span class="sd">        Chromagram with shape ``(..., n_chroma, N)``.</span>
+
+<span class="sd">        - ``(T,)`` → ``(n_chroma, N)``</span>
+<span class="sd">        - ``(B, T)`` → ``(B, n_chroma, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">fmin</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">fmin</span> <span class="o">=</span> <span class="n">note_to_hz</span><span class="p">(</span><span class="s2">&quot;C1&quot;</span><span class="p">)</span>
@@ -2209,22 +2286,31 @@
 <span class="sd">    two-dimensional coordinates.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        y: Audio time series. Multichannel is supported.</span>
+<span class="sd">        y: Audio time series. The last axis must be time.</span>
+
+<span class="sd">            - ``(T,)`` - single waveform</span>
+<span class="sd">            - ``(B, T)`` - batch of waveforms</span>
+
 <span class="sd">        sr: Sampling rate of y</span>
-<span class="sd">        chroma: Normalized energy for each chroma bin at each frame.</span>
-<span class="sd">            If None, a chroma_stft is computed.</span>
+<span class="sd">        chroma: Normalized energy for each chroma bin at each frame</span>
+<span class="sd">            with shape ``(..., n_chroma, N)``. If None, a chroma_stft is computed.</span>
 <span class="sd">        **kwargs: Additional keyword arguments to chroma_stft,</span>
 <span class="sd">            if chroma is not pre-computed.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: Tonal centroid features [shape=(..., 6, t)]</span>
-<span class="sd">            Tonnetz dimensions:</span>
-<span class="sd">            - 0: Fifth x-axis</span>
-<span class="sd">            - 1: Fifth y-axis</span>
-<span class="sd">            - 2: Minor x-axis</span>
-<span class="sd">            - 3: Minor y-axis</span>
-<span class="sd">            - 4: Major x-axis</span>
-<span class="sd">            - 5: Major y-axis</span>
+<span class="sd">        Tonnetz features with shape ``(..., 6, N)``.</span>
+
+<span class="sd">        - ``(T,)`` → ``(6, N)``</span>
+<span class="sd">        - ``(B, T)`` → ``(B, 6, N)``</span>
+
+<span class="sd">        Tonnetz dimensions:</span>
+
+<span class="sd">        - 0: Fifth x-axis</span>
+<span class="sd">        - 1: Fifth y-axis</span>
+<span class="sd">        - 2: Minor x-axis</span>
+<span class="sd">        - 3: Minor y-axis</span>
+<span class="sd">        - 4: Major x-axis</span>
+<span class="sd">        - 5: Major y-axis</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">chroma</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -2289,9 +2375,13 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute a chromagram from a power spectrogram or waveform.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        y: Audio time series. Multichannel is supported.</span>
+<span class="sd">        y: Audio time series. The last axis must be time.</span>
+
+<span class="sd">            - ``(T,)`` - single waveform</span>
+<span class="sd">            - ``(B, T)`` - batch of waveforms</span>
+
 <span class="sd">        sr: Sampling rate</span>
-<span class="sd">        S: Power spectrogram (optional if y is provided)</span>
+<span class="sd">        S: Power spectrogram with shape ``(..., F, N)`` (optional if y is provided)</span>
 <span class="sd">        norm: Column-wise normalization. See `normalize` for details.</span>
 <span class="sd">        n_fft: FFT window size</span>
 <span class="sd">        hop_length: Hop length</span>
@@ -2305,7 +2395,10 @@
 <span class="sd">        **kwargs: Additional arguments to chroma_filter (ctroct, octwidth, norm, base_c)</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: Chromagram [shape=(..., n_chroma, t)]</span>
+<span class="sd">        Chromagram with shape ``(..., n_chroma, N)``.</span>
+
+<span class="sd">        - ``(T,)`` → ``(n_chroma, N)``</span>
+<span class="sd">        - ``(B, T)`` → ``(B, n_chroma, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="c1"># Get power spectrogram</span>
     <span class="n">S</span><span class="p">,</span> <span class="n">n_fft</span> <span class="o">=</span> <span class="n">_spectrogram</span><span class="p">(</span>

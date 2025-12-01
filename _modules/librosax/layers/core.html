@@ -192,7 +192,6 @@
   <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html#id2">Changelog</a></li>
 </ul>
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../../librosax.html">Librosax</a><input aria-label="Toggle navigation of Librosax" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
@@ -659,15 +658,25 @@
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">waveform</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute a spectrogram from a signal using JAX.</span>
 
+<span class="sd">        Note:</span>
+<span class="sd">            Unlike ``librosax.stft``, this layer outputs with time before frequency</span>
+<span class="sd">            (suitable for neural network processing).</span>
+
 <span class="sd">        Args:</span>
-<span class="sd">            waveform: A waveform whose last axis is time.</span>
-<span class="sd">                The waveform can be 1D ``(T,)``, 2D ``(B, T)``, or 3D ``(B, C, T)``.</span>
+<span class="sd">            waveform: Audio waveform. The last axis must be time.</span>
+
+<span class="sd">                - ``(T,)`` - single waveform</span>
+<span class="sd">                - ``(B, T)`` - batch of waveforms</span>
+<span class="sd">                - ``(B, C, T)`` - batch with channels</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            jnp.ndarray: Spectrogram with appropriate shape based on input dimensions.</span>
-<span class="sd">                - For 1D input: shape ``(time_steps, freq_bins)``</span>
-<span class="sd">                - For 2D input: shape ``(batch_size, time_steps, freq_bins)``</span>
-<span class="sd">                - For 3D input: shape ``(batch_size, channels, time_steps, freq_bins)``</span>
+<span class="sd">            Power spectrogram. Note the axis order is ``(time, freq)``:</span>
+
+<span class="sd">            - ``(T,)`` → ``(N, F)``</span>
+<span class="sd">            - ``(B, T)`` → ``(B, N, F)``</span>
+<span class="sd">            - ``(B, C, T)`` → ``(B, C, N, F)``</span>
+
+<span class="sd">            where F = ``n_fft // 2 + 1`` and N = number of frames.</span>
 
 <span class="sd">        Raises:</span>
 <span class="sd">            ValueError: If the waveform has invalid dimensions.</span>
@@ -767,10 +776,19 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate (log) mel spectrogram from spectrogram.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            x: Spectrogram of shape ``(*, frames, n_fft//2+1)``.</span>
+<span class="sd">            x: Power spectrogram with shape ``(..., N, F)`` where N is frames</span>
+<span class="sd">                and F = ``n_fft // 2 + 1``. Typically output from ``Spectrogram``.</span>
+
+<span class="sd">                - ``(N, F)`` - single spectrogram</span>
+<span class="sd">                - ``(B, N, F)`` - batch of spectrograms</span>
+<span class="sd">                - ``(B, C, N, F)`` - batch with channels</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            jnp.ndarray: (Log) mel spectrogram of shape ``(*, frames, mel_bins)``.</span>
+<span class="sd">            (Log) mel spectrogram with shape ``(..., N, n_mels)``.</span>
+
+<span class="sd">            - ``(N, F)`` → ``(N, n_mels)``</span>
+<span class="sd">            - ``(B, N, F)`` → ``(B, N, n_mels)``</span>
+<span class="sd">            - ``(B, C, N, F)`` → ``(B, C, N, n_mels)``</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">freeze_parameters</span><span class="p">:</span>
             <span class="n">melW</span> <span class="o">=</span> <span class="n">librosa</span><span class="o">.</span><span class="n">filters</span><span class="o">.</span><span class="n">mel</span><span class="p">(</span>
@@ -862,13 +880,20 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute MFCCs from a spectrogram.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            x: Spectrogram of shape ``(*, frames, n_fft//2+1)``.</span>
+<span class="sd">            x: Power spectrogram with shape ``(..., N, F)`` where N is frames</span>
+<span class="sd">                and F = ``n_fft // 2 + 1``. Typically output from ``Spectrogram``.</span>
+
+<span class="sd">                - ``(N, F)`` - single spectrogram</span>
+<span class="sd">                - ``(B, N, F)`` - batch of spectrograms</span>
+<span class="sd">                - ``(B, C, N, F)`` - batch with channels</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            jnp.ndarray: MFCCs with appropriate shape based on input dimensions.</span>
-<span class="sd">                - For 2D input: shape ``(n_mfcc, time_steps)``</span>
-<span class="sd">                - For 3D input: shape ``(batch_size, n_mfcc, time_steps)``</span>
-<span class="sd">                - For 4D input: shape ``(batch_size, chans, n_mfcc, time_steps)``</span>
+<span class="sd">            MFCCs with shape ``(..., n_mfcc, N)``. Note the output transposes</span>
+<span class="sd">            the last two axes compared to the input.</span>
+
+<span class="sd">            - ``(N, F)`` → ``(n_mfcc, N)``</span>
+<span class="sd">            - ``(B, N, F)`` → ``(B, n_mfcc, N)``</span>
+<span class="sd">            - ``(B, C, N, F)`` → ``(B, C, n_mfcc, N)``</span>
 
 <span class="sd">        Raises:</span>
 <span class="sd">            ValueError: If the input has invalid dimensions.</span>

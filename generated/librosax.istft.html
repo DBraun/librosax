@@ -193,7 +193,6 @@
   <ul>
 <li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../changelog.html#id2">Changelog</a></li>
 </ul>
 <ul class="current">
 <li class="toctree-l1 current has-children"><a class="reference internal" href="../librosax.html">Librosax</a><input aria-label="Toggle navigation of Librosax" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
@@ -304,25 +303,59 @@
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>stft_matrix</strong> – The STFT matrix from which to compute the inverse.</p></li>
+<li><p><strong>stft_matrix</strong> – <p>Complex STFT matrix. The second-to-last axis must be frequency
+(<code class="docutils literal notranslate"><span class="pre">n_fft</span> <span class="pre">//</span> <span class="pre">2</span> <span class="pre">+</span> <span class="pre">1</span></code> bins) and the last axis must be time frames.
+Supported shapes:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">(F,</span> <span class="pre">N)</span></code> - single spectrogram</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">F,</span> <span class="pre">N)</span></code> - batch of B spectrograms</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">C,</span> <span class="pre">F,</span> <span class="pre">N)</span></code> - batch of B spectrograms with C channels</p></li>
+</ul>
+<p>where F = <code class="docutils literal notranslate"><span class="pre">n_fft</span> <span class="pre">//</span> <span class="pre">2</span> <span class="pre">+</span> <span class="pre">1</span></code> and N = number of frames.</p>
+</p></li>
 <li><p><strong>hop_length</strong> – Number of samples between successive frames. Default is <code class="docutils literal notranslate"><span class="pre">win_length</span> <span class="pre">//</span> <span class="pre">4</span></code>.</p></li>
 <li><p><strong>win_length</strong> – Window size. Default is <code class="docutils literal notranslate"><span class="pre">n_fft</span></code>.</p></li>
-<li><p><strong>n_fft</strong> – FFT size. Default is <code class="docutils literal notranslate"><span class="pre">(stft_matrix.shape[-2]</span> <span class="pre">-</span> <span class="pre">1)</span> <span class="pre">*</span> <span class="pre">2</span></code>.</p></li>
-<li><p><strong>window</strong> – Window function type. Default is <code class="docutils literal notranslate"><span class="pre">&quot;hann&quot;</span></code>.</p></li>
+<li><p><strong>n_fft</strong> – FFT size. Default is <code class="docutils literal notranslate"><span class="pre">(stft_matrix.shape[-2]</span> <span class="pre">-</span> <span class="pre">1)</span> <span class="pre">*</span> <span class="pre">2</span></code>, inferred from
+the frequency axis of the input.</p></li>
+<li><p><strong>window</strong> – Window function type. Default is <code class="docutils literal notranslate"><span class="pre">&quot;hann&quot;</span></code>. Also supports <code class="docutils literal notranslate"><span class="pre">&quot;sqrt_hann&quot;</span></code>.</p></li>
 <li><p><strong>center</strong> – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, assumes the waveform was padded so that frames were centered. Default is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
-<li><p><strong>length</strong> – Target length for the reconstructed signal. If None, the entire signal is returned.</p></li>
+<li><p><strong>length</strong> – Target length for the reconstructed signal. If <code class="docutils literal notranslate"><span class="pre">None</span></code>, the entire signal is returned.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Reconstructed time-domain signal.</p>
+<dd class="field-even"><p><p>Reconstructed time-domain signal. The last axis is time (samples).
+Output shapes correspond to inputs:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">(F,</span> <span class="pre">N)</span></code> → <code class="docutils literal notranslate"><span class="pre">(T,)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">F,</span> <span class="pre">N)</span></code> → <code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">T)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">C,</span> <span class="pre">F,</span> <span class="pre">N)</span></code> → <code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">C,</span> <span class="pre">T)</span></code></p></li>
+</ul>
+<p>where T is the reconstructed signal length.</p>
+</p>
 </dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>jnp.ndarray</p>
-</dd>
-<dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#AssertionError" title="(in Python v3.14)"><strong>AssertionError</strong></a> – If center is <code class="docutils literal notranslate"><span class="pre">False</span></code> because the function is only tested for <code class="docutils literal notranslate"><span class="pre">center=True</span></code>.</p>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#AssertionError" title="(in Python v3.14)"><strong>AssertionError</strong></a> – If center is <code class="docutils literal notranslate"><span class="pre">False</span></code> because the function is only tested for <code class="docutils literal notranslate"><span class="pre">center=True</span></code>.</p>
 </dd>
 </dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">librosax</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Single STFT: (n_freq, n_frames) -&gt; (n_samples,)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">S</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">1025</span><span class="p">,</span> <span class="mi">44</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">complex64</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y</span> <span class="o">=</span> <span class="n">librosax</span><span class="o">.</span><span class="n">istft</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="n">hop_length</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(22016,)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Batched STFT: (batch, n_freq, n_frames) -&gt; (batch, n_samples)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">S_batch</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">1025</span><span class="p">,</span> <span class="mi">44</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">complex64</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y_batch</span> <span class="o">=</span> <span class="n">librosax</span><span class="o">.</span><span class="n">istft</span><span class="p">(</span><span class="n">S_batch</span><span class="p">,</span> <span class="n">hop_length</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y_batch</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(4, 22016)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># With target length</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y_trimmed</span> <span class="o">=</span> <span class="n">librosax</span><span class="o">.</span><span class="n">istft</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="n">hop_length</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">length</span><span class="o">=</span><span class="mi">22050</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y_trimmed</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(22050,)</span>
+</pre></div>
+</div>
 </dd></dl>
 
 </section>

@@ -193,7 +193,6 @@
   <ul>
 <li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../changelog.html#id2">Changelog</a></li>
 </ul>
 <ul class="current">
 <li class="toctree-l1 has-children"><a class="reference internal" href="../librosax.html">Librosax</a><input aria-label="Toggle navigation of Librosax" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
@@ -306,29 +305,35 @@ two-dimensional coordinates.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>y</strong> – Audio time series. Multichannel is supported.</p></li>
+<li><p><strong>y</strong> – <p>Audio time series. The last axis must be time.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">(T,)</span></code> - single waveform</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">T)</span></code> - batch of waveforms</p></li>
+</ul>
+</p></li>
 <li><p><strong>sr</strong> – Sampling rate of y</p></li>
-<li><p><strong>chroma</strong> – Normalized energy for each chroma bin at each frame.
-If None, a chroma_stft is computed.</p></li>
+<li><p><strong>chroma</strong> – Normalized energy for each chroma bin at each frame
+with shape <code class="docutils literal notranslate"><span class="pre">(...,</span> <span class="pre">n_chroma,</span> <span class="pre">N)</span></code>. If None, a chroma_stft is computed.</p></li>
 <li><p><strong>**kwargs</strong> – Additional keyword arguments to chroma_stft,
 if chroma is not pre-computed.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>Tonal centroid features [shape=(…, 6, t)]</dt><dd><p>Tonnetz dimensions:
-- 0: Fifth x-axis
-- 1: Fifth y-axis
-- 2: Minor x-axis
-- 3: Minor y-axis
-- 4: Major x-axis
-- 5: Major y-axis</p>
-</dd>
-</dl>
+<dd class="field-even"><p><p>Tonnetz features with shape <code class="docutils literal notranslate"><span class="pre">(...,</span> <span class="pre">6,</span> <span class="pre">N)</span></code>.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">(T,)</span></code> → <code class="docutils literal notranslate"><span class="pre">(6,</span> <span class="pre">N)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">T)</span></code> → <code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">6,</span> <span class="pre">N)</span></code></p></li>
+</ul>
+<p>Tonnetz dimensions:</p>
+<ul class="simple">
+<li><p>0: Fifth x-axis</p></li>
+<li><p>1: Fifth y-axis</p></li>
+<li><p>2: Minor x-axis</p></li>
+<li><p>3: Minor y-axis</p></li>
+<li><p>4: Major x-axis</p></li>
+<li><p>5: Major y-axis</p></li>
+</ul>
 </p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>jnp.ndarray</p>
 </dd>
 </dl>
 </dd></dl>

@@ -192,7 +192,6 @@
   <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html#id2">Changelog</a></li>
 </ul>
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../../librosax.html">Librosax</a><input aria-label="Toggle navigation of Librosax" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
@@ -341,19 +340,46 @@
 <span class="sd">        ``n_fft``, ``hop_length``, ``win_length``, ``window``, ``center``, ``pad_mode``</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        waveform: Input signal waveform.</span>
-<span class="sd">        n_fft: FFT size.</span>
+<span class="sd">        waveform: Input signal waveform. The last axis must be time (samples).</span>
+<span class="sd">            Supported shapes:</span>
+
+<span class="sd">            - ``(T,)`` - single waveform with T samples</span>
+<span class="sd">            - ``(B, T)`` - batch of B waveforms</span>
+<span class="sd">            - ``(B, C, T)`` - batch of B waveforms with C channels</span>
+<span class="sd">        n_fft: FFT size. Determines the number of frequency bins in the output:</span>
+<span class="sd">            ``n_fft // 2 + 1``.</span>
 <span class="sd">        hop_length: Number of samples between successive frames. Default is ``win_length // 4``.</span>
 <span class="sd">        win_length: Window size. Default is ``n_fft``.</span>
-<span class="sd">        window: Window function type. Default is ``&quot;hann&quot;``.</span>
+<span class="sd">        window: Window function type. Default is ``&quot;hann&quot;``. Also supports ``&quot;sqrt_hann&quot;``.</span>
 <span class="sd">        center: If ``True``, the waveform is padded so that frames are centered. Default is ``True``.</span>
 <span class="sd">        pad_mode: Padding mode for the waveform. Must be one of ``[&quot;constant&quot;, &quot;reflect&quot;]``. Default is ``&quot;constant&quot;``.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: Complex STFT matrix.</span>
+<span class="sd">        Complex STFT matrix. The second-to-last axis is frequency (``n_fft // 2 + 1`` bins)</span>
+<span class="sd">        and the last axis is time frames. Output shapes correspond to inputs:</span>
+
+<span class="sd">        - ``(T,)`` → ``(F, N)``</span>
+<span class="sd">        - ``(B, T)`` → ``(B, F, N)``</span>
+<span class="sd">        - ``(B, C, T)`` → ``(B, C, F, N)``</span>
+
+<span class="sd">        where F = ``n_fft // 2 + 1`` and N = number of frames.</span>
 
 <span class="sd">    Raises:</span>
 <span class="sd">        AssertionError: If pad_mode is not one of ``[&quot;constant&quot;, &quot;reflect&quot;]``.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; import jax.numpy as jnp</span>
+<span class="sd">        &gt;&gt;&gt; import librosax</span>
+<span class="sd">        &gt;&gt;&gt; # Single waveform: (n_samples,) -&gt; (n_freq, n_frames)</span>
+<span class="sd">        &gt;&gt;&gt; y = jnp.zeros(22050)  # 1 second at 22050 Hz</span>
+<span class="sd">        &gt;&gt;&gt; S = librosax.stft(y, n_fft=2048, hop_length=512)</span>
+<span class="sd">        &gt;&gt;&gt; S.shape</span>
+<span class="sd">        (1025, 44)</span>
+<span class="sd">        &gt;&gt;&gt; # Batched waveforms: (batch, n_samples) -&gt; (batch, n_freq, n_frames)</span>
+<span class="sd">        &gt;&gt;&gt; y_batch = jnp.zeros((4, 22050))</span>
+<span class="sd">        &gt;&gt;&gt; S_batch = librosax.stft(y_batch, n_fft=2048, hop_length=512)</span>
+<span class="sd">        &gt;&gt;&gt; S_batch.shape</span>
+<span class="sd">        (4, 1025, 44)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">win_length</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">win_length</span> <span class="o">=</span> <span class="n">n_fft</span>
@@ -413,19 +439,53 @@
 <span class="sd">    This function reconstructs a waveform from an STFT matrix using JAX&#39;s ``scipy.signal.istft`` implementation.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        stft_matrix: The STFT matrix from which to compute the inverse.</span>
+<span class="sd">        stft_matrix: Complex STFT matrix. The second-to-last axis must be frequency</span>
+<span class="sd">            (``n_fft // 2 + 1`` bins) and the last axis must be time frames.</span>
+<span class="sd">            Supported shapes:</span>
+
+<span class="sd">            - ``(F, N)`` - single spectrogram</span>
+<span class="sd">            - ``(B, F, N)`` - batch of B spectrograms</span>
+<span class="sd">            - ``(B, C, F, N)`` - batch of B spectrograms with C channels</span>
+
+<span class="sd">            where F = ``n_fft // 2 + 1`` and N = number of frames.</span>
 <span class="sd">        hop_length: Number of samples between successive frames. Default is ``win_length // 4``.</span>
 <span class="sd">        win_length: Window size. Default is ``n_fft``.</span>
-<span class="sd">        n_fft: FFT size. Default is ``(stft_matrix.shape[-2] - 1) * 2``.</span>
-<span class="sd">        window: Window function type. Default is ``&quot;hann&quot;``.</span>
+<span class="sd">        n_fft: FFT size. Default is ``(stft_matrix.shape[-2] - 1) * 2``, inferred from</span>
+<span class="sd">            the frequency axis of the input.</span>
+<span class="sd">        window: Window function type. Default is ``&quot;hann&quot;``. Also supports ``&quot;sqrt_hann&quot;``.</span>
 <span class="sd">        center: If ``True``, assumes the waveform was padded so that frames were centered. Default is ``True``.</span>
-<span class="sd">        length: Target length for the reconstructed signal. If None, the entire signal is returned.</span>
+<span class="sd">        length: Target length for the reconstructed signal. If ``None``, the entire signal is returned.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: Reconstructed time-domain signal.</span>
+<span class="sd">        Reconstructed time-domain signal. The last axis is time (samples).</span>
+<span class="sd">        Output shapes correspond to inputs:</span>
+
+<span class="sd">        - ``(F, N)`` → ``(T,)``</span>
+<span class="sd">        - ``(B, F, N)`` → ``(B, T)``</span>
+<span class="sd">        - ``(B, C, F, N)`` → ``(B, C, T)``</span>
+
+<span class="sd">        where T is the reconstructed signal length.</span>
 
 <span class="sd">    Raises:</span>
 <span class="sd">        AssertionError: If center is ``False`` because the function is only tested for ``center=True``.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; import jax.numpy as jnp</span>
+<span class="sd">        &gt;&gt;&gt; import librosax</span>
+<span class="sd">        &gt;&gt;&gt; # Single STFT: (n_freq, n_frames) -&gt; (n_samples,)</span>
+<span class="sd">        &gt;&gt;&gt; S = jnp.zeros((1025, 44), dtype=jnp.complex64)</span>
+<span class="sd">        &gt;&gt;&gt; y = librosax.istft(S, hop_length=512)</span>
+<span class="sd">        &gt;&gt;&gt; y.shape</span>
+<span class="sd">        (22016,)</span>
+<span class="sd">        &gt;&gt;&gt; # Batched STFT: (batch, n_freq, n_frames) -&gt; (batch, n_samples)</span>
+<span class="sd">        &gt;&gt;&gt; S_batch = jnp.zeros((4, 1025, 44), dtype=jnp.complex64)</span>
+<span class="sd">        &gt;&gt;&gt; y_batch = librosax.istft(S_batch, hop_length=512)</span>
+<span class="sd">        &gt;&gt;&gt; y_batch.shape</span>
+<span class="sd">        (4, 22016)</span>
+<span class="sd">        &gt;&gt;&gt; # With target length</span>
+<span class="sd">        &gt;&gt;&gt; y_trimmed = librosax.istft(S, hop_length=512, length=22050)</span>
+<span class="sd">        &gt;&gt;&gt; y_trimmed.shape</span>
+<span class="sd">        (22050,)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">assert</span> <span class="n">center</span><span class="p">,</span> <span class="s2">&quot;Only tested for `center==True`&quot;</span>
 
@@ -489,13 +549,13 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a power spectrogram to decibel (dB) units.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        x: Input power spectrogram.</span>
+<span class="sd">        x: Input power spectrogram. Any shape; applied element-wise.</span>
 <span class="sd">        amin: Minimum threshold for input values. Default is 1e-10.</span>
 <span class="sd">        top_db: Threshold the output at top_db below the peak. Default is 80.0.</span>
 <span class="sd">        ref: Reference value for scaling. Default is 1.0.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: dB-scaled spectrogram.</span>
+<span class="sd">        dB-scaled spectrogram with same shape as input.</span>
 
 <span class="sd">    Raises:</span>
 <span class="sd">        librosax.util.exceptions.ParameterError: If ``top_db`` is negative.</span>
@@ -547,7 +607,7 @@
 <span class="sd">    but is provided for convenience.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        S: Input amplitude spectrogram.</span>
+<span class="sd">        S: Input amplitude spectrogram. Any shape; applied element-wise.</span>
 <span class="sd">        ref: Reference value for scaling. If scalar, the amplitude ``abs(S)`` is scaled relative</span>
 <span class="sd">            to ref: ``20 * log10(S / ref)``. If callable, the reference value is computed</span>
 <span class="sd">            as ``ref(S)``. Default is 1.0.</span>
@@ -555,7 +615,7 @@
 <span class="sd">        top_db: Threshold the output at top_db below the peak. Default is 80.0.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        jnp.ndarray: dB-scaled spectrogram.</span>
+<span class="sd">        dB-scaled spectrogram with same shape as input.</span>
 
 <span class="sd">    See Also:</span>
 <span class="sd">        power_to_db, db_to_amplitude</span>

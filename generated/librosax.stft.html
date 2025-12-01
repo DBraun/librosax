@@ -193,7 +193,6 @@
   <ul>
 <li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../changelog.html#id2">Changelog</a></li>
 </ul>
 <ul class="current">
 <li class="toctree-l1 current has-children"><a class="reference internal" href="../librosax.html">Librosax</a><input aria-label="Toggle navigation of Librosax" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
@@ -309,25 +308,53 @@
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>waveform</strong> – Input signal waveform.</p></li>
-<li><p><strong>n_fft</strong> – FFT size.</p></li>
+<li><p><strong>waveform</strong> – <p>Input signal waveform. The last axis must be time (samples).
+Supported shapes:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">(T,)</span></code> - single waveform with T samples</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">T)</span></code> - batch of B waveforms</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">C,</span> <span class="pre">T)</span></code> - batch of B waveforms with C channels</p></li>
+</ul>
+</p></li>
+<li><p><strong>n_fft</strong> – FFT size. Determines the number of frequency bins in the output:
+<code class="docutils literal notranslate"><span class="pre">n_fft</span> <span class="pre">//</span> <span class="pre">2</span> <span class="pre">+</span> <span class="pre">1</span></code>.</p></li>
 <li><p><strong>hop_length</strong> – Number of samples between successive frames. Default is <code class="docutils literal notranslate"><span class="pre">win_length</span> <span class="pre">//</span> <span class="pre">4</span></code>.</p></li>
 <li><p><strong>win_length</strong> – Window size. Default is <code class="docutils literal notranslate"><span class="pre">n_fft</span></code>.</p></li>
-<li><p><strong>window</strong> – Window function type. Default is <code class="docutils literal notranslate"><span class="pre">&quot;hann&quot;</span></code>.</p></li>
+<li><p><strong>window</strong> – Window function type. Default is <code class="docutils literal notranslate"><span class="pre">&quot;hann&quot;</span></code>. Also supports <code class="docutils literal notranslate"><span class="pre">&quot;sqrt_hann&quot;</span></code>.</p></li>
 <li><p><strong>center</strong> – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, the waveform is padded so that frames are centered. Default is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
 <li><p><strong>pad_mode</strong> – Padding mode for the waveform. Must be one of <code class="docutils literal notranslate"><span class="pre">[&quot;constant&quot;,</span> <span class="pre">&quot;reflect&quot;]</span></code>. Default is <code class="docutils literal notranslate"><span class="pre">&quot;constant&quot;</span></code>.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Complex STFT matrix.</p>
+<dd class="field-even"><p><p>Complex STFT matrix. The second-to-last axis is frequency (<code class="docutils literal notranslate"><span class="pre">n_fft</span> <span class="pre">//</span> <span class="pre">2</span> <span class="pre">+</span> <span class="pre">1</span></code> bins)
+and the last axis is time frames. Output shapes correspond to inputs:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">(T,)</span></code> → <code class="docutils literal notranslate"><span class="pre">(F,</span> <span class="pre">N)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">T)</span></code> → <code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">F,</span> <span class="pre">N)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">C,</span> <span class="pre">T)</span></code> → <code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">C,</span> <span class="pre">F,</span> <span class="pre">N)</span></code></p></li>
+</ul>
+<p>where F = <code class="docutils literal notranslate"><span class="pre">n_fft</span> <span class="pre">//</span> <span class="pre">2</span> <span class="pre">+</span> <span class="pre">1</span></code> and N = number of frames.</p>
+</p>
 </dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>jnp.ndarray</p>
-</dd>
-<dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#AssertionError" title="(in Python v3.14)"><strong>AssertionError</strong></a> – If pad_mode is not one of <code class="docutils literal notranslate"><span class="pre">[&quot;constant&quot;,</span> <span class="pre">&quot;reflect&quot;]</span></code>.</p>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#AssertionError" title="(in Python v3.14)"><strong>AssertionError</strong></a> – If pad_mode is not one of <code class="docutils literal notranslate"><span class="pre">[&quot;constant&quot;,</span> <span class="pre">&quot;reflect&quot;]</span></code>.</p>
 </dd>
 </dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">librosax</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Single waveform: (n_samples,) -&gt; (n_freq, n_frames)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">22050</span><span class="p">)</span>  <span class="c1"># 1 second at 22050 Hz</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">S</span> <span class="o">=</span> <span class="n">librosax</span><span class="o">.</span><span class="n">stft</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">n_fft</span><span class="o">=</span><span class="mi">2048</span><span class="p">,</span> <span class="n">hop_length</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">S</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(1025, 44)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Batched waveforms: (batch, n_samples) -&gt; (batch, n_freq, n_frames)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y_batch</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">22050</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">S_batch</span> <span class="o">=</span> <span class="n">librosax</span><span class="o">.</span><span class="n">stft</span><span class="p">(</span><span class="n">y_batch</span><span class="p">,</span> <span class="n">n_fft</span><span class="o">=</span><span class="mi">2048</span><span class="p">,</span> <span class="n">hop_length</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">S_batch</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(4, 1025, 44)</span>
+</pre></div>
+</div>
 </dd></dl>
 
 </section>

@@ -193,7 +193,6 @@
   <ul>
 <li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../changelog.html#id2">Changelog</a></li>
 </ul>
 <ul class="current">
 <li class="toctree-l1 current has-children"><a class="reference internal" href="../librosax.html">Librosax</a><input aria-label="Toggle navigation of Librosax" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
@@ -305,7 +304,7 @@ but is provided for convenience.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>S</strong> – Input amplitude spectrogram.</p></li>
+<li><p><strong>S</strong> – Input amplitude spectrogram. Any shape; applied element-wise.</p></li>
 <li><p><strong>ref</strong> – Reference value for scaling. If scalar, the amplitude <code class="docutils literal notranslate"><span class="pre">abs(S)</span></code> is scaled relative
 to ref: <code class="docutils literal notranslate"><span class="pre">20</span> <span class="pre">*</span> <span class="pre">log10(S</span> <span class="pre">/</span> <span class="pre">ref)</span></code>. If callable, the reference value is computed
 as <code class="docutils literal notranslate"><span class="pre">ref(S)</span></code>. Default is 1.0.</p></li>
@@ -314,10 +313,7 @@ as <code class="docutils literal notranslate"><span class="pre">ref(S)</span></c
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>dB-scaled spectrogram.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>jnp.ndarray</p>
+<dd class="field-even"><p>dB-scaled spectrogram with same shape as input.</p>
 </dd>
 </dl>
 <div class="admonition seealso">

@@ -193,7 +193,6 @@
   <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../changelog.html#id2">Changelog</a></li>
 </ul>
 <ul class="current">
 <li class="toctree-l1 current has-children"><a class="reference internal" href="../../librosax.html">Librosax</a><input aria-label="Toggle navigation of Librosax" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
@@ -313,7 +312,12 @@ efficiently by convolving the time-domain signal with CQT kernels.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>y</strong> – Audio time series</p></li>
+<li><p><strong>y</strong> – <p>Audio time series. The last axis must be time.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">(T,)</span></code> - single waveform</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">T)</span></code> - batch of waveforms</p></li>
+</ul>
+</p></li>
 <li><p><strong>sr</strong> – Sampling rate</p></li>
 <li><p><strong>hop_length</strong> – Number of samples between successive CQT columns</p></li>
 <li><p><strong>fmin</strong> – Minimum frequency (default: C1 = 32.70 Hz)</p></li>
@@ -335,7 +339,12 @@ efficiently by convolving the time-domain signal with CQT kernels.</p>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>CQT matrix [shape=(n_bins, t)] format depends on output_format</p>
+<dd class="field-even"><p><p>CQT matrix with shape <code class="docutils literal notranslate"><span class="pre">(...,</span> <span class="pre">n_bins,</span> <span class="pre">N)</span></code>. Format depends on output_format.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">(T,)</span></code> → <code class="docutils literal notranslate"><span class="pre">(n_bins,</span> <span class="pre">N)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">T)</span></code> → <code class="docutils literal notranslate"><span class="pre">(B,</span> <span class="pre">n_bins,</span> <span class="pre">N)</span></code></p></li>
+</ul>
+</p>
 </dd>
 </dl>
 </dd></dl>

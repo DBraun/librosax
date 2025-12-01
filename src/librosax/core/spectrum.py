@@ -43,19 +43,46 @@ def stft(
         ``n_fft``, ``hop_length``, ``win_length``, ``window``, ``center``, ``pad_mode``
 
     Args:
-        waveform: Input signal waveform.
-        n_fft: FFT size.
+        waveform: Input signal waveform. The last axis must be time (samples).
+            Supported shapes:
+
+            - ``(T,)`` - single waveform with T samples
+            - ``(B, T)`` - batch of B waveforms
+            - ``(B, C, T)`` - batch of B waveforms with C channels
+        n_fft: FFT size. Determines the number of frequency bins in the output:
+            ``n_fft // 2 + 1``.
         hop_length: Number of samples between successive frames. Default is ``win_length // 4``.
         win_length: Window size. Default is ``n_fft``.
-        window: Window function type. Default is ``"hann"``.
+        window: Window function type. Default is ``"hann"``. Also supports ``"sqrt_hann"``.
         center: If ``True``, the waveform is padded so that frames are centered. Default is ``True``.
         pad_mode: Padding mode for the waveform. Must be one of ``["constant", "reflect"]``. Default is ``"constant"``.
 
     Returns:
-        jnp.ndarray: Complex STFT matrix.
+        Complex STFT matrix. The second-to-last axis is frequency (``n_fft // 2 + 1`` bins)
+        and the last axis is time frames. Output shapes correspond to inputs:
+
+        - ``(T,)`` → ``(F, N)``
+        - ``(B, T)`` → ``(B, F, N)``
+        - ``(B, C, T)`` → ``(B, C, F, N)``
+
+        where F = ``n_fft // 2 + 1`` and N = number of frames.
 
     Raises:
         AssertionError: If pad_mode is not one of ``["constant", "reflect"]``.
+
+    Examples:
+        >>> import jax.numpy as jnp
+        >>> import librosax
+        >>> # Single waveform: (n_samples,) -> (n_freq, n_frames)
+        >>> y = jnp.zeros(22050)  # 1 second at 22050 Hz
+        >>> S = librosax.stft(y, n_fft=2048, hop_length=512)
+        >>> S.shape
+        (1025, 44)
+        >>> # Batched waveforms: (batch, n_samples) -> (batch, n_freq, n_frames)
+        >>> y_batch = jnp.zeros((4, 22050))
+        >>> S_batch = librosax.stft(y_batch, n_fft=2048, hop_length=512)
+        >>> S_batch.shape
+        (4, 1025, 44)
     """
     if win_length is None:
         win_length = n_fft
@@ -112,19 +139,53 @@ def istft(
     This function reconstructs a waveform from an STFT matrix using JAX's ``scipy.signal.istft`` implementation.
 
     Args:
-        stft_matrix: The STFT matrix from which to compute the inverse.
+        stft_matrix: Complex STFT matrix. The second-to-last axis must be frequency
+            (``n_fft // 2 + 1`` bins) and the last axis must be time frames.
+            Supported shapes:
+
+            - ``(F, N)`` - single spectrogram
+            - ``(B, F, N)`` - batch of B spectrograms
+            - ``(B, C, F, N)`` - batch of B spectrograms with C channels
+
+            where F = ``n_fft // 2 + 1`` and N = number of frames.
         hop_length: Number of samples between successive frames. Default is ``win_length // 4``.
         win_length: Window size. Default is ``n_fft``.
-        n_fft: FFT size. Default is ``(stft_matrix.shape[-2] - 1) * 2``.
-        window: Window function type. Default is ``"hann"``.
+        n_fft: FFT size. Default is ``(stft_matrix.shape[-2] - 1) * 2``, inferred from
+            the frequency axis of the input.
+        window: Window function type. Default is ``"hann"``. Also supports ``"sqrt_hann"``.
         center: If ``True``, assumes the waveform was padded so that frames were centered. Default is ``True``.
-        length: Target length for the reconstructed signal. If None, the entire signal is returned.
+        length: Target length for the reconstructed signal. If ``None``, the entire signal is returned.
 
     Returns:
-        jnp.ndarray: Reconstructed time-domain signal.
+        Reconstructed time-domain signal. The last axis is time (samples).
+        Output shapes correspond to inputs:
+
+        - ``(F, N)`` → ``(T,)``
+        - ``(B, F, N)`` → ``(B, T)``
+        - ``(B, C, F, N)`` → ``(B, C, T)``
+
+        where T is the reconstructed signal length.
 
     Raises:
         AssertionError: If center is ``False`` because the function is only tested for ``center=True``.
+
+    Examples:
+        >>> import jax.numpy as jnp
+        >>> import librosax
+        >>> # Single STFT: (n_freq, n_frames) -> (n_samples,)
+        >>> S = jnp.zeros((1025, 44), dtype=jnp.complex64)
+        >>> y = librosax.istft(S, hop_length=512)
+        >>> y.shape
+        (22016,)
+        >>> # Batched STFT: (batch, n_freq, n_frames) -> (batch, n_samples)
+        >>> S_batch = jnp.zeros((4, 1025, 44), dtype=jnp.complex64)
+        >>> y_batch = librosax.istft(S_batch, hop_length=512)
+        >>> y_batch.shape
+        (4, 22016)
+        >>> # With target length
+        >>> y_trimmed = librosax.istft(S, hop_length=512, length=22050)
+        >>> y_trimmed.shape
+        (22050,)
     """
     assert center, "Only tested for `center==True`"
 

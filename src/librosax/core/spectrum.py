@@ -246,13 +246,13 @@ def power_to_db(
     """Convert a power spectrogram to decibel (dB) units.
 
     Args:
-        x: Input power spectrogram.
+        x: Input power spectrogram. Any shape; applied element-wise.
         amin: Minimum threshold for input values. Default is 1e-10.
         top_db: Threshold the output at top_db below the peak. Default is 80.0.
         ref: Reference value for scaling. Default is 1.0.
 
     Returns:
-        jnp.ndarray: dB-scaled spectrogram.
+        dB-scaled spectrogram with same shape as input.
 
     Raises:
         librosax.util.exceptions.ParameterError: If ``top_db`` is negative.
@@ -301,7 +301,7 @@ def amplitude_to_db(
     but is provided for convenience.
 
     Args:
-        S: Input amplitude spectrogram.
+        S: Input amplitude spectrogram. Any shape; applied element-wise.
         ref: Reference value for scaling. If scalar, the amplitude ``abs(S)`` is scaled relative
             to ref: ``20 * log10(S / ref)``. If callable, the reference value is computed
             as ``ref(S)``. Default is 1.0.
@@ -309,7 +309,7 @@ def amplitude_to_db(
         top_db: Threshold the output at top_db below the peak. Default is 80.0.
 
     Returns:
-        jnp.ndarray: dB-scaled spectrogram.
+        dB-scaled spectrogram with same shape as input.
 
     See Also:
         power_to_db, db_to_amplitude

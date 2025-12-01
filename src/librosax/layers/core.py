@@ -346,15 +346,25 @@ class Spectrogram(Module):
     def __call__(self, waveform: jnp.ndarray) -> jnp.ndarray:
         """Compute a spectrogram from a signal using JAX.
 
+        Note:
+            Unlike ``librosax.stft``, this layer outputs with time before frequency
+            (suitable for neural network processing).
+
         Args:
-            waveform: A waveform whose last axis is time.
-                The waveform can be 1D ``(T,)``, 2D ``(B, T)``, or 3D ``(B, C, T)``.
+            waveform: Audio waveform. The last axis must be time.
+
+                - ``(T,)`` - single waveform
+                - ``(B, T)`` - batch of waveforms
+                - ``(B, C, T)`` - batch with channels
 
         Returns:
-            jnp.ndarray: Spectrogram with appropriate shape based on input dimensions.
-                - For 1D input: shape ``(time_steps, freq_bins)``
-                - For 2D input: shape ``(batch_size, time_steps, freq_bins)``
-                - For 3D input: shape ``(batch_size, channels, time_steps, freq_bins)``
+            Power spectrogram. Note the axis order is ``(time, freq)``:
+
+            - ``(T,)`` → ``(N, F)``
+            - ``(B, T)`` → ``(B, N, F)``
+            - ``(B, C, T)`` → ``(B, C, N, F)``
+
+            where F = ``n_fft // 2 + 1`` and N = number of frames.
 
         Raises:
             ValueError: If the waveform has invalid dimensions.
@@ -448,10 +458,19 @@ class LogMelFilterBank(Module):
         """Calculate (log) mel spectrogram from spectrogram.
 
         Args:
-            x: Spectrogram of shape ``(*, frames, n_fft//2+1)``.
+            x: Power spectrogram with shape ``(..., N, F)`` where N is frames
+                and F = ``n_fft // 2 + 1``. Typically output from ``Spectrogram``.
+
+                - ``(N, F)`` - single spectrogram
+                - ``(B, N, F)`` - batch of spectrograms
+                - ``(B, C, N, F)`` - batch with channels
 
         Returns:
-            jnp.ndarray: (Log) mel spectrogram of shape ``(*, frames, mel_bins)``.
+            (Log) mel spectrogram with shape ``(..., N, n_mels)``.
+
+            - ``(N, F)`` → ``(N, n_mels)``
+            - ``(B, N, F)`` → ``(B, N, n_mels)``
+            - ``(B, C, N, F)`` → ``(B, C, N, n_mels)``
         """
         if self.freeze_parameters:
             melW = librosa.filters.mel(
@@ -537,13 +556,20 @@ class MFCC(LogMelFilterBank):
         """Compute MFCCs from a spectrogram.
 
         Args:
-            x: Spectrogram of shape ``(*, frames, n_fft//2+1)``.
+            x: Power spectrogram with shape ``(..., N, F)`` where N is frames
+                and F = ``n_fft // 2 + 1``. Typically output from ``Spectrogram``.
+
+                - ``(N, F)`` - single spectrogram
+                - ``(B, N, F)`` - batch of spectrograms
+                - ``(B, C, N, F)`` - batch with channels
 
         Returns:
-            jnp.ndarray: MFCCs with appropriate shape based on input dimensions.
-                - For 2D input: shape ``(n_mfcc, time_steps)``
-                - For 3D input: shape ``(batch_size, n_mfcc, time_steps)``
-                - For 4D input: shape ``(batch_size, chans, n_mfcc, time_steps)``
+            MFCCs with shape ``(..., n_mfcc, N)``. Note the output transposes
+            the last two axes compared to the input.
+
+            - ``(N, F)`` → ``(n_mfcc, N)``
+            - ``(B, N, F)`` → ``(B, n_mfcc, N)``
+            - ``(B, C, N, F)`` → ``(B, C, n_mfcc, N)``
 
         Raises:
             ValueError: If the input has invalid dimensions.

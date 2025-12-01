@@ -60,9 +60,13 @@ def spectral_centroid(
     Users should ensure S is real-valued and non-negative.
 
     Args:
-        y: Audio time series. Multichannel is supported.
+        y: Audio time series. The last axis must be time.
+
+            - ``(T,)`` - single waveform
+            - ``(B, T)`` - batch of waveforms
+
         sr: Audio sampling rate
-        S: (optional) Pre-computed spectrogram magnitude
+        S: (optional) Pre-computed spectrogram magnitude with shape ``(..., F, N)``
         n_fft: FFT window size
         hop_length: Hop length for STFT
         freq: Center frequencies for spectrogram bins. If None, FFT bin center
@@ -73,7 +77,11 @@ def spectral_centroid(
         pad_mode: Padding mode
 
     Returns:
-        jnp.ndarray: Spectral centroid frequencies [shape=(..., 1, t)]
+        Spectral centroid frequencies with shape ``(..., 1, N)`` where N is the
+        number of frames. The frequency axis is reduced to size 1.
+
+        - ``(T,)`` → ``(1, N)``
+        - ``(B, T)`` → ``(B, 1, N)``
     """
     S, n_fft = _spectrogram(
         y=y,
@@ -127,9 +135,13 @@ def spectral_bandwidth(
     Users should ensure S is real-valued and non-negative.
 
     Args:
-        y: Audio time series. Multichannel is supported.
+        y: Audio time series. The last axis must be time.
+
+            - ``(T,)`` - single waveform
+            - ``(B, T)`` - batch of waveforms
+
         sr: Audio sampling rate
-        S: (optional) Pre-computed spectrogram magnitude
+        S: (optional) Pre-computed spectrogram magnitude with shape ``(..., F, N)``
         n_fft: FFT window size
         hop_length: Hop length for STFT
         win_length: Window length
@@ -143,7 +155,10 @@ def spectral_bandwidth(
         p: Power to raise deviation from spectral centroid
 
     Returns:
-        jnp.ndarray: Frequency bandwidth for each frame [shape=(..., 1, t)]
+        Frequency bandwidth with shape ``(..., 1, N)``.
+
+        - ``(T,)`` → ``(1, N)``
+        - ``(B, T)`` → ``(B, 1, N)``
     """
     S, n_fft = _spectrogram(
         y=y,
@@ -208,9 +223,13 @@ def spectral_rolloff(
     the bins below. Users should ensure S is real-valued and non-negative.
 
     Args:
-        y: Audio time series. Multichannel is supported.
+        y: Audio time series. The last axis must be time.
+
+            - ``(T,)`` - single waveform
+            - ``(B, T)`` - batch of waveforms
+
         sr: Audio sampling rate
-        S: (optional) Pre-computed spectrogram magnitude
+        S: (optional) Pre-computed spectrogram magnitude with shape ``(..., F, N)``
         n_fft: FFT window size
         hop_length: Hop length for STFT
         win_length: Window length
@@ -222,7 +241,10 @@ def spectral_rolloff(
         roll_percent: Roll-off percentage (0 < roll_percent < 1)
 
     Returns:
-        jnp.ndarray: Roll-off frequency for each frame [shape=(..., 1, t)]
+        Roll-off frequency with shape ``(..., 1, N)``.
+
+        - ``(T,)`` → ``(1, N)``
+        - ``(B, T)`` → ``(B, 1, N)``
     """
     if not 0.0 < roll_percent < 1.0:
         raise ValueError("roll_percent must lie in the range (0, 1)")
@@ -288,8 +310,12 @@ def spectral_flatness(
     non-negative.
 
     Args:
-        y: Audio time series. Multichannel is supported.
-        S: (optional) Pre-computed spectrogram magnitude
+        y: Audio time series. The last axis must be time.
+
+            - ``(T,)`` - single waveform
+            - ``(B, T)`` - batch of waveforms
+
+        S: (optional) Pre-computed spectrogram magnitude with shape ``(..., F, N)``
         n_fft: FFT window size
         hop_length: Hop length for STFT
         win_length: Window length
@@ -300,7 +326,10 @@ def spectral_flatness(
         power: Exponent for the magnitude spectrogram (e.g., 1 for energy, 2 for power)
 
     Returns:
-        jnp.ndarray: Spectral flatness for each frame [shape=(..., 1, t)]
+        Spectral flatness with shape ``(..., 1, N)``.
+
+        - ``(T,)`` → ``(1, N)``
+        - ``(B, T)`` → ``(B, 1, N)``
     """
     if amin <= 0:
         raise ValueError("amin must be strictly positive")
@@ -416,8 +445,12 @@ def rms(
     representation of energy over time because its frames can be windowed.
 
     Args:
-        y: (optional) Audio time series. Required if S is not input.
-        S: (optional) Spectrogram magnitude. Required if y is not input.
+        y: (optional) Audio time series. The last axis must be time.
+
+            - ``(T,)`` - single waveform
+            - ``(B, T)`` - batch of waveforms
+
+        S: (optional) Spectrogram magnitude with shape ``(..., F, N)``
         frame_length: Length of analysis frame (in samples) for energy calculation
         hop_length: Hop length for STFT
         center: If True and operating on time-domain input (y), pad the signal
@@ -426,7 +459,10 @@ def rms(
         dtype: Data type of the output array
 
     Returns:
-        jnp.ndarray: RMS value for each frame [shape=(..., 1, t)]
+        RMS value with shape ``(..., 1, N)``.
+
+        - ``(T,)`` → ``(1, N)``
+        - ``(B, T)`` → ``(B, 1, N)``
     """
     if y is not None:
         if center:
@@ -543,7 +579,11 @@ def zero_crossing_rate(
     """Compute the zero-crossing rate of an audio time series.
 
     Args:
-        y: Audio time series. Multichannel is supported.
+        y: Audio time series. The last axis must be time.
+
+            - ``(T,)`` - single waveform
+            - ``(B, T)`` - batch of waveforms
+
         frame_length: Length of the frame over which to compute zero crossing rates
         hop_length: Number of samples to advance for each frame
         center: If True, frames are centered by padding the edges of y.
@@ -551,7 +591,10 @@ def zero_crossing_rate(
         **kwargs: Additional keyword arguments to pass to zero_crossings
 
     Returns:
-        jnp.ndarray: Zero crossing rate for each frame [shape=(..., 1, t)]
+        Zero crossing rate with shape ``(..., 1, N)``.
+
+        - ``(T,)`` → ``(1, N)``
+        - ``(B, T)`` → ``(B, 1, N)``
     """
     if center:
         # Pad with edge values
@@ -602,9 +645,13 @@ def spectral_contrast(
     correspond to broad-band noise.
 
     Args:
-        y: Audio time series. Multichannel is supported.
+        y: Audio time series. The last axis must be time.
+
+            - ``(T,)`` - single waveform
+            - ``(B, T)`` - batch of waveforms
+
         sr: Audio sampling rate
-        S: (optional) Pre-computed spectrogram magnitude
+        S: (optional) Pre-computed spectrogram magnitude with shape ``(..., F, N)``
         n_fft: FFT window size
         hop_length: Hop length for STFT
         win_length: Window length
@@ -621,7 +668,10 @@ def spectral_contrast(
             If False, return the logarithmic difference: log(peaks) - log(valleys).
 
     Returns:
-        jnp.ndarray: Spectral contrast values [shape=(..., n_bands + 1, t)]
+        Spectral contrast with shape ``(..., n_bands + 1, N)``.
+
+        - ``(T,)`` → ``(n_bands + 1, N)``
+        - ``(B, T)`` → ``(B, n_bands + 1, N)``
     """
     S, n_fft = _spectrogram(
         y=y,
@@ -820,9 +870,13 @@ def melspectrogram(
         ``power``, ``n_mels``, ``fmin``, ``fmax``, ``htk``, ``norm``, ``dtype``
 
     Args:
-        y: Audio time series. Multichannel is supported.
+        y: Audio time series. The last axis must be time.
+
+            - ``(T,)`` - single waveform
+            - ``(B, T)`` - batch of waveforms
+
         sr: Audio sampling rate
-        S: (optional) Pre-computed spectrogram magnitude
+        S: (optional) Pre-computed spectrogram magnitude with shape ``(..., F, N)``
         n_fft: FFT window size
         hop_length: Hop length for STFT
         win_length: Window length
@@ -844,7 +898,10 @@ def melspectrogram(
         dtype: Data type of the output array
 
     Returns:
-        jnp.ndarray: Mel spectrogram [shape=(..., n_mels, t)]
+        Mel spectrogram with shape ``(..., n_mels, N)``.
+
+        - ``(T,)`` → ``(n_mels, N)``
+        - ``(B, T)`` → ``(B, n_mels, N)``
     """
     if fmax is None:
         fmax = sr / 2
@@ -929,9 +986,13 @@ def mfcc(
         ``sr``, ``n_mfcc``, ``dct_type``, ``norm``, ``lifter``, plus all other kwargs.
 
     Args:
-        y: Audio time series. Multichannel is supported.
+        y: Audio time series. The last axis must be time.
+
+            - ``(T,)`` - single waveform
+            - ``(B, T)`` - batch of waveforms
+
         sr: Audio sampling rate
-        S: (optional) log-power mel spectrogram
+        S: (optional) log-power mel spectrogram with shape ``(..., n_mels, N)``
         n_mfcc: Number of MFCCs to return (default: 20)
         dct_type: Discrete cosine transform (DCT) type (default: 2)
         norm: If "ortho", use orthonormal DCT basis. Default: "ortho"
@@ -952,7 +1013,10 @@ def mfcc(
             (used if y is provided)
 
     Returns:
-        jnp.ndarray: MFCC sequence [shape=(..., n_mfcc, t)]
+        MFCCs with shape ``(..., n_mfcc, N)``.
+
+        - ``(T,)`` → ``(n_mfcc, N)``
+        - ``(B, T)`` → ``(B, n_mfcc, N)``
     """
     if S is None:
         # Compute mel spectrogram if not provided
@@ -1271,7 +1335,11 @@ def cqt(
         ``normalization_type``
 
     Args:
-        y: Audio time series
+        y: Audio time series. The last axis must be time.
+
+            - ``(T,)`` - single waveform
+            - ``(B, T)`` - batch of waveforms
+
         sr: Sampling rate
         hop_length: Number of samples between successive CQT columns
         fmin: Minimum frequency (default: C1 = 32.70 Hz)
@@ -1292,7 +1360,10 @@ def cqt(
         normalization_type: Normalization type ('librosa', 'convolutional', 'wrap')
 
     Returns:
-        CQT matrix [shape=(n_bins, t)] format depends on output_format
+        CQT matrix with shape ``(..., n_bins, N)``. Format depends on output_format.
+
+        - ``(T,)`` → ``(n_bins, N)``
+        - ``(B, T)`` → ``(B, n_bins, N)``
     """
     if fmin is None:
         fmin = note_to_hz("C1")
@@ -1783,9 +1854,13 @@ def chroma_cqt(
     """Chromagram from a constant-Q transform.
 
     Args:
-        y: Audio time series. Multichannel is supported.
+        y: Audio time series. The last axis must be time.
+
+            - ``(T,)`` - single waveform
+            - ``(B, T)`` - batch of waveforms
+
         sr: Sampling rate
-        C: Pre-computed CQT spectrogram
+        C: Pre-computed CQT spectrogram with shape ``(..., n_cqt_bins, N)``
         hop_length: Number of samples between successive CQT columns
         fmin: Minimum frequency. Default: C1 ~= 32.70 Hz
         norm: Normalization mode for chroma
@@ -1799,7 +1874,10 @@ def chroma_cqt(
         **kwargs: Additional parameters for cqt
 
     Returns:
-        jnp.ndarray: Normalized chroma [shape=(..., n_chroma, t)]
+        Chromagram with shape ``(..., n_chroma, N)``.
+
+        - ``(T,)`` → ``(n_chroma, N)``
+        - ``(B, T)`` → ``(B, n_chroma, N)``
     """
     if fmin is None:
         fmin = note_to_hz("C1")
@@ -1866,22 +1944,31 @@ def tonnetz(
     two-dimensional coordinates.
 
     Args:
-        y: Audio time series. Multichannel is supported.
+        y: Audio time series. The last axis must be time.
+
+            - ``(T,)`` - single waveform
+            - ``(B, T)`` - batch of waveforms
+
         sr: Sampling rate of y
-        chroma: Normalized energy for each chroma bin at each frame.
-            If None, a chroma_stft is computed.
+        chroma: Normalized energy for each chroma bin at each frame
+            with shape ``(..., n_chroma, N)``. If None, a chroma_stft is computed.
         **kwargs: Additional keyword arguments to chroma_stft,
             if chroma is not pre-computed.
 
     Returns:
-        jnp.ndarray: Tonal centroid features [shape=(..., 6, t)]
-            Tonnetz dimensions:
-            - 0: Fifth x-axis
-            - 1: Fifth y-axis
-            - 2: Minor x-axis
-            - 3: Minor y-axis
-            - 4: Major x-axis
-            - 5: Major y-axis
+        Tonnetz features with shape ``(..., 6, N)``.
+
+        - ``(T,)`` → ``(6, N)``
+        - ``(B, T)`` → ``(B, 6, N)``
+
+        Tonnetz dimensions:
+
+        - 0: Fifth x-axis
+        - 1: Fifth y-axis
+        - 2: Minor x-axis
+        - 3: Minor y-axis
+        - 4: Major x-axis
+        - 5: Major y-axis
     """
     if y is None and chroma is None:
         raise ValueError(
@@ -1943,9 +2030,13 @@ def chroma_stft(
     """Compute a chromagram from a power spectrogram or waveform.
 
     Args:
-        y: Audio time series. Multichannel is supported.
+        y: Audio time series. The last axis must be time.
+
+            - ``(T,)`` - single waveform
+            - ``(B, T)`` - batch of waveforms
+
         sr: Sampling rate
-        S: Power spectrogram (optional if y is provided)
+        S: Power spectrogram with shape ``(..., F, N)`` (optional if y is provided)
         norm: Column-wise normalization. See `normalize` for details.
         n_fft: FFT window size
         hop_length: Hop length
@@ -1959,7 +2050,10 @@ def chroma_stft(
         **kwargs: Additional arguments to chroma_filter (ctroct, octwidth, norm, base_c)
 
     Returns:
-        jnp.ndarray: Chromagram [shape=(..., n_chroma, t)]
+        Chromagram with shape ``(..., n_chroma, N)``.
+
+        - ``(T,)`` → ``(n_chroma, N)``
+        - ``(B, T)`` → ``(B, n_chroma, N)``
     """
     # Get power spectrogram
     S, n_fft = _spectrogram(

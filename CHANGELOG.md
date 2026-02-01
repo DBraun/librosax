@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Effort-based Versioning](https://jacobtomlinson.dev/effver/).
 
+## [0.1.2] - Unreleased
+
+### Added
+- Export exception classes at top level (`ParameterError`, `LibrosaxError`)
+- Export comprehensive conversion functions at top level:
+  - Time/sample conversions: `frames_to_samples`, `samples_to_frames`, `frames_to_time`, `time_to_frames`, `samples_to_time`, `time_to_samples`, `blocks_to_samples`, `blocks_to_frames`, `blocks_to_time`, `samples_like`, `times_like`
+  - Note/frequency conversions: `note_to_hz`, `note_to_midi`, `midi_to_hz`, `midi_to_note`, `hz_to_note`, `hz_to_midi`, `hz_to_mel`, `hz_to_octs`, `hz_to_fjs`, `mel_to_hz`, `octs_to_hz`, `A4_to_tuning`, `tuning_to_A4`
+  - Indian classical music (svara) conversions: `midi_to_svara_h`, `midi_to_svara_c`, `note_to_svara_h`, `note_to_svara_c`, `hz_to_svara_h`, `hz_to_svara_c`
+  - Frequency utilities: `cqt_frequencies`, `mel_frequencies`, `tempo_frequencies`, `fourier_tempo_frequencies`
+  - Frequency weighting: `A_weighting`, `B_weighting`, `C_weighting`, `D_weighting`, `Z_weighting`, `frequency_weighting`, `multi_frequency_weighting`
+
+### Fixed
+- Fix `core/convert.py` to not use `jnp.asanyarray`
+- Fix `tempo_frequencies` to avoid in-place array mutation (use JAX-compatible array construction)
+- Enable JAX x64 mode in `tests/test_convert.py` for proper floating-point precision in conversion tests
+
 ## [0.1.1] - 2025-11-14
 
 - Fix GitHub Action for docs.

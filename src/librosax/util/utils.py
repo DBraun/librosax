@@ -152,11 +152,7 @@ def normalize(
     return jnp.asarray(result)
 
 
-def valid_audio(
-    y: jnp.ndarray,
-    *,
-    mono: Optional[bool] = None
-) -> bool:
+def valid_audio(y: jnp.ndarray) -> bool:
     """Validate whether a variable contains valid audio data.
 
     This function checks if the input is a valid audio signal by verifying:
@@ -164,15 +160,9 @@ def valid_audio(
     - The input has numeric dtype (not string, object, etc.)
     - The input is 1D (mono) or 2D (multi-channel)
     - All values are finite (no NaN or Inf)
-    - If mono=True, enforces 1D array
-    - If mono=False, allows 1D or 2D
 
     Args:
         y: Input audio signal to validate.
-        mono: Enforce mono (1D) audio:
-            - If True, input must be 1D
-            - If False, input can be 1D or 2D
-            - If None, no channel restriction
 
     Returns:
         True if valid audio signal, False otherwise.
@@ -180,22 +170,16 @@ def valid_audio(
     Examples:
         >>> # Valid mono audio
         >>> y = jnp.array([0.1, 0.2, 0.3])
-        >>> librosax.util.valid_audio(y, mono=True)
+        >>> librosax.util.valid_audio(y)
         True
 
         >>> # Invalid: contains NaN
         >>> y_bad = jnp.array([0.1, jnp.nan, 0.3])
         >>> librosax.util.valid_audio(y_bad)
         False
-
-        >>> # Valid stereo audio
-        >>> y_stereo = jnp.array([[0.1, 0.2], [0.3, 0.4]])
-        >>> librosax.util.valid_audio(y_stereo, mono=False)
-        True
     """
     y_np = np.asarray(y)
-    result = _librosa_util.valid_audio(y_np, mono=mono)
-    return result
+    return _librosa_util.valid_audio(y_np)
 
 
 __all__ = [

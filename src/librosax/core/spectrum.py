@@ -1,8 +1,11 @@
 from typing import Any, Callable, Optional, Union
 
+import jax
 from jax import numpy as jnp
 from jax.scipy import signal
+from jax.scipy.fft import dct as jax_dct
 import numpy as np
+from scipy.fftpack import dct as scipy_dct
 from scipy.signal import get_window
 from ..util.exceptions import ParameterError
 
@@ -22,7 +25,36 @@ __all__ = [
     # "fmt",
     # "pcen",
     # "griffinlim",
+    "_dct_flexible",
 ]
+
+
+def _dct_flexible(x: jnp.ndarray, type: int = 2, norm: Optional[str] = None, axis: int = -1) -> jnp.ndarray:
+    """DCT with fallback to scipy for types 1 and 3.
+
+    JAX only supports DCT type 2. For types 1 and 3, we use scipy via
+    jax.pure_callback to maintain compatibility with JAX transformations.
+
+    Args:
+        x: Input array.
+        type: DCT type (1, 2, 3, or 4). Default is 2.
+        norm: Normalization mode. Default is None.
+        axis: Axis along which to compute DCT. Default is -1.
+
+    Returns:
+        DCT of the input array.
+    """
+    if type == 2:
+        return jax_dct(x, type=type, norm=norm, axis=axis)
+    else:
+        def scipy_dct_wrapper(x_arr):
+            return scipy_dct(np.asarray(x_arr), type=type, norm=norm, axis=axis).astype(x_arr.dtype)
+
+        return jax.pure_callback(
+            scipy_dct_wrapper,
+            jax.ShapeDtypeStruct(x.shape, x.dtype),
+            x
+        )
 
 
 def stft(
@@ -103,6 +135,9 @@ def stft(
     # Pad the window to n_fft size
     if window == "sqrt_hann":
         win = np.sqrt(get_window("hann", win_length))
+    elif callable(window):
+        # Handle callable windows (e.g., np.ones)
+        win = window(win_length)
     else:
         win = get_window(window, win_length)
 
@@ -121,7 +156,7 @@ def stft(
         padded=False,
         axis=-1,
     )
-    Zxx = Zxx * win_length / 2.0
+    Zxx = Zxx * win.sum()
     return Zxx
 
 
@@ -187,7 +222,10 @@ def istft(
         >>> y_trimmed.shape
         (22050,)
     """
-    assert center, "Only tested for `center==True`"
+    # Only center=True is currently supported
+    # center=False would require different padding/trimming logic
+    if not center:
+        raise NotImplementedError("istft currently only supports center=True")
 
     if n_fft is None:
         n_fft = (stft_matrix.shape[-2] - 1) * 2
@@ -201,6 +239,9 @@ def istft(
     # Pad the window to n_fft size
     if window == "sqrt_hann":
         win = np.sqrt(get_window("hann", win_length))
+    elif callable(window):
+        # Handle callable windows (e.g., np.ones)
+        win = window(win_length)
     else:
         win = get_window(window, win_length)
 
@@ -218,7 +259,7 @@ def istft(
         boundary=center,
     )
 
-    reconstructed_signal = reconstructed_signal * 2.0 / win_length
+    reconstructed_signal = reconstructed_signal / win.sum()
 
     # Trim or pad the output signal to the desired length
     if length is not None:
@@ -241,7 +282,7 @@ def power_to_db(
     x: jnp.ndarray,
     amin: float = 1e-10,
     top_db: Optional[float] = 80.0,
-    ref: float = 1.0,
+    ref: Union[float, Callable] = 1.0,
 ) -> jnp.ndarray:
     """Convert a power spectrogram to decibel (dB) units.
 
@@ -250,6 +291,8 @@ def power_to_db(
         amin: Minimum threshold for input values. Default is 1e-10.
         top_db: Threshold the output at top_db below the peak. Default is 80.0.
         ref: Reference value for scaling. Default is 1.0.
+            If scalar, the amplitude is scaled relative to ref.
+            If callable, the reference value is computed as ref(x).
 
     Returns:
         dB-scaled spectrogram with same shape as input.
@@ -257,8 +300,14 @@ def power_to_db(
     Raises:
         librosax.util.exceptions.ParameterError: If ``top_db`` is negative.
     """
+    # Handle callable ref (e.g., np.max, np.median)
+    if callable(ref):
+        ref_value = ref(x)
+    else:
+        ref_value = ref
+
     log_spec = 10.0 * jnp.log10(jnp.maximum(amin, x))
-    log_spec = log_spec - 10.0 * jnp.log10(jnp.maximum(amin, ref))
+    log_spec = log_spec - 10.0 * jnp.log10(jnp.maximum(amin, ref_value))
 
     if top_db is not None:
         if top_db < 0:
@@ -400,7 +449,7 @@ def normalize(
         return S
         
     # All norms only depend on magnitude
-    mag = jnp.abs(S).astype(jnp.float32)
+    mag = jnp.abs(S)
     
     # Compute the appropriate norm
     if norm == jnp.inf:

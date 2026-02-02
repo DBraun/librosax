@@ -5,10 +5,10 @@ from flax.nnx.module import first_from
 from flax.nnx import rnglib
 import jax
 from jax import numpy as jnp, random
-from jax.scipy.fft import dct
-import librosa
+import numpy as np
 
-from librosax import stft, power_to_db
+from librosax import stft, power_to_db, filters
+from librosax.core.spectrum import _dct_flexible
 
 
 class DropStripes(Module):
@@ -444,7 +444,7 @@ class LogMelFilterBank(Module):
             self.fmax = self.sr // 2
 
         if not self.freeze_parameters:
-            melW = librosa.filters.mel(
+            melW = filters.mel(
                 sr=self.sr,
                 n_fft=self.n_fft,
                 n_mels=self.n_mels,
@@ -473,7 +473,7 @@ class LogMelFilterBank(Module):
             - ``(B, C, N, F)`` → ``(B, C, N, n_mels)``
         """
         if self.freeze_parameters:
-            melW = librosa.filters.mel(
+            melW = filters.mel(
                 sr=self.sr,
                 n_fft=self.n_fft,
                 n_mels=self.n_mels,
@@ -577,7 +577,7 @@ class MFCC(LogMelFilterBank):
         # Get log-mel spectrogram from parent class
         mel_spec = super().__call__(x)
 
-        mfccs = dct(mel_spec, type=self.dct_type, norm=self.norm)
+        mfccs = _dct_flexible(mel_spec, type=self.dct_type, norm=self.norm)
         mfccs = mfccs[..., : self.n_mfcc]
 
         # (..., T, n_mfcc) -> (..., n_mfcc, T)

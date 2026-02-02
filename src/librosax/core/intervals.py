@@ -210,8 +210,8 @@ def pythagorean_intervals(
     # If the fractional part is negative, add
     # one more power of two to get it into the range [0, 1).
     too_small = log_ratios < 0
-    log_ratios[too_small] += 1
-    pow2[too_small] += 1
+    log_ratios = log_ratios.at[too_small].add(1)
+    pow2 = pow2.at[too_small].add(-1)
 
     # Convert powers of 2 to integer
     pow2 = pow2.astype(int)
@@ -266,6 +266,8 @@ def __harmonic_distance(logs, a, b):
 
 def _crystal_tie_break(a, b, logs):
     """Given two tuples of prime powers, break ties."""
+    a = jnp.asarray(a)
+    b = jnp.asarray(b)
     return logs.dot(jnp.abs(a)) < logs.dot(jnp.abs(b))
 
 
@@ -377,8 +379,8 @@ def plimit_intervals(
             {2: -3, 3: 1, 5: 1}
         ]
     """
-    primes = jnp.atleast_1d(primes)
-    logs = jnp.log2(primes, dtype=jnp.float64)
+    primes = jnp.asarray(jnp.atleast_1d(primes), dtype=jnp.float64)
+    logs = jnp.log2(primes)
 
     # The seed set are primes and their reciprocals
     # These are the values that we can use to expand our
@@ -433,7 +435,8 @@ def plimit_intervals(
         intervals.append(new_point)
 
         for _ in seeds:
-            new_seed = tuple(jnp.array(new_point) + jnp.array(_))
+            # Convert to Python types to ensure hashability
+            new_seed = tuple(int(x) for x in (jnp.array(new_point) + jnp.array(_)))
             if new_seed not in intervals and new_seed not in frontier:
                 frontier.append(new_seed)
 
@@ -446,8 +449,8 @@ def plimit_intervals(
     # If the fractional part is negative, add
     # one more power of two to get it into the range [0, 1).
     too_small = log_ratios < 0
-    log_ratios[too_small] += 1
-    pow2[too_small] -= 1
+    log_ratios = log_ratios.at[too_small].add(1)
+    pow2 = pow2.at[too_small].add(-1)
 
     # Convert powers of 2 to integer
     pow2 = pow2.astype(int)
@@ -467,9 +470,12 @@ def plimit_intervals(
         for i in idx:
             v = dict()
             if pow2[i] != 0:
-                v[2] = -pow2[i]
+                v[2] = -int(pow2[i])
 
-            v.update({p: int(power) for p, power in zip(primes, pows[i]) if power != 0})
+            # Convert JAX arrays to Python types for hashability
+            pows_row = pows[i].tolist() if hasattr(pows[i], 'tolist') else list(pows[i])
+            primes_list = primes.tolist() if hasattr(primes, 'tolist') else list(primes)
+            v.update({int(p): int(power) for p, power in zip(primes_list, pows_row) if power != 0})
 
             factors.append(v)
         return factors

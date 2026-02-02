@@ -112,7 +112,7 @@ def frames_to_samples(
     if n_fft is not None:
         offset = int(n_fft // 2)
 
-    return (jnp.asanyarray(frames) * hop_length + offset).astype(int)
+    return (jnp.asarray(frames) * hop_length + offset).astype(int)
 
 
 @overload
@@ -184,7 +184,7 @@ def samples_to_frames(
     if n_fft is not None:
         offset = int(n_fft // 2)
 
-    samples = jnp.asanyarray(samples)
+    samples = jnp.asarray(samples)
     return jnp.asarray(jnp.floor((samples - offset) // hop_length), dtype=int)
 
 
@@ -376,7 +376,7 @@ def time_to_samples(
     array([    0,  2205,  4410,  6615,  8820, 11025, 13230, 15435,
            17640, 19845])
     """
-    return (jnp.asanyarray(times) * sr).astype(int)
+    return (jnp.asarray(times) * sr).astype(int)
 
 
 @overload
@@ -426,7 +426,7 @@ def samples_to_time(
                 0.813,  0.836,  0.859,  0.882,  0.906,  0.929,  0.952,
                 0.975,  0.998])
     """
-    return jnp.asanyarray(samples) / float(sr)
+    return jnp.asarray(samples) / float(sr)
 
 
 @overload
@@ -476,7 +476,7 @@ def blocks_to_frames(
     ...     n_frame = librosax.blocks_to_frames(n, block_length=16)
 
     """
-    return block_length * jnp.asanyarray(blocks)
+    return block_length * jnp.asarray(blocks)
 
 
 @overload
@@ -966,7 +966,8 @@ def midi_to_hz(
     hz_to_midi
     note_to_hz
     """
-    if isinstance(notes, (int, list)):
+    # Convert range/list to array, but keep scalars as-is to avoid tracer issues
+    if isinstance(notes, (int, list, range)):
         notes = np.asarray(notes)
     return 440.0 * (2.0 ** ((notes - 69.0) / 12.0))
 
@@ -1016,7 +1017,7 @@ def hz_to_midi(
     note_to_midi
     hz_to_note
     """
-    midi: jnp.ndarray = 12 * (jnp.log2(jnp.asanyarray(frequencies)) - jnp.log2(440.0)) + 69
+    midi: jnp.ndarray = 12 * (jnp.log2(jnp.asarray(frequencies)) - jnp.log2(440.0)) + 69
     return midi
 
 
@@ -1130,7 +1131,7 @@ def hz_to_mel(
     --------
     mel_to_hz
     """
-    frequencies = jnp.asanyarray(frequencies)
+    frequencies = jnp.asarray(frequencies)
 
     if htk:
         mels: jnp.ndarray = 2595.0 * jnp.log10(1.0 + frequencies / 700.0)
@@ -1151,9 +1152,9 @@ def hz_to_mel(
     if frequencies.ndim:
         # If we have array data, vectorize
         log_t = frequencies >= min_log_hz
-        mels[log_t] = min_log_mel + jnp.log(frequencies[log_t] / min_log_hz) / logstep
+        mels = mels.at[log_t].set(min_log_mel + jnp.log(frequencies[log_t] / min_log_hz) / logstep)
     elif frequencies >= min_log_hz:
-        # If we have scalar data, heck directly
+        # If we have scalar data, check directly
         mels = min_log_mel + jnp.log(frequencies / min_log_hz) / logstep
 
     return mels
@@ -1205,7 +1206,7 @@ def mel_to_hz(
     --------
     hz_to_mel
     """
-    mels = jnp.asanyarray(mels)
+    mels = jnp.asarray(mels)
 
     if htk:
         return 700.0 * (10.0 ** (mels / 2595.0) - 1.0)
@@ -1223,7 +1224,7 @@ def mel_to_hz(
     if mels.ndim:
         # If we have vector data, vectorize
         log_t = mels >= min_log_mel
-        freqs[log_t] = min_log_hz * jnp.exp(logstep * (mels[log_t] - min_log_mel))
+        freqs = freqs.at[log_t].set(min_log_hz * jnp.exp(logstep * (mels[log_t] - min_log_mel)))
     elif mels >= min_log_mel:
         # If we have scalar data, check directly
         freqs = min_log_hz * jnp.exp(logstep * (mels - min_log_mel))
@@ -1293,7 +1294,7 @@ def hz_to_octs(
     """
     A440 = 440.0 * 2.0 ** (tuning / bins_per_octave)
 
-    octs: jnp.ndarray = jnp.log2(jnp.asanyarray(frequencies) / (float(A440) / 16))
+    octs: jnp.ndarray = jnp.log2(jnp.asarray(frequencies) / (float(A440) / 16))
     return octs
 
 
@@ -1361,7 +1362,7 @@ def octs_to_hz(
     """
     A440 = 440.0 * 2.0 ** (tuning / bins_per_octave)
 
-    return (float(A440) / 16) * (2.0 ** jnp.asanyarray(octs))
+    return (float(A440) / 16) * (2.0 ** jnp.asarray(octs))
 
 
 @overload
@@ -1431,7 +1432,7 @@ def A4_to_tuning(
     --------
     tuning_to_A4
     """
-    tuning: jnp.ndarray = bins_per_octave * (jnp.log2(jnp.asanyarray(A4)) - jnp.log2(440.0))
+    tuning: jnp.ndarray = bins_per_octave * (jnp.log2(jnp.asarray(A4)) - jnp.log2(440.0))
     return tuning
 
 
@@ -1505,7 +1506,7 @@ def tuning_to_A4(
     --------
     A4_to_tuning
     """
-    return 440.0 * 2.0 ** (jnp.asanyarray(tuning) / bins_per_octave)
+    return 440.0 * 2.0 ** (jnp.asarray(tuning) / bins_per_octave)
 
 
 def fft_frequencies(*, sr: float = 22050, n_fft: int = 2048) -> jnp.ndarray:
@@ -1684,10 +1685,9 @@ def tempo_frequencies(
     array([      inf,  2583.984,  1291.992, ...,     6.782,
                6.764,     6.747])
     """
-    bin_frequencies = jnp.zeros(int(n_bins), dtype=jnp.float64)
-
-    bin_frequencies[0] = jnp.inf
-    bin_frequencies[1:] = 60.0 * sr / (hop_length * jnp.arange(1.0, n_bins))
+    # Construct array with inf at index 0 and tempo frequencies for rest
+    tempo_values = 60.0 * sr / (hop_length * jnp.arange(1.0, n_bins))
+    bin_frequencies = jnp.concatenate([jnp.array([jnp.inf]), tempo_values])
 
     return bin_frequencies
 
@@ -1786,7 +1786,7 @@ def A_weighting(
     ...        ylabel='Weighting (log10)',
     ...        title='A-Weighting of CQT frequencies')
     """
-    f_sq = jnp.asanyarray(frequencies) ** 2.0
+    f_sq = jnp.asarray(frequencies) ** 2.0
 
     const = jnp.array([12194.217, 20.598997, 107.65265, 737.86223]) ** 2.0
     weights: jnp.ndarray = 2.0 + 20.0 * (
@@ -1865,7 +1865,7 @@ def B_weighting(
     ...        ylabel='Weighting (log10)',
     ...        title='B-Weighting of CQT frequencies')
     """
-    f_sq = jnp.asanyarray(frequencies) ** 2.0
+    f_sq = jnp.asarray(frequencies) ** 2.0
 
     const = jnp.array([12194.217, 20.598997, 158.48932]) ** 2.0
     weights: jnp.ndarray = 0.17 + 20.0 * (
@@ -1939,7 +1939,7 @@ def C_weighting(
     >>> ax.set(xlabel='Frequency (Hz)', ylabel='Weighting (log10)',
     ...        title='C-Weighting of CQT frequencies')
     """
-    f_sq = jnp.asanyarray(frequencies) ** 2.0
+    f_sq = jnp.asarray(frequencies) ** 2.0
 
     const = jnp.array([12194.217, 20.598997]) ** 2.0
     weights: jnp.ndarray = 0.062 + 20.0 * (
@@ -2012,7 +2012,7 @@ def D_weighting(
     >>> ax.set(xlabel='Frequency (Hz)', ylabel='Weighting (log10)',
     ...        title='D-Weighting of CQT frequencies')
     """
-    f_sq = jnp.asanyarray(frequencies) ** 2.0
+    f_sq = jnp.asarray(frequencies) ** 2.0
 
     const = jnp.array([8.3046305e-3, 1018.7, 1039.6, 3136.5, 3424, 282.7, 1160]) ** 2.0
     weights: jnp.ndarray = 20.0 * (
@@ -3085,17 +3085,19 @@ def hz_to_fjs(
        'G₅', 'G♯⁵'], dtype='<U3')
 
     """
+    # Convert to array first to handle lists
+    frequencies_arr = jnp.asarray(frequencies)
+
     if fmin is None:
-        # mypy doesn't know that min can handle scalars
-        fmin = jnp.min(frequencies)  # type: ignore
+        fmin = jnp.min(frequencies_arr)
     if unison is None:
         unison = hz_to_note(fmin, octave=False, unicode=False)
 
-    if jnp.isscalar(frequencies):
-        # suppress type check - mypy does not understand scalar checks
-        intervals = frequencies / fmin  # type: ignore
+    if frequencies_arr.ndim == 0:
+        # scalar input
+        intervals = frequencies_arr / fmin
     else:
-        intervals = jnp.asarray(frequencies) / fmin
+        intervals = frequencies_arr / fmin
 
     # mypy does not understand vectorization
     return notation.interval_to_fjs(intervals, unison=unison, unicode=unicode)  # type: ignore

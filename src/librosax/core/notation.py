@@ -3,6 +3,7 @@
 """Music notation utilities"""
 
 import re
+import numpy as np
 from jax import numpy as jnp
 from numba import jit
 from collections import Counter
@@ -524,16 +525,16 @@ def __simplify_note(key: Union[str, _IterableLike[str], Iterable[str]], addition
 
 
 def __simplify_note(key: Union[str, _IterableLike[str], Iterable[str]], additional_acc: str = '',
-                    unicode: bool = True) -> Union[str, jnp.ndarray]:
+                    unicode: bool = True) -> Union[str, np.ndarray]:
     """Take in a note name and simplify by canceling sharp-flat pairs.
-    
+
     Also handles doubling accidentals as appropriate.
 
     Args:
         key: Note name(s) to simplify.
         additional_acc: Additional accidentals to apply.
         unicode: If True, use Unicode symbols for accidentals.
-        
+
     Returns:
         Simplified note name(s).
 
@@ -548,7 +549,8 @@ def __simplify_note(key: Union[str, _IterableLike[str], Iterable[str]], addition
         array(['C', 'C♭𝄫'], dtype='<U3')
     """
     if not isinstance(key, str):
-        return jnp.array([__simplify_note(n + additional_acc, unicode=unicode) for n in key])
+        # Use numpy array for strings since JAX doesn't support string dtypes
+        return np.array([__simplify_note(n + additional_acc, unicode=unicode) for n in key])
 
     match = NOTE_RE.match(key + additional_acc)
 
@@ -728,13 +730,18 @@ def key_to_notes(key: str, *, unicode: bool = True, natural: bool = False) -> Li
 
     if multiple:
         sign_map = {+1: "♯", -1: "♭"}
-        additional_acc = sign_map[jnp.sign(offset)]
+        # Use Python sign logic to get an int for dictionary lookup
+        sign_val = (offset > 0) - (offset < 0)
+        additional_acc = sign_map[sign_val]
         intermediate_notes = key_to_notes(tonic + additional_acc * (abs(offset) - 1) + ':' + scale, natural=False)
         notes = [__simplify_note(note, additional_acc) for note in intermediate_notes]
         degrees = __note_to_degree(notes)
-        notes = jnp.roll(notes, shift=-jnp.argwhere(degrees == 0)[0])
-
-        notes = list(notes)
+        # Use numpy for string array operations (JAX doesn't support string dtypes)
+        notes_array = np.array(notes)
+        # Get the first index where degrees == 0
+        zero_idx = int(jnp.where(degrees == 0)[0][0])
+        notes_array = np.roll(notes_array, shift=-zero_idx)
+        notes = list(notes_array)
 
         if not unicode:
             translations = str.maketrans({"♯": "#", "𝄪": "##", "♭": "b", "𝄫": "bb", "♮": "n"})
@@ -821,7 +828,7 @@ def key_to_notes(key: str, *, unicode: bool = True, natural: bool = False) -> Li
 
     # Apply natural signs to any note which has no other accidentals and does not appear in the scale for key.
     if natural:
-        scale_notes = set(key_to_degrees(key))
+        scale_notes = set(key_to_degrees(key).tolist())
         for place, note in enumerate(notes):
             if __note_to_degree(note) in scale_notes:
                 continue
@@ -962,7 +969,7 @@ def fifths_to_note(*, unison: str, fifths: int, unicode: bool = True) -> str:
     pitch = match.group("note").upper()
 
     # Find the number of accidentals to start from
-    offset = jnp.sum([acc_map[o] for o in match.group("accidental")])
+    offset = sum([acc_map[o] for o in match.group("accidental")])
 
     # Find the raw target note
     circle_idx = COFMAP.index(pitch)
@@ -973,9 +980,11 @@ def fifths_to_note(*, unison: str, fifths: int, unicode: bool = True) -> str:
     acc_index = offset + (circle_idx + fifths) // 7
 
     # Compress multiple-accidentals as needed
-    acc_str = acc_map_inv[jnp.sign(acc_index) * 2] * int(
+    # Use Python's sign logic to get an int for dictionary lookup
+    sign_val = (acc_index > 0) - (acc_index < 0)
+    acc_str = acc_map_inv[sign_val * 2] * int(
         abs(acc_index) // 2
-    ) + acc_map_inv[jnp.sign(acc_index)] * int(abs(acc_index) % 2)
+    ) + acc_map_inv[sign_val] * int(abs(acc_index) % 2)
 
     return raw_output + acc_str
 
@@ -990,7 +999,7 @@ def __o_fold(d):
     It is equivalent to the `red` function described in the FJS
     documentation.
     """
-    return d * (2.0 ** -jnp.floor(jnp.log2(d)))
+    return d * (2.0 ** -np.floor(np.log2(d)))
 
 
 @jit(nopython=True, nogil=True, cache=True)
@@ -1003,7 +1012,7 @@ def __bo_fold(d):
     It is equivalent to the `reb` function described in the FJS
     documentation, but with a simpler implementation.
     """
-    return d * (2.0 ** -jnp.round(jnp.log2(d)))
+    return d * (2.0 ** -np.round(np.log2(d)))
 
 
 @jit(nopython=True, nogil=True, cache=True)
@@ -1013,11 +1022,11 @@ def __fifth_search(interval, tolerance):
 
     This implementation will give up after 32 fifths
     """
-    log_tolerance = jnp.abs(jnp.log2(tolerance))
+    log_tolerance = np.abs(np.log2(tolerance))
     for power in range(32):
         for sign in [1, -1]:
             if (
-                    jnp.abs(jnp.log2(__bo_fold(interval / 3.0 ** (power * sign))))
+                    np.abs(np.log2(__bo_fold(interval / 3.0 ** (power * sign))))
                     <= log_tolerance
             ):
                 return power * sign
@@ -1149,7 +1158,7 @@ def interval_to_fjs(
     try:
         # Balance the interval into the octave for lookup
         interval_b = __o_fold(interval)
-        powers = INTERVALS[jnp.around(interval_b, decimals=6)]
+        powers = INTERVALS[np.around(interval_b, decimals=6)]
     except KeyError as exc:
         raise ParameterError(f"Unknown interval={interval}") from exc
 
@@ -1157,8 +1166,8 @@ def interval_to_fjs(
     powers = {p: powers[p] for p in powers if p > 3}
 
     # Split into otonal and utonal accidentals
-    otonal = jnp.prod([p ** powers[p] for p in powers if powers[p] > 0])
-    utonal = jnp.prod([p ** -powers[p] for p in powers if powers[p] < 0])
+    otonal = int(np.prod([p ** powers[p] for p in powers if powers[p] > 0]))
+    utonal = int(np.prod([p ** -powers[p] for p in powers if powers[p] < 0]))
 
     suffix = ""
     if otonal > 1:

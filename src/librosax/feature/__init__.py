@@ -60,8 +60,8 @@ Pitch and frequency
 from .spectral import (
     chroma_stft,
     chroma_cqt,
-    # chroma_sens,
-    # chroma_vqt,
+    chroma_vqt,
+    chroma_cens,
     melspectrogram,
     mfcc,
     rms,
@@ -70,7 +70,7 @@ from .spectral import (
     spectral_contrast,
     spectral_flatness,
     spectral_rolloff,
-    # poly_features,
+    poly_features,
     tonnetz,
     zero_crossing_rate,
 
@@ -82,19 +82,33 @@ from .spectral import (
     cqt2010,
 )
 
+from .temporal import (
+    delta,
+    stack_memory,
+)
+
+from .rhythm import (
+    tempogram,
+    fourier_tempogram,
+    tempogram_ratio,
+    tempo,
+)
+
+from . import inverse
+
 __all__ = [
     "spectral_centroid",
     "spectral_bandwidth",
     "spectral_contrast",
     "spectral_rolloff",
     "spectral_flatness",
-    # "poly_features",
+    "poly_features",
     "rms",
     "zero_crossing_rate",
     "chroma_stft",
     "chroma_cqt",
-    # "chroma_cens",
-    # "chroma_vqt",
+    "chroma_vqt",
+    "chroma_cens",
     "melspectrogram",
     "mfcc",
     "tonnetz",
@@ -104,4 +118,12 @@ __all__ = [
     "cqt_frequencies",
     "cqt",
     "cqt2010",
+    # Temporal features
+    "delta",
+    "stack_memory",
+    # Rhythm features
+    "tempogram",
+    "fourier_tempogram",
+    "tempogram_ratio",
+    "tempo",
 ]

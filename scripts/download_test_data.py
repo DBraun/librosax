@@ -40,7 +40,7 @@ def download_file(url: str, output_path: Path) -> None:
 def main():
     """Download all ground-truth files."""
     # Create output directory
-    output_dir = Path("tests/data/ground_truths")
+    output_dir = Path("tests/ground_truths")
     output_dir.mkdir(parents=True, exist_ok=True)
     
     print(f"Downloading ground-truth files to {output_dir}")

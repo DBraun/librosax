@@ -120,7 +120,10 @@ def vectorize(
         @functools.wraps(function)
         def _vec(*args, **kwargs):
             y = vecfunc(*args, **kwargs)
-            if np.isscalar(args[0]):
+            # Check if the first argument is scalar-like (Python scalar or 0-d array)
+            arg0 = args[0]
+            is_scalar = np.isscalar(arg0) or (hasattr(arg0, 'ndim') and arg0.ndim == 0)
+            if is_scalar:
                 return y.item()
             else:
                 return y

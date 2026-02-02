@@ -1,21 +1,11 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
-"""Exception classes for librosa"""
+"""Exception classes for librosax"""
 
+# Re-export librosa's exception classes for compatibility
+# This ensures that exceptions raised by librosa functions wrapped by librosax
+# can be caught using librosax exception types
+from librosa.util.exceptions import LibrosaError as LibrosaxError
+from librosa.util.exceptions import ParameterError
 
-class LibrosaxError(Exception):
-    """The root librosa exception class.
-    
-    All librosa-specific exceptions inherit from this base class.
-    """
-
-    pass
-
-
-class ParameterError(LibrosaxError):
-    """Exception class for mal-formed inputs.
-    
-    Raised when function parameters are invalid or incorrectly formatted.
-    """
-
-    pass
+__all__ = ["LibrosaxError", "ParameterError"]

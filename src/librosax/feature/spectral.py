@@ -6,8 +6,10 @@ import numpy as np
 from jax import numpy as jnp
 from jax.scipy import signal as jssignal
 
-from librosax.core.spectrum import fft_frequencies, normalize, power_to_db, stft, _spectrogram
+from librosax.core.spectrum import fft_frequencies, normalize, power_to_db, stft, _spectrogram, _dct_flexible
 from librosax.core.convert import note_to_hz
+from librosax import filters
+from librosax.util.exceptions import ParameterError
 from functools import partial
 
 __all__ = [
@@ -16,13 +18,13 @@ __all__ = [
     "spectral_contrast",
     "spectral_rolloff",
     "spectral_flatness",
-    # "poly_features",
+    "poly_features",
     "rms",
     "zero_crossing_rate",
     "chroma_stft",
     "chroma_cqt",
-    # "chroma_cens",
-    # "chroma_vqt",
+    "chroma_vqt",
+    "chroma_cens",
     "melspectrogram",
     "mfcc",
     "tonnetz",
@@ -247,7 +249,7 @@ def spectral_rolloff(
         - ``(B, T)`` → ``(B, 1, N)``
     """
     if not 0.0 < roll_percent < 1.0:
-        raise ValueError("roll_percent must lie in the range (0, 1)")
+        raise ParameterError("roll_percent must lie in the range (0, 1)")
 
     S, n_fft = _spectrogram(
         y=y,
@@ -332,7 +334,7 @@ def spectral_flatness(
         - ``(B, T)`` → ``(B, 1, N)``
     """
     if amin <= 0:
-        raise ValueError("amin must be strictly positive")
+        raise ParameterError("amin must be strictly positive")
 
     S, n_fft = _spectrogram(
         y=y,
@@ -480,10 +482,12 @@ def rms(
     elif S is not None:
         # Note: Runtime checks are not compatible with JIT compilation
         # Users should ensure S.shape[-2] == frame_length // 2 + 1
-        assert S.shape[-2] == frame_length // 2 + 1, (
+        if S.shape[-2] != frame_length // 2 + 1:
+            raise ParameterError(
                 f"Since S.shape[-2] is {S.shape[-2]}, "
                 f"frame_length is expected to be {S.shape[-2] * 2 - 2} or {S.shape[-2] * 2 - 1}; "
-                f"found {frame_length}")
+                f"found {frame_length}"
+            )
 
         # Power spectrogram
         x = abs2(S, dtype=dtype)
@@ -497,7 +501,7 @@ def rms(
         # Calculate power
         power = 2 * jnp.sum(x, axis=-2, keepdims=True) / frame_length**2
     else:
-        raise ValueError("Either y or S must be input.")
+        raise ParameterError("Either y or S must be input.")
 
     return jnp.sqrt(power)
 
@@ -691,16 +695,16 @@ def spectral_contrast(
     freq = jnp.atleast_1d(freq)
 
     if freq.ndim != 1 or len(freq) != S.shape[-2]:
-        raise ValueError(f"freq.shape mismatch: expected ({S.shape[-2]},)")
+        raise ParameterError(f"freq.shape mismatch: expected ({S.shape[-2]},)")
 
     if n_bands < 1 or not isinstance(n_bands, int):
-        raise ValueError("n_bands must be a positive integer")
+        raise ParameterError("n_bands must be a positive integer")
 
     if not 0.0 < quantile < 1.0:
-        raise ValueError("quantile must lie in the range (0, 1)")
+        raise ParameterError("quantile must lie in the range (0, 1)")
 
     if fmin <= 0:
-        raise ValueError("fmin must be a positive number")
+        raise ParameterError("fmin must be a positive number")
 
     # Create octave bands
     octa = jnp.zeros(n_bands + 2)
@@ -894,7 +898,7 @@ def melspectrogram(
             If "slaney", divide the triangular mel weights by the width of the
             mel band (area normalization).
             If numeric, use norm as a mel exponent normalization.
-            See librosa.filters.mel for details.
+            See librosax.filters.mel for details.
         dtype: Data type of the output array
 
     Returns:
@@ -930,8 +934,8 @@ def melspectrogram(
         # We need to infer n_fft from the spectrogram shape
         n_fft = 2 * (S.shape[-2] - 1)
 
-    # Build mel filter matrix
-    mel_basis = librosa.filters.mel(
+    # Build mel filter matrix (already returns JAX array)
+    mel_basis = filters.mel(
         sr=sr,
         n_fft=n_fft,
         n_mels=n_mels,
@@ -939,11 +943,8 @@ def melspectrogram(
         fmax=fmax,
         htk=htk,
         norm=norm,
-        dtype=np.float32,  # librosa uses numpy
+        dtype=dtype,
     )
-
-    # Convert to JAX array
-    mel_basis = jnp.array(mel_basis, dtype=dtype)
 
     # Apply mel filterbank
     # mel_basis shape: (n_mels, 1 + n_fft/2)
@@ -1050,9 +1051,8 @@ def mfcc(
     # Need to transpose for DCT which expects (..., t, n_mels)
     S_transposed = jnp.moveaxis(S, -2, -1)
 
-    # Apply DCT
-    from jax.scipy.fft import dct as jax_dct
-    mfccs = jax_dct(S_transposed, type=dct_type, norm=norm, axis=-1)
+    # Apply DCT using the shared _dct_flexible function
+    mfccs = _dct_flexible(S_transposed, type=dct_type, norm=norm, axis=-1)
 
     # Keep only the first n_mfcc coefficients
     mfccs = mfccs[..., :n_mfcc]
@@ -1063,15 +1063,16 @@ def mfcc(
     # Apply liftering if requested
     if lifter > 0:
         # Create liftering coefficients
-        n = jnp.arange(n_mfcc)
-        lift = 1 + (lifter / 2) * jnp.sin(jnp.pi * (n + 1) / lifter)
+        # Shape: (n_mfcc,) which will broadcast correctly with (..., n_mfcc, t)
+        LI = jnp.sin(jnp.pi * jnp.arange(1, 1 + n_mfcc, dtype=mfccs.dtype) / lifter)
+        LI = 1 + (lifter / 2) * LI
 
-        # Reshape for broadcasting
-        ndim_diff = mfccs.ndim - 1
-        lift_shape = [1] * ndim_diff + [n_mfcc] + [1]
-        lift = lift.reshape(lift_shape)
+        # Reshape for broadcasting: (n_mfcc,) -> (n_mfcc, 1) for shape (..., n_mfcc, t)
+        # LI needs to align with the n_mfcc dimension
+        shape = [1] * (mfccs.ndim - 2) + [n_mfcc, 1]
+        LI = LI.reshape(shape)
 
-        mfccs = mfccs * lift
+        mfccs = mfccs * LI
 
     return mfccs
 
@@ -1103,7 +1104,7 @@ def chroma_filter(
     octwidth: Optional[float] = 2,
     norm: Optional[float] = 2,
     base_c: bool = True,
-    dtype: jnp.dtype = jnp.float32,
+    dtype: jnp.dtype = jnp.float64,
 ) -> jnp.ndarray:
     """Create a chroma filter bank.
 
@@ -1139,7 +1140,7 @@ def chroma_filter(
     binwidthbins = jnp.concatenate([jnp.maximum(frqbins[1:] - frqbins[:-1], 1.0), jnp.array([1])])
 
     # Create the chroma matrix
-    D = jnp.arange(0, n_chroma, dtype=jnp.float32)[jnp.newaxis, :] - frqbins[:, jnp.newaxis]
+    D = jnp.arange(0, n_chroma, dtype=dtype)[jnp.newaxis, :] - frqbins[:, jnp.newaxis]
 
     n_chroma2 = jnp.round(float(n_chroma) / 2)
 
@@ -1365,6 +1366,9 @@ def cqt(
         - ``(T,)`` → ``(n_bins, N)``
         - ``(B, T)`` → ``(B, n_bins, N)``
     """
+    if y is None:
+        raise ParameterError("y cannot be None - audio input is required for CQT")
+
     if fmin is None:
         fmin = note_to_hz("C1")
 
@@ -1879,6 +1883,9 @@ def chroma_cqt(
         - ``(T,)`` → ``(n_chroma, N)``
         - ``(B, T)`` → ``(B, n_chroma, N)``
     """
+    if y is None and C is None:
+        raise ParameterError("Either y or C must be provided")
+
     if fmin is None:
         fmin = note_to_hz("C1")
 
@@ -1971,7 +1978,7 @@ def tonnetz(
         - 5: Major y-axis
     """
     if y is None and chroma is None:
-        raise ValueError(
+        raise ParameterError(
             "Either the audio samples or the chromagram must be "
             "passed as an argument."
         )
@@ -2071,12 +2078,15 @@ def chroma_stft(
     if y is not None:
         S = S ** 2
 
-    # For now, we don't implement automatic tuning estimation
-    # Users need to provide tuning explicitly or use default 0.0
+    # Estimate tuning if not provided
     if tuning is None:
-        # In a full implementation, we would estimate tuning here
-        # For now, just use A440 standard tuning
-        tuning = 0.0
+        def _estimate_tuning(S_arr):
+            return np.array([librosa.estimate_tuning(S=S_arr, sr=sr, bins_per_octave=n_chroma)])
+        tuning = jax.pure_callback(
+            _estimate_tuning,
+            jax.ShapeDtypeStruct((1,), jnp.float64),
+            S
+        )[0]
 
     # Get the filter bank
     chromafb = chroma_filter(
@@ -2100,3 +2110,208 @@ def chroma_stft(
         chroma = raw_chroma
 
     return chroma
+
+
+def poly_features(
+    *,
+    y: Optional[jnp.ndarray] = None,
+    sr: float = 22050,
+    S: Optional[jnp.ndarray] = None,
+    n_fft: int = 2048,
+    hop_length: int = 512,
+    win_length: Optional[int] = None,
+    window: str = "hann",
+    center: bool = True,
+    pad_mode: str = "constant",
+    order: int = 1,
+    freq: Optional[jnp.ndarray] = None,
+) -> jnp.ndarray:
+    """Get coefficients of fitting an nth-order polynomial to the columns of a spectrogram.
+
+    This function wraps librosa.feature.poly_features for compatibility.
+
+    Args:
+        y: Audio time series.
+        sr: Audio sampling rate of y.
+        S: Spectrogram magnitude. If None, compute from y.
+        n_fft: FFT window size.
+        hop_length: Hop length for STFT.
+        win_length: Window length. If None, defaults to n_fft.
+        window: Window function.
+        center: If True, center frames.
+        pad_mode: Padding mode.
+        order: Order of the polynomial (1=linear, 2=quadratic, etc).
+        freq: Optional center frequencies for each row of S. If None, use FFT bin frequencies.
+
+    Returns:
+        Polynomial coefficients with shape (..., order+1, t).
+
+    Examples:
+        Compute first-order (linear) coefficients
+
+        >>> y, sr = librosax.load('audio.wav')
+        >>> coeffs = librosax.feature.poly_features(y=y, sr=sr, order=1)
+        >>> coeffs.shape
+        (2, t)  # intercept and slope for each frame
+    """
+    # Convert JAX arrays to numpy if needed
+    if y is not None:
+        y = np.asarray(y)
+    if S is not None:
+        S = np.asarray(S)
+    if freq is not None:
+        freq = np.asarray(freq)
+
+    result = librosa.feature.poly_features(
+        y=y,
+        sr=sr,
+        S=S,
+        n_fft=n_fft,
+        hop_length=hop_length,
+        win_length=win_length,
+        window=window,
+        center=center,
+        pad_mode=pad_mode,
+        order=order,
+        freq=freq,
+    )
+
+    return jnp.asarray(result)
+
+
+def chroma_vqt(
+    *,
+    y: Optional[jnp.ndarray] = None,
+    sr: float = 22050,
+    V: Optional[jnp.ndarray] = None,
+    hop_length: int = 512,
+    fmin: Optional[float] = None,
+    intervals: str = "ji5",
+    norm: Optional[float] = jnp.inf,
+    threshold: float = 0.0,
+    n_octaves: int = 7,
+    bins_per_octave: int = 12,
+    gamma: float = 0,
+) -> jnp.ndarray:
+    """Chromagram using Variable-Q Transform (VQT).
+
+    This is a wrapper around librosa.feature.chroma_vqt for compatibility.
+
+    Args:
+        y: Audio time series.
+        sr: Sampling rate.
+        V: Pre-computed VQT spectrogram (optional).
+        hop_length: Hop length for VQT.
+        fmin: Minimum frequency. If None, defaults to C1.
+        intervals: Interval specification ('ji3', 'ji5', 'equal', etc).
+        norm: Normalization type.
+        threshold: Pre-normalization energy threshold.
+        n_octaves: Number of octaves.
+        bins_per_octave: Number of bins per octave in the VQT.
+        gamma: Bandwidth offset for variable-Q filterbank.
+
+    Returns:
+        Chromagram with shape (..., n_chroma, t).
+
+    Examples:
+        >>> y, sr = librosax.load('audio.wav')
+        >>> chroma = librosax.feature.chroma_vqt(y=y, sr=sr)
+        >>> chroma.shape
+        (12, t)
+    """
+    # Convert JAX arrays to numpy if needed
+    if y is not None:
+        y = np.asarray(y)
+    if V is not None:
+        V = np.asarray(V)
+
+    result = librosa.feature.chroma_vqt(
+        y=y,
+        sr=sr,
+        V=V,
+        hop_length=hop_length,
+        fmin=fmin,
+        intervals=intervals,
+        norm=norm,
+        threshold=threshold,
+        n_octaves=n_octaves,
+        bins_per_octave=bins_per_octave,
+        gamma=gamma,
+    )
+
+    return jnp.asarray(result)
+
+
+def chroma_cens(
+    *,
+    y: Optional[jnp.ndarray] = None,
+    sr: float = 22050,
+    C: Optional[jnp.ndarray] = None,
+    hop_length: int = 512,
+    fmin: Optional[float] = None,
+    tuning: Optional[float] = None,
+    n_chroma: int = 12,
+    n_octaves: int = 7,
+    bins_per_octave: int = 36,
+    cqt_mode: str = "full",
+    window: Optional[jnp.ndarray] = None,
+    norm: Optional[float] = 2,
+    win_len_smooth: Optional[int] = 41,
+    smoothing_window: str = "hann",
+) -> jnp.ndarray:
+    """Compute Chroma Energy Normalized Statistics (CENS).
+
+    This is a wrapper around librosa.feature.chroma_cens.
+
+    CENS is a variant of chroma features with additional temporal smoothing
+    and energy normalization.
+
+    Args:
+        y: Audio time series.
+        sr: Sampling rate.
+        C: Pre-computed constant-Q chromagram.
+        hop_length: Hop length.
+        fmin: Minimum frequency. If None, defaults to C1.
+        tuning: Tuning deviation from A440 in fractional bins.
+        n_chroma: Number of chroma bins.
+        n_octaves: Number of octaves.
+        bins_per_octave: Number of bins per octave in the CQT.
+        cqt_mode: CQT mode.
+        window: Optional weighting window.
+        norm: Normalization type.
+        win_len_smooth: Length of temporal smoothing window.
+        smoothing_window: Type of smoothing window.
+
+    Returns:
+        CENS chromagram with shape (..., n_chroma, t).
+
+    Examples:
+        >>> y, sr = librosax.load('audio.wav')
+        >>> cens = librosax.feature.chroma_cens(y=y, sr=sr)
+    """
+    # Convert JAX arrays to numpy if needed
+    if y is not None:
+        y = np.asarray(y)
+    if C is not None:
+        C = np.asarray(C)
+    if window is not None:
+        window = np.asarray(window)
+
+    result = librosa.feature.chroma_cens(
+        y=y,
+        sr=sr,
+        C=C,
+        hop_length=hop_length,
+        fmin=fmin,
+        tuning=tuning,
+        n_chroma=n_chroma,
+        n_octaves=n_octaves,
+        bins_per_octave=bins_per_octave,
+        cqt_mode=cqt_mode,
+        window=window,
+        norm=norm,
+        win_len_smooth=win_len_smooth,
+        smoothing_window=smoothing_window,
+    )
+
+    return jnp.asarray(result)

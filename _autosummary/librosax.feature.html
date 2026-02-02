@@ -5,10 +5,10 @@
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="librosax.feature.spectral_centroid" href="generated/librosax.feature.spectral_centroid.html"><link rel="prev" title="librosax.fft_frequencies" href="../generated/librosax.fft_frequencies.html">
 
-    <!-- Generated with Sphinx 8.2.3 and Furo 2025.09.25 -->
-        <title>librosax.feature - Librosax Documentation, v0.1.1</title>
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
+        <title>librosax.feature - Librosax Documentation, v0.1.2</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
-    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=580074bf" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
     
     
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../index.html"><div class="brand">Librosax Documentation, v0.1.1</div></a>
+      <a href="../index.html"><div class="brand">Librosax Documentation, v0.1.2</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
   
-  <span class="sidebar-brand-text">Librosax Documentation, v0.1.1</span>
+  <span class="sidebar-brand-text">Librosax Documentation, v0.1.2</span>
   
 </a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -192,6 +192,7 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul>
 <li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scope.html">Scope and Design Philosophy</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
 </ul>
 <ul class="current">
@@ -317,7 +318,7 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="../generated/librosax.feature.spectral_contrast.html#librosax.feature.spectral_contrast" title="librosax.feature.spectral_contrast"><code class="xref py py-obj docutils literal notranslate"><span class="pre">spectral_contrast</span></code></a>(*[, y, sr, S, n_fft, ...])</p></td>
 <td><p>Compute spectral contrast.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../generated/librosax.feature.rms.html#librosax.feature.rms" title="librosax.feature.rms"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rms</span></code></a>(*[, y, S, frame_length, hop_length, ...])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="../generated/librosax.feature.rms.html#librosax.feature.rms" title="librosax.feature.rms"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rms</span></code></a>(*, y, S, frame_length, hop_length, ...)</p></td>
 <td><p>Compute root-mean-square (RMS) value for each frame.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="../generated/librosax.feature.zero_crossing_rate.html#librosax.feature.zero_crossing_rate" title="librosax.feature.zero_crossing_rate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">zero_crossing_rate</span></code></a>(y, *[, frame_length, ...])</p></td>
@@ -332,7 +333,7 @@
 <div class="table-wrapper autosummary longtable docutils container">
 <table class="autosummary longtable docutils align-default">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="../generated/librosax.feature.melspectrogram.html#librosax.feature.melspectrogram" title="librosax.feature.melspectrogram"><code class="xref py py-obj docutils literal notranslate"><span class="pre">melspectrogram</span></code></a>(*[, y, sr, S, n_fft, ...])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="../generated/librosax.feature.melspectrogram.html#librosax.feature.melspectrogram" title="librosax.feature.melspectrogram"><code class="xref py py-obj docutils literal notranslate"><span class="pre">melspectrogram</span></code></a>(*, y, sr, S, n_fft, ...)</p></td>
 <td><p>Compute a mel-scaled spectrogram.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="../generated/librosax.feature.mfcc.html#librosax.feature.mfcc" title="librosax.feature.mfcc"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mfcc</span></code></a>(*[, y, sr, S, n_mfcc, dct_type, norm, ...])</p></td>
@@ -353,7 +354,7 @@
 <tr class="row-even"><td><p><a class="reference internal" href="../generated/librosax.feature.chroma_cqt.html#librosax.feature.chroma_cqt" title="librosax.feature.chroma_cqt"><code class="xref py py-obj docutils literal notranslate"><span class="pre">chroma_cqt</span></code></a>(*[, y, sr, C, hop_length, fmin, ...])</p></td>
 <td><p>Chromagram from a constant-Q transform.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../generated/librosax.feature.chroma_filter.html#librosax.feature.chroma_filter" title="librosax.feature.chroma_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">chroma_filter</span></code></a>(*, sr, n_fft[, n_chroma, ...])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="../generated/librosax.feature.chroma_filter.html#librosax.feature.chroma_filter" title="librosax.feature.chroma_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">chroma_filter</span></code></a>(*, sr, n_fft, n_chroma, ...)</p></td>
 <td><p>Create a chroma filter bank.</p></td>
 </tr>
 </tbody>
@@ -365,10 +366,10 @@
 <div class="table-wrapper autosummary longtable docutils container">
 <table class="autosummary longtable docutils align-default">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="../generated/librosax.feature.cqt.html#librosax.feature.cqt" title="librosax.feature.cqt"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cqt</span></code></a>(y, *[, sr, hop_length, fmin, n_bins, ...])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="../generated/librosax.feature.cqt.html#librosax.feature.cqt" title="librosax.feature.cqt"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cqt</span></code></a>(y, *, sr, hop_length, fmin, n_bins, ...)</p></td>
 <td><p>Compute the constant-Q transform following nnAudio's CQT1992v2 implementation.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../generated/librosax.feature.cqt2010.html#librosax.feature.cqt2010" title="librosax.feature.cqt2010"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cqt2010</span></code></a>(y, *[, sr, hop_length, fmin, fmax, ...])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="../generated/librosax.feature.cqt2010.html#librosax.feature.cqt2010" title="librosax.feature.cqt2010"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cqt2010</span></code></a>(y, *, sr, hop_length, fmin, fmax, ...)</p></td>
 <td><p>Compute constant-Q transform using the 2010 algorithm with multi-resolution.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="../generated/librosax.feature.cqt_frequencies.html#librosax.feature.cqt_frequencies" title="librosax.feature.cqt_frequencies"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cqt_frequencies</span></code></a>(*[, n_bins, ...])</p></td>
@@ -398,7 +399,7 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="../generated/librosax.feature.hz_to_octs.html#librosax.feature.hz_to_octs" title="librosax.feature.hz_to_octs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hz_to_octs</span></code></a>(frequencies, *[, tuning, ...])</p></td>
 <td><p>Convert frequencies (Hz) to octave numbers.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../generated/librosax.feature.note_to_hz.html#librosax.feature.note_to_hz" title="librosax.feature.note_to_hz"><code class="xref py py-obj docutils literal notranslate"><span class="pre">note_to_hz</span></code></a>()</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="../generated/librosax.feature.note_to_hz.html#librosax.feature.note_to_hz" title="librosax.feature.note_to_hz"><code class="xref py py-obj docutils literal notranslate"><span class="pre">note_to_hz</span></code></a>(...)</p></td>
 <td><p>Convert one or more note names to frequency (Hz).</p></td>
 </tr>
 </tbody>
@@ -484,9 +485,9 @@
       
     </aside>
   </div>
-</div><script src="../_static/documentation_options.js?v=a58bc63e"></script>
-    <script src="../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+</div><script src="../_static/documentation_options.js?v=92734c54"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
     </body>
 </html>

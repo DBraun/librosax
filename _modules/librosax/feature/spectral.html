@@ -4,10 +4,10 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
 
-    <!-- Generated with Sphinx 8.2.3 and Furo 2025.09.25 -->
-        <title>librosax.feature.spectral - Librosax Documentation, v0.1.1</title>
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
+        <title>librosax.feature.spectral - Librosax Documentation, v0.1.2</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d111a655" />
-    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=580074bf" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
     
     
@@ -160,7 +160,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../../index.html"><div class="brand">Librosax Documentation, v0.1.1</div></a>
+      <a href="../../../index.html"><div class="brand">Librosax Documentation, v0.1.2</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -181,7 +181,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../../index.html">
   
-  <span class="sidebar-brand-text">Librosax Documentation, v0.1.1</span>
+  <span class="sidebar-brand-text">Librosax Documentation, v0.1.2</span>
   
 </a><form class="sidebar-search-container" method="get" action="../../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -191,6 +191,7 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../scope.html">Scope and Design Philosophy</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
 </ul>
 <ul>
@@ -301,8 +302,10 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">numpy</span> <span class="k">as</span> <span class="n">jnp</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">jax.scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">signal</span> <span class="k">as</span> <span class="n">jssignal</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">librosax.core.spectrum</span><span class="w"> </span><span class="kn">import</span> <span class="n">fft_frequencies</span><span class="p">,</span> <span class="n">normalize</span><span class="p">,</span> <span class="n">power_to_db</span><span class="p">,</span> <span class="n">stft</span><span class="p">,</span> <span class="n">_spectrogram</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">librosax.core.spectrum</span><span class="w"> </span><span class="kn">import</span> <span class="n">fft_frequencies</span><span class="p">,</span> <span class="n">normalize</span><span class="p">,</span> <span class="n">power_to_db</span><span class="p">,</span> <span class="n">stft</span><span class="p">,</span> <span class="n">_spectrogram</span><span class="p">,</span> <span class="n">_dct_flexible</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">librosax.core.convert</span><span class="w"> </span><span class="kn">import</span> <span class="n">note_to_hz</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">librosax</span><span class="w"> </span><span class="kn">import</span> <span class="n">filters</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">librosax.util.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ParameterError</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">partial</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
@@ -311,13 +314,13 @@
     <span class="s2">&quot;spectral_contrast&quot;</span><span class="p">,</span>
     <span class="s2">&quot;spectral_rolloff&quot;</span><span class="p">,</span>
     <span class="s2">&quot;spectral_flatness&quot;</span><span class="p">,</span>
-    <span class="c1"># &quot;poly_features&quot;,</span>
+    <span class="s2">&quot;poly_features&quot;</span><span class="p">,</span>
     <span class="s2">&quot;rms&quot;</span><span class="p">,</span>
     <span class="s2">&quot;zero_crossing_rate&quot;</span><span class="p">,</span>
     <span class="s2">&quot;chroma_stft&quot;</span><span class="p">,</span>
     <span class="s2">&quot;chroma_cqt&quot;</span><span class="p">,</span>
-    <span class="c1"># &quot;chroma_cens&quot;,</span>
-    <span class="c1"># &quot;chroma_vqt&quot;,</span>
+    <span class="s2">&quot;chroma_vqt&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;chroma_cens&quot;</span><span class="p">,</span>
     <span class="s2">&quot;melspectrogram&quot;</span><span class="p">,</span>
     <span class="s2">&quot;mfcc&quot;</span><span class="p">,</span>
     <span class="s2">&quot;tonnetz&quot;</span><span class="p">,</span>
@@ -550,7 +553,7 @@
 <span class="sd">        - ``(B, T)`` → ``(B, 1, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="mf">0.0</span> <span class="o">&lt;</span> <span class="n">roll_percent</span> <span class="o">&lt;</span> <span class="mf">1.0</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;roll_percent must lie in the range (0, 1)&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span><span class="s2">&quot;roll_percent must lie in the range (0, 1)&quot;</span><span class="p">)</span>
 
     <span class="n">S</span><span class="p">,</span> <span class="n">n_fft</span> <span class="o">=</span> <span class="n">_spectrogram</span><span class="p">(</span>
         <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
@@ -638,7 +641,7 @@
 <span class="sd">        - ``(B, T)`` → ``(B, 1, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">amin</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;amin must be strictly positive&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span><span class="s2">&quot;amin must be strictly positive&quot;</span><span class="p">)</span>
 
     <span class="n">S</span><span class="p">,</span> <span class="n">n_fft</span> <span class="o">=</span> <span class="n">_spectrogram</span><span class="p">(</span>
         <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
@@ -789,10 +792,12 @@
     <span class="k">elif</span> <span class="n">S</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="c1"># Note: Runtime checks are not compatible with JIT compilation</span>
         <span class="c1"># Users should ensure S.shape[-2] == frame_length // 2 + 1</span>
-        <span class="k">assert</span> <span class="n">S</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">frame_length</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="p">(</span>
+        <span class="k">if</span> <span class="n">S</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">!=</span> <span class="n">frame_length</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;Since S.shape[-2] is </span><span class="si">{</span><span class="n">S</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span><span class="si">}</span><span class="s2">, &quot;</span>
                 <span class="sa">f</span><span class="s2">&quot;frame_length is expected to be </span><span class="si">{</span><span class="n">S</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2</span><span class="si">}</span><span class="s2"> or </span><span class="si">{</span><span class="n">S</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">; &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;found </span><span class="si">{</span><span class="n">frame_length</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="sa">f</span><span class="s2">&quot;found </span><span class="si">{</span><span class="n">frame_length</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
 
         <span class="c1"># Power spectrogram</span>
         <span class="n">x</span> <span class="o">=</span> <span class="n">abs2</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
@@ -806,7 +811,7 @@
         <span class="c1"># Calculate power</span>
         <span class="n">power</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">2</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">/</span> <span class="n">frame_length</span><span class="o">**</span><span class="mi">2</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Either y or S must be input.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span><span class="s2">&quot;Either y or S must be input.&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">power</span><span class="p">)</span></div>
 
@@ -1006,16 +1011,16 @@
     <span class="n">freq</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">atleast_1d</span><span class="p">(</span><span class="n">freq</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">freq</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">1</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">freq</span><span class="p">)</span> <span class="o">!=</span> <span class="n">S</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;freq.shape mismatch: expected (</span><span class="si">{</span><span class="n">S</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span><span class="si">}</span><span class="s2">,)&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;freq.shape mismatch: expected (</span><span class="si">{</span><span class="n">S</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span><span class="si">}</span><span class="s2">,)&quot;</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">n_bands</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">n_bands</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;n_bands must be a positive integer&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span><span class="s2">&quot;n_bands must be a positive integer&quot;</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="mf">0.0</span> <span class="o">&lt;</span> <span class="n">quantile</span> <span class="o">&lt;</span> <span class="mf">1.0</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;quantile must lie in the range (0, 1)&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span><span class="s2">&quot;quantile must lie in the range (0, 1)&quot;</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">fmin</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;fmin must be a positive number&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span><span class="s2">&quot;fmin must be a positive number&quot;</span><span class="p">)</span>
 
     <span class="c1"># Create octave bands</span>
     <span class="n">octa</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_bands</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span>
@@ -1212,7 +1217,7 @@
 <span class="sd">            If &quot;slaney&quot;, divide the triangular mel weights by the width of the</span>
 <span class="sd">            mel band (area normalization).</span>
 <span class="sd">            If numeric, use norm as a mel exponent normalization.</span>
-<span class="sd">            See librosa.filters.mel for details.</span>
+<span class="sd">            See librosax.filters.mel for details.</span>
 <span class="sd">        dtype: Data type of the output array</span>
 
 <span class="sd">    Returns:</span>
@@ -1248,8 +1253,8 @@
         <span class="c1"># We need to infer n_fft from the spectrogram shape</span>
         <span class="n">n_fft</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">S</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
 
-    <span class="c1"># Build mel filter matrix</span>
-    <span class="n">mel_basis</span> <span class="o">=</span> <span class="n">librosa</span><span class="o">.</span><span class="n">filters</span><span class="o">.</span><span class="n">mel</span><span class="p">(</span>
+    <span class="c1"># Build mel filter matrix (already returns JAX array)</span>
+    <span class="n">mel_basis</span> <span class="o">=</span> <span class="n">filters</span><span class="o">.</span><span class="n">mel</span><span class="p">(</span>
         <span class="n">sr</span><span class="o">=</span><span class="n">sr</span><span class="p">,</span>
         <span class="n">n_fft</span><span class="o">=</span><span class="n">n_fft</span><span class="p">,</span>
         <span class="n">n_mels</span><span class="o">=</span><span class="n">n_mels</span><span class="p">,</span>
@@ -1257,11 +1262,8 @@
         <span class="n">fmax</span><span class="o">=</span><span class="n">fmax</span><span class="p">,</span>
         <span class="n">htk</span><span class="o">=</span><span class="n">htk</span><span class="p">,</span>
         <span class="n">norm</span><span class="o">=</span><span class="n">norm</span><span class="p">,</span>
-        <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>  <span class="c1"># librosa uses numpy</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span>
     <span class="p">)</span>
-
-    <span class="c1"># Convert to JAX array</span>
-    <span class="n">mel_basis</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mel_basis</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
 
     <span class="c1"># Apply mel filterbank</span>
     <span class="c1"># mel_basis shape: (n_mels, 1 + n_fft/2)</span>
@@ -1371,9 +1373,8 @@
     <span class="c1"># Need to transpose for DCT which expects (..., t, n_mels)</span>
     <span class="n">S_transposed</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">moveaxis</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
 
-    <span class="c1"># Apply DCT</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">jax.scipy.fft</span><span class="w"> </span><span class="kn">import</span> <span class="n">dct</span> <span class="k">as</span> <span class="n">jax_dct</span>
-    <span class="n">mfccs</span> <span class="o">=</span> <span class="n">jax_dct</span><span class="p">(</span><span class="n">S_transposed</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">dct_type</span><span class="p">,</span> <span class="n">norm</span><span class="o">=</span><span class="n">norm</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># Apply DCT using the shared _dct_flexible function</span>
+    <span class="n">mfccs</span> <span class="o">=</span> <span class="n">_dct_flexible</span><span class="p">(</span><span class="n">S_transposed</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">dct_type</span><span class="p">,</span> <span class="n">norm</span><span class="o">=</span><span class="n">norm</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
 
     <span class="c1"># Keep only the first n_mfcc coefficients</span>
     <span class="n">mfccs</span> <span class="o">=</span> <span class="n">mfccs</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span><span class="n">n_mfcc</span><span class="p">]</span>
@@ -1384,15 +1385,16 @@
     <span class="c1"># Apply liftering if requested</span>
     <span class="k">if</span> <span class="n">lifter</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
         <span class="c1"># Create liftering coefficients</span>
-        <span class="n">n</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_mfcc</span><span class="p">)</span>
-        <span class="n">lift</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">+</span> <span class="p">(</span><span class="n">lifter</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="n">lifter</span><span class="p">)</span>
+        <span class="c1"># Shape: (n_mfcc,) which will broadcast correctly with (..., n_mfcc, t)</span>
+        <span class="n">LI</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">n_mfcc</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">mfccs</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span> <span class="o">/</span> <span class="n">lifter</span><span class="p">)</span>
+        <span class="n">LI</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">+</span> <span class="p">(</span><span class="n">lifter</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">LI</span>
 
-        <span class="c1"># Reshape for broadcasting</span>
-        <span class="n">ndim_diff</span> <span class="o">=</span> <span class="n">mfccs</span><span class="o">.</span><span class="n">ndim</span> <span class="o">-</span> <span class="mi">1</span>
-        <span class="n">lift_shape</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">ndim_diff</span> <span class="o">+</span> <span class="p">[</span><span class="n">n_mfcc</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-        <span class="n">lift</span> <span class="o">=</span> <span class="n">lift</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">lift_shape</span><span class="p">)</span>
+        <span class="c1"># Reshape for broadcasting: (n_mfcc,) -&gt; (n_mfcc, 1) for shape (..., n_mfcc, t)</span>
+        <span class="c1"># LI needs to align with the n_mfcc dimension</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">mfccs</span><span class="o">.</span><span class="n">ndim</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="n">n_mfcc</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">LI</span> <span class="o">=</span> <span class="n">LI</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
 
-        <span class="n">mfccs</span> <span class="o">=</span> <span class="n">mfccs</span> <span class="o">*</span> <span class="n">lift</span>
+        <span class="n">mfccs</span> <span class="o">=</span> <span class="n">mfccs</span> <span class="o">*</span> <span class="n">LI</span>
 
     <span class="k">return</span> <span class="n">mfccs</span></div>
 
@@ -1430,7 +1432,7 @@
     <span class="n">octwidth</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
     <span class="n">norm</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
     <span class="n">base_c</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-    <span class="n">dtype</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+    <span class="n">dtype</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a chroma filter bank.</span>
 
@@ -1466,7 +1468,7 @@
     <span class="n">binwidthbins</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">jnp</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">frqbins</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">frqbins</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="mf">1.0</span><span class="p">),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">])])</span>
 
     <span class="c1"># Create the chroma matrix</span>
-    <span class="n">D</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_chroma</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">float32</span><span class="p">)[</span><span class="n">jnp</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,</span> <span class="p">:]</span> <span class="o">-</span> <span class="n">frqbins</span><span class="p">[:,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">newaxis</span><span class="p">]</span>
+    <span class="n">D</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_chroma</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)[</span><span class="n">jnp</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,</span> <span class="p">:]</span> <span class="o">-</span> <span class="n">frqbins</span><span class="p">[:,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">newaxis</span><span class="p">]</span>
 
     <span class="n">n_chroma2</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">n_chroma</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>
 
@@ -1698,6 +1700,9 @@
 <span class="sd">        - ``(T,)`` → ``(n_bins, N)``</span>
 <span class="sd">        - ``(B, T)`` → ``(B, n_bins, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span><span class="s2">&quot;y cannot be None - audio input is required for CQT&quot;</span><span class="p">)</span>
+
     <span class="k">if</span> <span class="n">fmin</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">fmin</span> <span class="o">=</span> <span class="n">note_to_hz</span><span class="p">(</span><span class="s2">&quot;C1&quot;</span><span class="p">)</span>
 
@@ -2218,6 +2223,9 @@
 <span class="sd">        - ``(T,)`` → ``(n_chroma, N)``</span>
 <span class="sd">        - ``(B, T)`` → ``(B, n_chroma, N)``</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">C</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span><span class="s2">&quot;Either y or C must be provided&quot;</span><span class="p">)</span>
+
     <span class="k">if</span> <span class="n">fmin</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">fmin</span> <span class="o">=</span> <span class="n">note_to_hz</span><span class="p">(</span><span class="s2">&quot;C1&quot;</span><span class="p">)</span>
 
@@ -2313,7 +2321,7 @@
 <span class="sd">        - 5: Major y-axis</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">chroma</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+        <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span>
             <span class="s2">&quot;Either the audio samples or the chromagram must be &quot;</span>
             <span class="s2">&quot;passed as an argument.&quot;</span>
         <span class="p">)</span>
@@ -2416,12 +2424,15 @@
     <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">S</span> <span class="o">=</span> <span class="n">S</span> <span class="o">**</span> <span class="mi">2</span>
 
-    <span class="c1"># For now, we don&#39;t implement automatic tuning estimation</span>
-    <span class="c1"># Users need to provide tuning explicitly or use default 0.0</span>
+    <span class="c1"># Estimate tuning if not provided</span>
     <span class="k">if</span> <span class="n">tuning</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="c1"># In a full implementation, we would estimate tuning here</span>
-        <span class="c1"># For now, just use A440 standard tuning</span>
-        <span class="n">tuning</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">_estimate_tuning</span><span class="p">(</span><span class="n">S_arr</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">librosa</span><span class="o">.</span><span class="n">estimate_tuning</span><span class="p">(</span><span class="n">S</span><span class="o">=</span><span class="n">S_arr</span><span class="p">,</span> <span class="n">sr</span><span class="o">=</span><span class="n">sr</span><span class="p">,</span> <span class="n">bins_per_octave</span><span class="o">=</span><span class="n">n_chroma</span><span class="p">)])</span>
+        <span class="n">tuning</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">pure_callback</span><span class="p">(</span>
+            <span class="n">_estimate_tuning</span><span class="p">,</span>
+            <span class="n">jax</span><span class="o">.</span><span class="n">ShapeDtypeStruct</span><span class="p">((</span><span class="mi">1</span><span class="p">,),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span>
+            <span class="n">S</span>
+        <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
 
     <span class="c1"># Get the filter bank</span>
     <span class="n">chromafb</span> <span class="o">=</span> <span class="n">chroma_filter</span><span class="p">(</span>
@@ -2446,6 +2457,211 @@
 
     <span class="k">return</span> <span class="n">chroma</span></div>
 
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">poly_features</span><span class="p">(</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">y</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">sr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">22050</span><span class="p">,</span>
+    <span class="n">S</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">n_fft</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2048</span><span class="p">,</span>
+    <span class="n">hop_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">512</span><span class="p">,</span>
+    <span class="n">win_length</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">window</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;hann&quot;</span><span class="p">,</span>
+    <span class="n">center</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">pad_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;constant&quot;</span><span class="p">,</span>
+    <span class="n">order</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">freq</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get coefficients of fitting an nth-order polynomial to the columns of a spectrogram.</span>
+
+<span class="sd">    This function wraps librosa.feature.poly_features for compatibility.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        y: Audio time series.</span>
+<span class="sd">        sr: Audio sampling rate of y.</span>
+<span class="sd">        S: Spectrogram magnitude. If None, compute from y.</span>
+<span class="sd">        n_fft: FFT window size.</span>
+<span class="sd">        hop_length: Hop length for STFT.</span>
+<span class="sd">        win_length: Window length. If None, defaults to n_fft.</span>
+<span class="sd">        window: Window function.</span>
+<span class="sd">        center: If True, center frames.</span>
+<span class="sd">        pad_mode: Padding mode.</span>
+<span class="sd">        order: Order of the polynomial (1=linear, 2=quadratic, etc).</span>
+<span class="sd">        freq: Optional center frequencies for each row of S. If None, use FFT bin frequencies.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Polynomial coefficients with shape (..., order+1, t).</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        Compute first-order (linear) coefficients</span>
+
+<span class="sd">        &gt;&gt;&gt; y, sr = librosax.load(&#39;audio.wav&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; coeffs = librosax.feature.poly_features(y=y, sr=sr, order=1)</span>
+<span class="sd">        &gt;&gt;&gt; coeffs.shape</span>
+<span class="sd">        (2, t)  # intercept and slope for each frame</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Convert JAX arrays to numpy if needed</span>
+    <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">S</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">S</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">S</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">freq</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">freq</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">freq</span><span class="p">)</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">librosa</span><span class="o">.</span><span class="n">feature</span><span class="o">.</span><span class="n">poly_features</span><span class="p">(</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
+        <span class="n">sr</span><span class="o">=</span><span class="n">sr</span><span class="p">,</span>
+        <span class="n">S</span><span class="o">=</span><span class="n">S</span><span class="p">,</span>
+        <span class="n">n_fft</span><span class="o">=</span><span class="n">n_fft</span><span class="p">,</span>
+        <span class="n">hop_length</span><span class="o">=</span><span class="n">hop_length</span><span class="p">,</span>
+        <span class="n">win_length</span><span class="o">=</span><span class="n">win_length</span><span class="p">,</span>
+        <span class="n">window</span><span class="o">=</span><span class="n">window</span><span class="p">,</span>
+        <span class="n">center</span><span class="o">=</span><span class="n">center</span><span class="p">,</span>
+        <span class="n">pad_mode</span><span class="o">=</span><span class="n">pad_mode</span><span class="p">,</span>
+        <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span>
+        <span class="n">freq</span><span class="o">=</span><span class="n">freq</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">chroma_vqt</span><span class="p">(</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">y</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">sr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">22050</span><span class="p">,</span>
+    <span class="n">V</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">hop_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">512</span><span class="p">,</span>
+    <span class="n">fmin</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">intervals</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ji5&quot;</span><span class="p">,</span>
+    <span class="n">norm</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span>
+    <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="n">n_octaves</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">7</span><span class="p">,</span>
+    <span class="n">bins_per_octave</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">12</span><span class="p">,</span>
+    <span class="n">gamma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Chromagram using Variable-Q Transform (VQT).</span>
+
+<span class="sd">    This is a wrapper around librosa.feature.chroma_vqt for compatibility.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        y: Audio time series.</span>
+<span class="sd">        sr: Sampling rate.</span>
+<span class="sd">        V: Pre-computed VQT spectrogram (optional).</span>
+<span class="sd">        hop_length: Hop length for VQT.</span>
+<span class="sd">        fmin: Minimum frequency. If None, defaults to C1.</span>
+<span class="sd">        intervals: Interval specification (&#39;ji3&#39;, &#39;ji5&#39;, &#39;equal&#39;, etc).</span>
+<span class="sd">        norm: Normalization type.</span>
+<span class="sd">        threshold: Pre-normalization energy threshold.</span>
+<span class="sd">        n_octaves: Number of octaves.</span>
+<span class="sd">        bins_per_octave: Number of bins per octave in the VQT.</span>
+<span class="sd">        gamma: Bandwidth offset for variable-Q filterbank.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Chromagram with shape (..., n_chroma, t).</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; y, sr = librosax.load(&#39;audio.wav&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; chroma = librosax.feature.chroma_vqt(y=y, sr=sr)</span>
+<span class="sd">        &gt;&gt;&gt; chroma.shape</span>
+<span class="sd">        (12, t)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Convert JAX arrays to numpy if needed</span>
+    <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">V</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">V</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">V</span><span class="p">)</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">librosa</span><span class="o">.</span><span class="n">feature</span><span class="o">.</span><span class="n">chroma_vqt</span><span class="p">(</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
+        <span class="n">sr</span><span class="o">=</span><span class="n">sr</span><span class="p">,</span>
+        <span class="n">V</span><span class="o">=</span><span class="n">V</span><span class="p">,</span>
+        <span class="n">hop_length</span><span class="o">=</span><span class="n">hop_length</span><span class="p">,</span>
+        <span class="n">fmin</span><span class="o">=</span><span class="n">fmin</span><span class="p">,</span>
+        <span class="n">intervals</span><span class="o">=</span><span class="n">intervals</span><span class="p">,</span>
+        <span class="n">norm</span><span class="o">=</span><span class="n">norm</span><span class="p">,</span>
+        <span class="n">threshold</span><span class="o">=</span><span class="n">threshold</span><span class="p">,</span>
+        <span class="n">n_octaves</span><span class="o">=</span><span class="n">n_octaves</span><span class="p">,</span>
+        <span class="n">bins_per_octave</span><span class="o">=</span><span class="n">bins_per_octave</span><span class="p">,</span>
+        <span class="n">gamma</span><span class="o">=</span><span class="n">gamma</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">chroma_cens</span><span class="p">(</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">y</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">sr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">22050</span><span class="p">,</span>
+    <span class="n">C</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">hop_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">512</span><span class="p">,</span>
+    <span class="n">fmin</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">tuning</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">n_chroma</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">12</span><span class="p">,</span>
+    <span class="n">n_octaves</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">7</span><span class="p">,</span>
+    <span class="n">bins_per_octave</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">36</span><span class="p">,</span>
+    <span class="n">cqt_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;full&quot;</span><span class="p">,</span>
+    <span class="n">window</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">norm</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="n">win_len_smooth</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">41</span><span class="p">,</span>
+    <span class="n">smoothing_window</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;hann&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute Chroma Energy Normalized Statistics (CENS).</span>
+
+<span class="sd">    This is a wrapper around librosa.feature.chroma_cens.</span>
+
+<span class="sd">    CENS is a variant of chroma features with additional temporal smoothing</span>
+<span class="sd">    and energy normalization.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        y: Audio time series.</span>
+<span class="sd">        sr: Sampling rate.</span>
+<span class="sd">        C: Pre-computed constant-Q chromagram.</span>
+<span class="sd">        hop_length: Hop length.</span>
+<span class="sd">        fmin: Minimum frequency. If None, defaults to C1.</span>
+<span class="sd">        tuning: Tuning deviation from A440 in fractional bins.</span>
+<span class="sd">        n_chroma: Number of chroma bins.</span>
+<span class="sd">        n_octaves: Number of octaves.</span>
+<span class="sd">        bins_per_octave: Number of bins per octave in the CQT.</span>
+<span class="sd">        cqt_mode: CQT mode.</span>
+<span class="sd">        window: Optional weighting window.</span>
+<span class="sd">        norm: Normalization type.</span>
+<span class="sd">        win_len_smooth: Length of temporal smoothing window.</span>
+<span class="sd">        smoothing_window: Type of smoothing window.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        CENS chromagram with shape (..., n_chroma, t).</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; y, sr = librosax.load(&#39;audio.wav&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; cens = librosax.feature.chroma_cens(y=y, sr=sr)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Convert JAX arrays to numpy if needed</span>
+    <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">C</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">C</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">C</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">window</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">window</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">window</span><span class="p">)</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">librosa</span><span class="o">.</span><span class="n">feature</span><span class="o">.</span><span class="n">chroma_cens</span><span class="p">(</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
+        <span class="n">sr</span><span class="o">=</span><span class="n">sr</span><span class="p">,</span>
+        <span class="n">C</span><span class="o">=</span><span class="n">C</span><span class="p">,</span>
+        <span class="n">hop_length</span><span class="o">=</span><span class="n">hop_length</span><span class="p">,</span>
+        <span class="n">fmin</span><span class="o">=</span><span class="n">fmin</span><span class="p">,</span>
+        <span class="n">tuning</span><span class="o">=</span><span class="n">tuning</span><span class="p">,</span>
+        <span class="n">n_chroma</span><span class="o">=</span><span class="n">n_chroma</span><span class="p">,</span>
+        <span class="n">n_octaves</span><span class="o">=</span><span class="n">n_octaves</span><span class="p">,</span>
+        <span class="n">bins_per_octave</span><span class="o">=</span><span class="n">bins_per_octave</span><span class="p">,</span>
+        <span class="n">cqt_mode</span><span class="o">=</span><span class="n">cqt_mode</span><span class="p">,</span>
+        <span class="n">window</span><span class="o">=</span><span class="n">window</span><span class="p">,</span>
+        <span class="n">norm</span><span class="o">=</span><span class="n">norm</span><span class="p">,</span>
+        <span class="n">win_len_smooth</span><span class="o">=</span><span class="n">win_len_smooth</span><span class="p">,</span>
+        <span class="n">smoothing_window</span><span class="o">=</span><span class="n">smoothing_window</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
 </pre></div>
         </article>
       </div>
@@ -2478,9 +2694,9 @@
       
     </aside>
   </div>
-</div><script src="../../../_static/documentation_options.js?v=a58bc63e"></script>
-    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+</div><script src="../../../_static/documentation_options.js?v=92734c54"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../../_static/scripts/furo.js?v=46bd48cc"></script>
     </body>
 </html>

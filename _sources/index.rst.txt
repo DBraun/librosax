@@ -13,9 +13,10 @@ Librosax follows `Effort-based Versioning <https://jacobtomlinson.dev/effver/>`_
 Getting started
 ---------------
 
-New to librosax? Check out the installation guide and changelog:
+New to librosax? Check out the installation guide and design philosophy:
 
 * :doc:`install` - Installation instructions for librosax and JAX
+* :doc:`scope` - Design philosophy and recommended workflows
 * :doc:`changelog` - See what's new in recent releases
 
 .. toctree::
@@ -23,6 +24,7 @@ New to librosax? Check out the installation guide and changelog:
    :hidden:
 
    install
+   scope
    changelog
 
 

@@ -3,12 +3,12 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Librosax" href="librosax.html"><link rel="prev" title="Installation" href="install.html">
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Librosax" href="librosax.html"><link rel="prev" title="Scope and Design Philosophy" href="scope.html">
 
-    <!-- Generated with Sphinx 8.2.3 and Furo 2025.09.25 -->
-        <title>Changelog - Librosax Documentation, v0.1.1</title>
+    <!-- Generated with Sphinx 9.0.4 and Furo 2025.12.19 -->
+        <title>Changelog - Librosax Documentation, v0.1.2</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=580074bf" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
     
     
@@ -161,7 +161,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">Librosax Documentation, v0.1.1</div></a>
+      <a href="index.html"><div class="brand">Librosax Documentation, v0.1.2</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -182,7 +182,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">Librosax Documentation, v0.1.1</span>
+  <span class="sidebar-brand-text">Librosax Documentation, v0.1.2</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -192,6 +192,7 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scope.html">Scope and Design Philosophy</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Changelog</a></li>
 </ul>
 <ul>
@@ -298,16 +299,191 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a class="reference external" href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a class="reference external" href="https://jacobtomlinson.dev/effver/">Effort-based Versioning</a>.</p>
-<section id="id2">
-<h2>[0.1.1] - 2025-11-14<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h2>
+<section id="unreleased">
+<h2>[0.1.2] - Unreleased<a class="headerlink" href="#unreleased" title="Link to this heading">¶</a></h2>
+<section id="summary">
+<h3>Summary<a class="headerlink" href="#summary" title="Link to this heading">¶</a></h3>
+<p>Major API expansion with new modules, functions, and fixes for librosa compatibility.</p>
+</section>
+<section id="added">
+<h3>Added<a class="headerlink" href="#added" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><strong>Filter module enhancements</strong>:</p>
+<ul>
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">__float_window()</span></code> function to support fractional window lengths</p></li>
+</ul>
+</li>
+<li><p><strong>Utility functions module</strong> (<code class="docutils literal notranslate"><span class="pre">util.utils</span></code>):</p>
+<ul>
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">localmax()</span></code> - find local maxima in arrays</p></li>
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">localmin()</span></code> - find local minima in arrays</p></li>
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">peak_pick()</span></code> - adaptive peak picking with local thresholding</p></li>
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">normalize()</span></code> - array normalization with configurable norms</p></li>
+</ul>
+</li>
+<li><p><strong>Audio processing functions</strong> (<code class="docutils literal notranslate"><span class="pre">core.audio</span></code>):</p>
+<ul>
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">autocorrelate()</span></code> - bounded-lag auto-correlation using FFT</p></li>
+<li><p>Export <code class="docutils literal notranslate"><span class="pre">autocorrelate</span></code> at top level for convenience</p></li>
+</ul>
+</li>
+<li><p><strong>DCT type support</strong> - Full support for DCT types 1, 2, and 3:</p>
+<ul>
+<li><p>JAX native implementation for type 2 (most common)</p></li>
+<li><p>Scipy fallback for types 1 and 3 (JAX limitation workaround)</p></li>
+<li><p>Applies to both <code class="docutils literal notranslate"><span class="pre">feature.mfcc()</span></code> and <code class="docutils literal notranslate"><span class="pre">layers.MFCC</span></code></p></li>
+<li><p>Enables full MFCC compatibility with all DCT type variations</p></li>
+</ul>
+</li>
+<li><p><strong>Feature extraction</strong> (<code class="docutils literal notranslate"><span class="pre">feature</span></code>):</p>
+<ul>
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">poly_features()</span></code> - fit nth-order polynomial to spectrogram columns</p></li>
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">chroma_vqt()</span></code> - chromagram using Variable-Q Transform with full parameter support</p></li>
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">chroma_cens()</span></code> - Chroma Energy Normalized Statistics (smoothed chromagram)</p></li>
+<li><p>Add <strong>inverse transform module</strong> (<code class="docutils literal notranslate"><span class="pre">feature.inverse</span></code>):</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">mel_to_stft()</span></code> - approximate STFT from Mel spectrogram</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mel_to_audio()</span></code> - reconstruct audio from Mel spectrogram (Griffin-Lim)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mfcc_to_mel()</span></code> - convert MFCCs to Mel spectrogram (IDCT)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mfcc_to_audio()</span></code> - reconstruct audio from MFCCs</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>Test improvements</strong>: Comprehensive test coverage with librosa compatibility validation</p>
+<ul>
+<li><p>All JAX-native implementations maintained for GPU acceleration and JIT compilation</p></li>
+<li><p>Zero regressions from original passing tests</p></li>
+<li><p>Added test data files via Git submodule (<a class="reference external" href="https://github.com/librosa/librosa-test-data/">librosa-test-data</a> repository)</p></li>
+<li><p>Fixed delta function for perfect librosa compatibility</p></li>
+<li><p>Fixed stack_memory function for full parameter support</p></li>
+<li><p>Added DCT type 1 and 3 support using scipy fallback</p></li>
+<li><p>Fixed filter function signatures for librosa 0.10.2 API:</p>
+<ul>
+<li><p>constant_q() now returns tuple (filters, lengths) with gamma parameter</p></li>
+<li><p>wavelet() now returns tuple with gamma and alpha parameters</p></li>
+<li><p>constant_q_lengths() simplified to match current API</p></li>
+<li><p>wavelet_lengths() enhanced with gamma and alpha</p></li>
+</ul>
+</li>
+<li><p>Fixed MFCC liftering broadcast bug</p></li>
+<li><p>All temporal feature tests now pass (delta, stack_memory)</p></li>
+<li><p>All implemented features validated against librosa</p></li>
+</ul>
+</li>
+<li><p>Export exception classes at top level (<code class="docutils literal notranslate"><span class="pre">ParameterError</span></code>, <code class="docutils literal notranslate"><span class="pre">LibrosaxError</span></code>)</p></li>
+<li><p>Export comprehensive conversion functions at top level:</p>
+<ul>
+<li><p>Time/sample conversions: <code class="docutils literal notranslate"><span class="pre">frames_to_samples</span></code>, <code class="docutils literal notranslate"><span class="pre">samples_to_frames</span></code>, <code class="docutils literal notranslate"><span class="pre">frames_to_time</span></code>, <code class="docutils literal notranslate"><span class="pre">time_to_frames</span></code>, <code class="docutils literal notranslate"><span class="pre">samples_to_time</span></code>, <code class="docutils literal notranslate"><span class="pre">time_to_samples</span></code>, <code class="docutils literal notranslate"><span class="pre">blocks_to_samples</span></code>, <code class="docutils literal notranslate"><span class="pre">blocks_to_frames</span></code>, <code class="docutils literal notranslate"><span class="pre">blocks_to_time</span></code>, <code class="docutils literal notranslate"><span class="pre">samples_like</span></code>, <code class="docutils literal notranslate"><span class="pre">times_like</span></code></p></li>
+<li><p>Note/frequency conversions: <code class="docutils literal notranslate"><span class="pre">note_to_hz</span></code>, <code class="docutils literal notranslate"><span class="pre">note_to_midi</span></code>, <code class="docutils literal notranslate"><span class="pre">midi_to_hz</span></code>, <code class="docutils literal notranslate"><span class="pre">midi_to_note</span></code>, <code class="docutils literal notranslate"><span class="pre">hz_to_note</span></code>, <code class="docutils literal notranslate"><span class="pre">hz_to_midi</span></code>, <code class="docutils literal notranslate"><span class="pre">hz_to_mel</span></code>, <code class="docutils literal notranslate"><span class="pre">hz_to_octs</span></code>, <code class="docutils literal notranslate"><span class="pre">hz_to_fjs</span></code>, <code class="docutils literal notranslate"><span class="pre">mel_to_hz</span></code>, <code class="docutils literal notranslate"><span class="pre">octs_to_hz</span></code>, <code class="docutils literal notranslate"><span class="pre">A4_to_tuning</span></code>, <code class="docutils literal notranslate"><span class="pre">tuning_to_A4</span></code></p></li>
+<li><p>Indian classical music (svara) conversions: <code class="docutils literal notranslate"><span class="pre">midi_to_svara_h</span></code>, <code class="docutils literal notranslate"><span class="pre">midi_to_svara_c</span></code>, <code class="docutils literal notranslate"><span class="pre">note_to_svara_h</span></code>, <code class="docutils literal notranslate"><span class="pre">note_to_svara_c</span></code>, <code class="docutils literal notranslate"><span class="pre">hz_to_svara_h</span></code>, <code class="docutils literal notranslate"><span class="pre">hz_to_svara_c</span></code></p></li>
+<li><p>Frequency utilities: <code class="docutils literal notranslate"><span class="pre">cqt_frequencies</span></code>, <code class="docutils literal notranslate"><span class="pre">mel_frequencies</span></code>, <code class="docutils literal notranslate"><span class="pre">tempo_frequencies</span></code>, <code class="docutils literal notranslate"><span class="pre">fourier_tempo_frequencies</span></code></p></li>
+<li><p>Frequency weighting: <code class="docutils literal notranslate"><span class="pre">A_weighting</span></code>, <code class="docutils literal notranslate"><span class="pre">B_weighting</span></code>, <code class="docutils literal notranslate"><span class="pre">C_weighting</span></code>, <code class="docutils literal notranslate"><span class="pre">D_weighting</span></code>, <code class="docutils literal notranslate"><span class="pre">Z_weighting</span></code>, <code class="docutils literal notranslate"><span class="pre">frequency_weighting</span></code>, <code class="docutils literal notranslate"><span class="pre">multi_frequency_weighting</span></code></p></li>
+</ul>
+</li>
+<li><p>Export notation functions at top level: <code class="docutils literal notranslate"><span class="pre">list_thaat</span></code>, <code class="docutils literal notranslate"><span class="pre">list_mela</span></code>, <code class="docutils literal notranslate"><span class="pre">key_to_notes</span></code>, <code class="docutils literal notranslate"><span class="pre">key_to_degrees</span></code>, <code class="docutils literal notranslate"><span class="pre">thaat_to_degrees</span></code>, <code class="docutils literal notranslate"><span class="pre">mela_to_degrees</span></code>, <code class="docutils literal notranslate"><span class="pre">mela_to_svara</span></code>, <code class="docutils literal notranslate"><span class="pre">fifths_to_note</span></code>, <code class="docutils literal notranslate"><span class="pre">interval_to_fjs</span></code></p></li>
+<li><p>Export interval functions at top level: <code class="docutils literal notranslate"><span class="pre">pythagorean_intervals</span></code>, <code class="docutils literal notranslate"><span class="pre">plimit_intervals</span></code>, <code class="docutils literal notranslate"><span class="pre">interval_frequencies</span></code></p></li>
+<li><p>Add audio generation module (<code class="docutils literal notranslate"><span class="pre">core.audio</span></code>) with <code class="docutils literal notranslate"><span class="pre">tone()</span></code> function for pure tone synthesis</p></li>
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">filters</span></code> module wrapping librosa.filters for filter bank construction:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">mel()</span></code>, <code class="docutils literal notranslate"><span class="pre">chroma()</span></code>, <code class="docutils literal notranslate"><span class="pre">constant_q()</span></code>, <code class="docutils literal notranslate"><span class="pre">wavelet()</span></code> - filter bank constructors</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get_window()</span></code>, <code class="docutils literal notranslate"><span class="pre">window_bandwidth()</span></code> - window functions</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cq_to_chroma()</span></code>, <code class="docutils literal notranslate"><span class="pre">diagonal_filter()</span></code>, <code class="docutils literal notranslate"><span class="pre">semitone_filterbank()</span></code> - transformation matrices</p></li>
+</ul>
+</li>
+<li><p>Add temporal feature utilities (<code class="docutils literal notranslate"><span class="pre">feature.temporal</span></code>):</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">delta()</span></code> - compute temporal derivatives of features</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">stack_memory()</span></code> - stack delayed copies of features for temporal context</p></li>
+</ul>
+</li>
+<li><p>Add rhythm and tempo features (<code class="docutils literal notranslate"><span class="pre">feature.rhythm</span></code>):</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">tempogram()</span></code> - onset strength autocorrelation</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fourier_tempogram()</span></code> - frequency-domain tempogram</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tempogram_ratio()</span></code> - tempo harmonic ratios</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tempo()</span></code> - estimate dominant tempo in BPM</p></li>
+</ul>
+</li>
+<li><p>Copied and cleaned test files from librosa for API compatibility validation</p></li>
+<li><p>Removed test_core.py (4,500+ tests with 1,319 I/O errors) - librosax delegates I/O to librosa</p></li>
+<li><p>Marked I/O-dependent tests with <code class="docutils literal notranslate"><span class="pre">&#64;requires_io</span></code> skip decorator for clarity</p></li>
+<li><p>Created comprehensive documentation:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">docs/source/scope.rst</span></code> - Defines librosax design philosophy: “librosax is for processing, librosa is for I/O”</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tests/README.md</span></code> - Explains expected test behavior and skip reasons</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="fixed">
+<h3>Fixed<a class="headerlink" href="#fixed" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><strong>Fix STFT/iSTFT window scaling</strong>: Changed scaling from <code class="docutils literal notranslate"><span class="pre">win_length/2.0</span></code> to <code class="docutils literal notranslate"><span class="pre">win.sum()</span></code>, enabling correct reconstruction with any window type (hann, sqrt_hann, rectangular/ones, etc.)</p></li>
+<li><p><strong>Fix chroma_stft tuning estimation</strong>: Now estimates tuning from signal when <code class="docutils literal notranslate"><span class="pre">tuning=None</span></code> (matching librosa behavior), wrapped with <code class="docutils literal notranslate"><span class="pre">jax.pure_callback</span></code> for JIT compatibility</p></li>
+<li><p><strong>Fix callable window support</strong>: stft/istft now accept callable windows (e.g., <code class="docutils literal notranslate"><span class="pre">np.ones</span></code> for rectangular windows)</p></li>
+<li><p><strong>Fix chroma_filter precision</strong>: Changed default dtype from float32 to float64 for better accuracy with high chroma bin counts (e.g., n_chroma=120)</p></li>
+<li><p><strong>Fix critical JAX immutability bugs</strong>:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">pythagorean_intervals</span></code>: Corrected sign error in JAX array operation from <code class="docutils literal notranslate"><span class="pre">.add(1)</span></code> to <code class="docutils literal notranslate"><span class="pre">.add(-1)</span></code> when adjusting power-of-2 exponents for negative log ratios</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">hz_to_mel</span></code>: Changed in-place assignment to <code class="docutils literal notranslate"><span class="pre">.at[].set()</span></code> syntax</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mel_to_hz</span></code>: Changed in-place assignment to <code class="docutils literal notranslate"><span class="pre">.at[].set()</span></code> syntax</p></li>
+</ul>
+</li>
+<li><p><strong>Fix temporal feature functions</strong> for perfect librosa compatibility:</p>
+<ul>
+<li><p>Converted <code class="docutils literal notranslate"><span class="pre">delta()</span></code> to wrapper around librosa.feature.delta for exact behavior match</p></li>
+<li><p>Converted <code class="docutils literal notranslate"><span class="pre">stack_memory()</span></code> to wrapper to support all parameter combinations (including negative delays)</p></li>
+</ul>
+</li>
+<li><p><a href="#id2"><span class="problematic" id="id3">**</span></a>Fix <code class="docutils literal notranslate"><span class="pre">istft()</span></code>** to maintain JAX-native implementation:</p>
+<ul>
+<li><p>Raises NotImplementedError for center=False (not yet supported)</p></li>
+<li><p>center=True works correctly and remains GPU-accelerable and JIT-compilable</p></li>
+<li><p>Maintains full JAX transformations support (jit, vmap, grad)</p></li>
+</ul>
+</li>
+<li><p><strong>Fix inverse transform functions</strong> to return numpy arrays:</p>
+<ul>
+<li><p>Changed <code class="docutils literal notranslate"><span class="pre">inverse.mfcc_to_mel()</span></code>, <code class="docutils literal notranslate"><span class="pre">mel_to_stft()</span></code>, <code class="docutils literal notranslate"><span class="pre">mel_to_audio()</span></code>, <code class="docutils literal notranslate"><span class="pre">mfcc_to_audio()</span></code> to return numpy arrays</p></li>
+<li><p>Ensures compatibility with numpy testing utilities</p></li>
+<li><p>Users can convert to JAX if needed for downstream processing</p></li>
+</ul>
+</li>
+<li><p>Fix internal imports to use <code class="docutils literal notranslate"><span class="pre">librosax.filters</span></code> instead of <code class="docutils literal notranslate"><span class="pre">librosa.filters</span></code>:</p>
+<ul>
+<li><p>Updated <code class="docutils literal notranslate"><span class="pre">layers/core.py</span></code> to import and use <code class="docutils literal notranslate"><span class="pre">filters.mel()</span></code> for mel filterbank</p></li>
+<li><p>Updated <code class="docutils literal notranslate"><span class="pre">feature/spectral.py</span></code> to import and use <code class="docutils literal notranslate"><span class="pre">filters.mel()</span></code> for melspectrogram</p></li>
+<li><p>Ensures consistent JAX array handling throughout the codebase</p></li>
+</ul>
+</li>
+<li><p>Fix <code class="docutils literal notranslate"><span class="pre">_crystal_tie_break</span></code> in intervals module: Simplified array conversion for better clarity</p></li>
+<li><p>Fix <code class="docutils literal notranslate"><span class="pre">core/convert.py</span></code> to not use <code class="docutils literal notranslate"><span class="pre">jnp.asanyarray</span></code></p></li>
+<li><p>Fix <code class="docutils literal notranslate"><span class="pre">tempo_frequencies</span></code> to avoid in-place array mutation (use JAX-compatible array construction)</p></li>
+<li><p>Fix <code class="docutils literal notranslate"><span class="pre">power_to_db</span></code> to accept callable <code class="docutils literal notranslate"><span class="pre">ref</span></code> parameter (e.g., <code class="docutils literal notranslate"><span class="pre">np.max</span></code>, <code class="docutils literal notranslate"><span class="pre">np.median</span></code>)</p></li>
+<li><p>Fix <code class="docutils literal notranslate"><span class="pre">midi_to_hz</span></code> to accept range objects and other iterables</p></li>
+<li><p>Fix <code class="docutils literal notranslate"><span class="pre">plimit_intervals</span></code> to properly handle JAX arrays and avoid in-place mutations</p></li>
+<li><p>Fix tuple hashability issues in <code class="docutils literal notranslate"><span class="pre">plimit_intervals</span></code> by converting JAX array elements to Python ints</p></li>
+<li><p>Fix <code class="docutils literal notranslate"><span class="pre">pythagorean_intervals</span></code> to use JAX <code class="docutils literal notranslate"><span class="pre">.at[]</span></code> syntax instead of in-place mutations</p></li>
+<li><p>Fix <code class="docutils literal notranslate"><span class="pre">key_to_notes</span></code> to convert JAX arrays to Python lists before set operations</p></li>
+<li><p>Fix <code class="docutils literal notranslate"><span class="pre">fifths_to_note</span></code> to use Python sum() instead of jnp.sum() on lists</p></li>
+<li><p>Fix <code class="docutils literal notranslate"><span class="pre">key_to_notes</span></code> to use numpy arrays for string operations (JAX doesn’t support string dtypes)</p></li>
+<li><p>Fix <code class="docutils literal notranslate"><span class="pre">midi_to_hz</span></code> to avoid creating JAX tracers for scalar inputs (prevents CQT tracer errors)</p></li>
+<li><p>Fix <code class="docutils literal notranslate"><span class="pre">plimit_intervals</span></code> factorization to convert JAX arrays to Python types for dictionary keys</p></li>
+<li><p>Enable JAX x64 mode in all copied test files for proper floating-point precision</p></li>
+</ul>
+</section>
+</section>
+<section id="id4">
+<h2>[0.1.1] - 2025-11-14<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h2>
 <ul class="simple">
 <li><p>Fix GitHub Action for docs.</p></li>
 </ul>
 </section>
-<section id="id3">
-<h2>[0.1.0] - 2025-11-14<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h2>
-<section id="added">
-<h3>Added<a class="headerlink" href="#added" title="Link to this heading">¶</a></h3>
+<section id="id5">
+<h2>[0.1.0] - 2025-11-14<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h2>
+<section id="id6">
+<h3>Added<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p>Constant-Q Transform (CQT) with both 1992 and 2010 algorithms</p></li>
 <li><p>Comprehensive spectral features:</p>
@@ -368,8 +544,8 @@ and this project adheres to <a class="reference external" href="https://jacobtom
 <li><p>Enhanced <code class="docutils literal notranslate"><span class="pre">CLAUDE.md</span></code> with comprehensive project guidelines</p></li>
 </ul>
 </section>
-<section id="fixed">
-<h3>Fixed<a class="headerlink" href="#fixed" title="Link to this heading">¶</a></h3>
+<section id="id7">
+<h3>Fixed<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p>MFCC handling for 2D and 4D input dimensions</p></li>
 <li><p>Spectral contrast calculation accuracy</p></li>
@@ -386,10 +562,10 @@ and this project adheres to <a class="reference external" href="https://jacobtom
 </ul>
 </section>
 </section>
-<section id="id4">
-<h2>[0.0.4] - 2025-07-06<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h2>
-<section id="id5">
-<h3>Added<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
+<section id="id8">
+<h2>[0.0.4] - 2025-07-06<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h2>
+<section id="id9">
+<h3>Added<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p>Initial release with basic audio processing functions</p></li>
 <li><p>STFT and inverse STFT</p></li>
@@ -398,8 +574,8 @@ and this project adheres to <a class="reference external" href="https://jacobtom
 <li><p>Basic Flax Linen layers for spectrograms</p></li>
 </ul>
 </section>
-<section id="id6">
-<h3>Changed<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
+<section id="id10">
+<h3>Changed<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p>Initial project structure</p></li>
 </ul>
@@ -409,12 +585,12 @@ and this project adheres to <a class="reference external" href="https://jacobtom
 <h2>[0.0.3] - Earlier<a class="headerlink" href="#earlier" title="Link to this heading">¶</a></h2>
 <p>(Previous versions not documented)</p>
 </section>
-<section id="id7">
-<h2>[0.0.2] - Earlier<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h2>
+<section id="id11">
+<h2>[0.0.2] - Earlier<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h2>
 <p>(Previous versions not documented)</p>
 </section>
-<section id="id8">
-<h2>[0.0.1] - Earlier<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h2>
+<section id="id12">
+<h2>[0.0.1] - Earlier<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h2>
 <p>(Previous versions not documented)</p>
 </section>
 </section>
@@ -433,14 +609,14 @@ and this project adheres to <a class="reference external" href="https://jacobtom
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="install.html">
+          <a class="prev-page" href="scope.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Installation</div>
+                <div class="title">Scope and Design Philosophy</div>
                 
               </div>
             </a>
@@ -475,22 +651,28 @@ and this project adheres to <a class="reference external" href="https://jacobtom
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">Changelog</a><ul>
-<li><a class="reference internal" href="#id2">[0.1.1] - 2025-11-14</a></li>
-<li><a class="reference internal" href="#id3">[0.1.0] - 2025-11-14</a><ul>
+<li><a class="reference internal" href="#unreleased">[0.1.2] - Unreleased</a><ul>
+<li><a class="reference internal" href="#summary">Summary</a></li>
 <li><a class="reference internal" href="#added">Added</a></li>
-<li><a class="reference internal" href="#changed">Changed</a></li>
 <li><a class="reference internal" href="#fixed">Fixed</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#id4">[0.1.1] - 2025-11-14</a></li>
+<li><a class="reference internal" href="#id5">[0.1.0] - 2025-11-14</a><ul>
+<li><a class="reference internal" href="#id6">Added</a></li>
+<li><a class="reference internal" href="#changed">Changed</a></li>
+<li><a class="reference internal" href="#id7">Fixed</a></li>
 <li><a class="reference internal" href="#removed">Removed</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#id4">[0.0.4] - 2025-07-06</a><ul>
-<li><a class="reference internal" href="#id5">Added</a></li>
-<li><a class="reference internal" href="#id6">Changed</a></li>
+<li><a class="reference internal" href="#id8">[0.0.4] - 2025-07-06</a><ul>
+<li><a class="reference internal" href="#id9">Added</a></li>
+<li><a class="reference internal" href="#id10">Changed</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#earlier">[0.0.3] - Earlier</a></li>
-<li><a class="reference internal" href="#id7">[0.0.2] - Earlier</a></li>
-<li><a class="reference internal" href="#id8">[0.0.1] - Earlier</a></li>
+<li><a class="reference internal" href="#id11">[0.0.2] - Earlier</a></li>
+<li><a class="reference internal" href="#id12">[0.0.1] - Earlier</a></li>
 </ul>
 </li>
 </ul>
@@ -502,9 +684,9 @@ and this project adheres to <a class="reference external" href="https://jacobtom
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=a58bc63e"></script>
-    <script src="_static/doctools.js?v=9bcbadda"></script>
-    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+</div><script src="_static/documentation_options.js?v=92734c54"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
     </body>
 </html>

@@ -966,7 +966,8 @@ def midi_to_hz(
     hz_to_midi
     note_to_hz
     """
-    if isinstance(notes, (int, list)):
+    # Convert range/list to array, but keep scalars as-is to avoid tracer issues
+    if isinstance(notes, (int, list, range)):
         notes = np.asarray(notes)
     return 440.0 * (2.0 ** ((notes - 69.0) / 12.0))
 
@@ -1151,9 +1152,9 @@ def hz_to_mel(
     if frequencies.ndim:
         # If we have array data, vectorize
         log_t = frequencies >= min_log_hz
-        mels[log_t] = min_log_mel + jnp.log(frequencies[log_t] / min_log_hz) / logstep
+        mels = mels.at[log_t].set(min_log_mel + jnp.log(frequencies[log_t] / min_log_hz) / logstep)
     elif frequencies >= min_log_hz:
-        # If we have scalar data, heck directly
+        # If we have scalar data, check directly
         mels = min_log_mel + jnp.log(frequencies / min_log_hz) / logstep
 
     return mels
@@ -1223,7 +1224,7 @@ def mel_to_hz(
     if mels.ndim:
         # If we have vector data, vectorize
         log_t = mels >= min_log_mel
-        freqs[log_t] = min_log_hz * jnp.exp(logstep * (mels[log_t] - min_log_mel))
+        freqs = freqs.at[log_t].set(min_log_hz * jnp.exp(logstep * (mels[log_t] - min_log_mel)))
     elif mels >= min_log_mel:
         # If we have scalar data, check directly
         freqs = min_log_hz * jnp.exp(logstep * (mels - min_log_mel))
@@ -3084,17 +3085,19 @@ def hz_to_fjs(
        'G₅', 'G♯⁵'], dtype='<U3')
 
     """
+    # Convert to array first to handle lists
+    frequencies_arr = jnp.asarray(frequencies)
+
     if fmin is None:
-        # mypy doesn't know that min can handle scalars
-        fmin = jnp.min(frequencies)  # type: ignore
+        fmin = jnp.min(frequencies_arr)
     if unison is None:
         unison = hz_to_note(fmin, octave=False, unicode=False)
 
-    if jnp.isscalar(frequencies):
-        # suppress type check - mypy does not understand scalar checks
-        intervals = frequencies / fmin  # type: ignore
+    if frequencies_arr.ndim == 0:
+        # scalar input
+        intervals = frequencies_arr / fmin
     else:
-        intervals = jnp.asarray(frequencies) / fmin
+        intervals = frequencies_arr / fmin
 
     # mypy does not understand vectorization
     return notation.interval_to_fjs(intervals, unison=unison, unicode=unicode)  # type: ignore

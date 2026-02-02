@@ -176,5 +176,5 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# Downloaded test data
-tests/data/ground_truths/
+# Downloaded test data (CQT ground truth files)
+tests/ground_truths/

@@ -36,14 +36,41 @@ Submodules
 
 from .version import version as __version__
 
+# Submodules
+from . import filters
+from . import feature
+
 # Exception classes
 from .util.exceptions import (
     LibrosaxError,
     ParameterError,
 )
 
+# Notation functions
+from .core.notation import (
+    list_thaat,
+    list_mela,
+    key_to_notes,
+    key_to_degrees,
+    thaat_to_degrees,
+    mela_to_degrees,
+    mela_to_svara,
+    fifths_to_note,
+    interval_to_fjs,
+)
+
+# Interval functions
+from .core.intervals import (
+    pythagorean_intervals,
+    plimit_intervals,
+    interval_frequencies,
+)
+
 # Core functionality at the top level
 from .core import (
+    # Audio generation and processing
+    tone,
+    autocorrelate,
     # Spectral representations
     stft,
     istft,

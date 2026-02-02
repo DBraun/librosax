@@ -1,4 +1,4 @@
-version = "0.1.2"
+version = "0.1.3"
 short_version = "0.1"
 
 import sys

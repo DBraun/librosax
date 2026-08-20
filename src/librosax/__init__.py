@@ -18,6 +18,18 @@ Magnitude scaling
     amplitude_to_db
     power_to_db
 
+Signal generation and mixing
+----------------------------
+.. autosummary::
+    :toctree: generated/
+
+    tone
+    autocorrelate
+    to_mono
+    to_stereo
+    to_multi
+    fix_length
+
 Frequency utilities
 -------------------
 .. autosummary::
@@ -71,6 +83,10 @@ from .core import (
     # Audio generation and processing
     tone,
     autocorrelate,
+    fix_length,
+    to_mono,
+    to_stereo,
+    to_multi,
     # Spectral representations
     stft,
     istft,

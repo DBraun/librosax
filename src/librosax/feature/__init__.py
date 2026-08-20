@@ -41,6 +41,18 @@ Constant-Q transform
     cqt2010
     cqt_frequencies
 
+Rhythm features
+---------------
+.. autosummary::
+    :toctree: generated/
+
+    tempogram
+    fourier_tempogram
+    hybrid_tempogram
+    metrogram
+    tempogram_ratio
+    tempo
+
 Tonal features
 --------------
 .. autosummary::
@@ -90,6 +102,8 @@ from .temporal import (
 from .rhythm import (
     tempogram,
     fourier_tempogram,
+    hybrid_tempogram,
+    metrogram,
     tempogram_ratio,
     tempo,
 )
@@ -124,6 +138,8 @@ __all__ = [
     # Rhythm features
     "tempogram",
     "fourier_tempogram",
+    "hybrid_tempogram",
+    "metrogram",
     "tempogram_ratio",
     "tempo",
 ]

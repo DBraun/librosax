@@ -12,6 +12,8 @@ import numpy as np
 from numpy.typing import ArrayLike
 import librosa.filters as _librosa_filters
 
+from librosax.util._compat import as_numpy
+
 
 def mel(
     *,
@@ -101,63 +103,6 @@ def chroma(
     return jnp.asarray(chroma_basis, dtype=dtype)
 
 
-def constant_q(
-    *,
-    sr: float,
-    fmin: Optional[float] = None,
-    n_bins: int = 84,
-    bins_per_octave: int = 12,
-    window: str = "hann",
-    filter_scale: float = 1,
-    pad_fft: bool = True,
-    norm: Optional[float] = 1,
-    dtype: jnp.dtype = jnp.complex64,
-    gamma: float = 0,
-    **kwargs
-):
-    """Create a Constant-Q filter bank.
-
-    This wraps librosa.filters.constant_q.
-
-    Args:
-        sr: Sample rate of the incoming signal.
-        fmin: Minimum frequency. If None, defaults to C1 (~32.7 Hz).
-        n_bins: Number of frequency bins.
-        bins_per_octave: Number of bins per octave.
-        window: Window function for each filter.
-        filter_scale: Scale factor for filter bandwidth.
-        pad_fft: Pad filter FFT to the nearest power of 2.
-        norm: Normalization factor for each filter.
-        dtype: The data type of the output array.
-        gamma: Bandwidth offset for variable-Q filterbank.
-        **kwargs: Additional keyword arguments.
-
-    Returns:
-        Tuple of (filters, lengths) where:
-        - filters: CQ filter bank (sparse matrix)
-        - lengths: Length of each filter
-
-    Examples:
-        >>> cqt_fb, lengths = librosax.filters.constant_q(sr=22050, fmin=32.7, n_bins=84)
-    """
-    # Call librosa's implementation which returns (filters, lengths)
-    result = _librosa_filters.constant_q(
-        sr=sr,
-        fmin=fmin,
-        n_bins=n_bins,
-        bins_per_octave=bins_per_octave,
-        window=window,
-        filter_scale=filter_scale,
-        pad_fft=pad_fft,
-        norm=norm,
-        dtype=dtype,
-        gamma=gamma,
-        **kwargs
-    )
-    # Return the tuple as-is (filters, lengths)
-    return result
-
-
 def get_window(
     window: Union[str, tuple, float, ArrayLike],
     Nx: int,
@@ -181,7 +126,7 @@ def get_window(
         >>> window.shape
         (1024,)
     """
-    win = _librosa_filters.get_window(window, Nx, fftbins=fftbins)
+    win = _librosa_filters.get_window(as_numpy(window), Nx, fftbins=fftbins)
     return jnp.asarray(win)
 
 
@@ -217,9 +162,9 @@ def semitone_filterbank(
         sample_rates = np.asarray(sample_rates)
 
     result = _librosa_filters.semitone_filterbank(
-        center_freqs=center_freqs,
+        center_freqs=as_numpy(center_freqs),
         tuning=tuning,
-        sample_rates=sample_rates,
+        sample_rates=as_numpy(sample_rates),
         flayout=flayout,
         **kwargs
     )
@@ -284,7 +229,7 @@ def cq_to_chroma(
         bins_per_octave=bins_per_octave,
         n_chroma=n_chroma,
         fmin=fmin,
-        window=window,
+        window=as_numpy(window),
         base_c=base_c,
     )
     return jnp.asarray(cq2chr, dtype=dtype)
@@ -317,50 +262,9 @@ def diagonal_filter(
         >>> diag_filt = librosax.filters.diagonal_filter(window, n=100, slope=0.5)
     """
     filt = _librosa_filters.diagonal_filter(
-        window=window, n=n, slope=slope, angle=angle, zero_mean=zero_mean
+        window=as_numpy(window), n=n, slope=slope, angle=angle, zero_mean=zero_mean
     )
     return jnp.asarray(filt)
-
-
-def constant_q_lengths(
-    *,
-    sr: float,
-    fmin: float,
-    n_bins: int = 84,
-    bins_per_octave: int = 12,
-    window: str = "hann",
-    filter_scale: float = 1,
-    gamma: float = 0,
-) -> jnp.ndarray:
-    """Return length of each filter in a constant-Q filterbank.
-
-    This wraps librosa.filters.constant_q_lengths.
-
-    Args:
-        sr: Sample rate.
-        fmin: Minimum frequency (required).
-        n_bins: Number of frequency bins.
-        bins_per_octave: Number of bins per octave.
-        window: Window function for each filter.
-        filter_scale: Scale factor for filter bandwidth.
-        gamma: Bandwidth offset for variable-Q filterbank.
-
-    Returns:
-        Array of filter lengths.
-
-    Examples:
-        >>> lengths = librosax.filters.constant_q_lengths(sr=22050, fmin=32.7, n_bins=84)
-    """
-    lengths = _librosa_filters.constant_q_lengths(
-        sr=sr,
-        fmin=fmin,
-        n_bins=n_bins,
-        bins_per_octave=bins_per_octave,
-        window=window,
-        filter_scale=filter_scale,
-        gamma=gamma,
-    )
-    return jnp.asarray(lengths)
 
 
 def wavelet(
@@ -403,15 +307,15 @@ def wavelet(
     """
     # librosa returns tuple (filters, lengths)
     result = _librosa_filters.wavelet(
-        freqs=freqs,
+        freqs=as_numpy(freqs),
         sr=sr,
-        window=window,
+        window=as_numpy(window),
         filter_scale=filter_scale,
         pad_fft=pad_fft,
         norm=norm,
         dtype=dtype,
         gamma=gamma,
-        alpha=alpha,
+        alpha=as_numpy(alpha),
         **kwargs
     )
     return result
@@ -448,12 +352,12 @@ def wavelet_lengths(
         >>> lengths, bw = librosax.filters.wavelet_lengths(freqs=freqs)
     """
     result = _librosa_filters.wavelet_lengths(
-        freqs=freqs,
+        freqs=as_numpy(freqs),
         sr=sr,
-        window=window,
+        window=as_numpy(window),
         filter_scale=filter_scale,
         gamma=gamma,
-        alpha=alpha,
+        alpha=as_numpy(alpha),
     )
     return result
 
@@ -488,7 +392,7 @@ def window_sumsquare(
         >>> wss = librosax.filters.window_sumsquare('hann', n_frames=100, hop_length=512)
     """
     wss = _librosa_filters.window_sumsquare(
-        window=window,
+        window=as_numpy(window),
         n_frames=n_frames,
         hop_length=hop_length,
         win_length=win_length,
@@ -542,8 +446,6 @@ def __float_window(window_spec: Union[str, tuple, Callable]) -> Callable:
 __all__ = [
     "mel",
     "chroma",
-    "constant_q",
-    "constant_q_lengths",
     "get_window",
     "semitone_filterbank",
     "window_bandwidth",

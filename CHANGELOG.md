@@ -10,7 +10,9 @@ and this project adheres to [Effort-based Versioning](https://jacobtomlinson.dev
 ### Summary
 
 Tracks librosa through its 1.0.0 release. librosa 1.0.0 is now the minimum
-supported version.
+supported version, which raises the Python floor to 3.12: librosa adopted
+[SPEC 0](https://scientific-python.org/specs/spec-0000/) in 1.0.0 and declares
+`requires-python >=3.12`, so librosax cannot resolve on 3.11.
 
 ### Added
 
@@ -84,6 +86,8 @@ supported version.
 - `filters.constant_q()` and `filters.constant_q_lengths()`, whose deprecation
   expired in librosa 1.0.0. Use `filters.wavelet()` and
   `filters.wavelet_lengths()`.
+- Support for Python 3.11, which librosa 1.0.0 does not support. The CI matrix
+  and the packaging metadata now start at 3.12.
 
 ### Fixed
 

@@ -4,9 +4,9 @@ import jax
 from jax import numpy as jnp
 from jax.scipy import signal
 from jax.scipy.fft import dct as jax_dct
+import librosa.filters
 import numpy as np
 from scipy.fftpack import dct as scipy_dct
-from scipy.signal import get_window
 import warnings
 
 from ..util.exceptions import ParameterError
@@ -59,12 +59,56 @@ def _dct_flexible(x: jnp.ndarray, type: int = 2, norm: Optional[str] = None, axi
         )
 
 
+_WindowSpec = Union[str, tuple, float, Callable, np.ndarray, jnp.ndarray]
+
+
+def _analysis_window(window: _WindowSpec, win_length: int, n_fft: int) -> np.ndarray:
+    """Build a zero-padded analysis window of length ``n_fft``.
+
+    Args:
+        window: Window specification. Accepts everything
+            ``librosa.filters.get_window`` does — a name such as ``"hann"``, a
+            ``(name, param)`` tuple such as ``("kaiser", 4.0)``, a float
+            interpreted as a Kaiser beta, a callable invoked as
+            ``window(win_length)``, or an explicit array of length
+            ``win_length``. The extra name ``"sqrt_hann"`` gives the square
+            root of a Hann window.
+        win_length: Length of the window itself.
+        n_fft: Length of the padded output; the window is centered within it.
+
+    Returns:
+        NumPy array of length ``n_fft``. The result is NumPy rather than JAX so
+        that it stays a compile-time constant when the caller is under
+        ``jax.jit``.
+
+    Raises:
+        librosa.util.exceptions.ParameterError: If an explicit window array
+            does not have length ``win_length``.
+    """
+    if isinstance(window, jax.Array):
+        # librosa's dispatcher recognizes lists and NumPy arrays, not JAX ones.
+        window = np.asarray(window)
+
+    if isinstance(window, str) and window == "sqrt_hann":
+        win = np.sqrt(librosa.filters.get_window("hann", win_length, fftbins=True))
+    else:
+        win = np.asarray(
+            librosa.filters.get_window(window, win_length, fftbins=True),
+            dtype=float,
+        )
+
+    padded_win = np.zeros(n_fft)
+    start = (n_fft - win_length) // 2
+    padded_win[start : start + win_length] = win
+    return padded_win
+
+
 def stft(
     waveform: jnp.ndarray,
     n_fft: int,
     hop_length: int = None,
     win_length: int = None,
-    window: str = "hann",
+    window: _WindowSpec = "hann",
     center: bool = True,
     pad_mode: str = "constant",
 ):
@@ -87,7 +131,16 @@ def stft(
             ``n_fft // 2 + 1``.
         hop_length: Number of samples between successive frames. Default is ``win_length // 4``.
         win_length: Window size. Default is ``n_fft``.
-        window: Window function type. Default is ``"hann"``. Also supports ``"sqrt_hann"``.
+        window: Window specification. Accepts anything
+            ``librosa.filters.get_window`` does: a name such as ``"hann"``, a
+            ``(name, param)`` tuple such as ``("kaiser", 4.0)``, a float
+            (Kaiser beta), a callable invoked as ``window(win_length)`` such as
+            ``np.hanning``, or an explicit array of length ``win_length``.
+            librosax additionally accepts ``"sqrt_hann"``. Default is
+            ``"hann"``.
+
+            Note that ``np.hanning`` is the *symmetric* Hann window, which
+            differs from the periodic window ``"hann"`` selects.
         center: If ``True``, the waveform is padded so that frames are centered. Default is ``True``.
         pad_mode: Padding mode for the waveform. Must be one of ``["constant", "reflect"]``. Default is ``"constant"``.
 
@@ -134,23 +187,11 @@ def stft(
         "reflect": "even",
     }[pad_mode]
 
-    # Pad the window to n_fft size
-    if window == "sqrt_hann":
-        win = np.sqrt(get_window("hann", win_length))
-    elif callable(window):
-        # Handle callable windows (e.g., np.ones)
-        win = window(win_length)
-    else:
-        win = get_window(window, win_length)
-
-    padded_win = np.zeros(n_fft)
-    start = (n_fft - win_length) // 2
-    padded_win[start : start + win_length] = win
-    padded_win = jnp.array(padded_win)
+    win = _analysis_window(window, win_length, n_fft)
 
     _, _, Zxx = signal.stft(
         waveform,
-        window=padded_win,
+        window=jnp.asarray(win),
         nperseg=n_fft,
         noverlap=n_fft - hop_length,
         nfft=n_fft,
@@ -167,7 +208,7 @@ def istft(
     hop_length: int = None,
     win_length: int = None,
     n_fft: int = None,
-    window: str = "hann",
+    window: _WindowSpec = "hann",
     center: bool = True,
     length: int = None,
 ):
@@ -189,7 +230,10 @@ def istft(
         win_length: Window size. Default is ``n_fft``.
         n_fft: FFT size. Default is ``(stft_matrix.shape[-2] - 1) * 2``, inferred from
             the frequency axis of the input.
-        window: Window function type. Default is ``"hann"``. Also supports ``"sqrt_hann"``.
+        window: Window specification, as in ``stft``: a name, a ``(name,
+            param)`` tuple, a Kaiser beta, a callable such as ``np.hanning``,
+            or an explicit array of length ``win_length``. Default is
+            ``"hann"``.
         center: If ``True``, assumes the waveform was padded so that frames were centered. Default is ``True``.
         length: Target length for the reconstructed signal. If ``None``, the entire signal is returned.
 
@@ -238,23 +282,11 @@ def istft(
     if hop_length is None:
         hop_length = win_length // 4
 
-    # Pad the window to n_fft size
-    if window == "sqrt_hann":
-        win = np.sqrt(get_window("hann", win_length))
-    elif callable(window):
-        # Handle callable windows (e.g., np.ones)
-        win = window(win_length)
-    else:
-        win = get_window(window, win_length)
-
-    padded_win = np.zeros(n_fft)
-    start = (n_fft - win_length) // 2
-    padded_win[start : start + win_length] = win
-    padded_win = jnp.array(padded_win)
+    win = _analysis_window(window, win_length, n_fft)
 
     _, reconstructed_signal = signal.istft(
         stft_matrix,
-        window=padded_win,
+        window=jnp.asarray(win),
         nperseg=n_fft,
         noverlap=n_fft - hop_length,
         nfft=n_fft,
@@ -621,7 +653,7 @@ def _spectrogram(
     n_fft: int = 2048,
     hop_length: int = 512,
     win_length: Optional[int] = None,
-    window: str = "hann",
+    window: _WindowSpec = "hann",
     center: bool = True,
     pad_mode: str = "constant",
 ) -> tuple[jnp.ndarray, int]:
@@ -637,7 +669,10 @@ def _spectrogram(
         n_fft: FFT window size
         hop_length: Number of samples between successive frames
         win_length: Window size
-        window: Window function
+        window: Window specification, as in ``stft``: a name, a ``(name,
+            param)`` tuple, a Kaiser beta, a callable such as ``np.hanning``,
+            or an explicit array of length ``win_length``. Default is
+            ``"hann"``.
         center: If True, pad the signal so that frames are centered
         pad_mode: Padding mode
         

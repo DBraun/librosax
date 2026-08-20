@@ -4,9 +4,11 @@ import jax
 from jax import numpy as jnp
 from jax.scipy import signal
 from jax.scipy.fft import dct as jax_dct
+import librosa.filters
 import numpy as np
 from scipy.fftpack import dct as scipy_dct
-from scipy.signal import get_window
+import warnings
+
 from ..util.exceptions import ParameterError
 
 
@@ -57,12 +59,56 @@ def _dct_flexible(x: jnp.ndarray, type: int = 2, norm: Optional[str] = None, axi
         )
 
 
+_WindowSpec = Union[str, tuple, float, Callable, np.ndarray, jnp.ndarray]
+
+
+def _analysis_window(window: _WindowSpec, win_length: int, n_fft: int) -> np.ndarray:
+    """Build a zero-padded analysis window of length ``n_fft``.
+
+    Args:
+        window: Window specification. Accepts everything
+            ``librosa.filters.get_window`` does — a name such as ``"hann"``, a
+            ``(name, param)`` tuple such as ``("kaiser", 4.0)``, a float
+            interpreted as a Kaiser beta, a callable invoked as
+            ``window(win_length)``, or an explicit array of length
+            ``win_length``. The extra name ``"sqrt_hann"`` gives the square
+            root of a Hann window.
+        win_length: Length of the window itself.
+        n_fft: Length of the padded output; the window is centered within it.
+
+    Returns:
+        NumPy array of length ``n_fft``. The result is NumPy rather than JAX so
+        that it stays a compile-time constant when the caller is under
+        ``jax.jit``.
+
+    Raises:
+        librosa.util.exceptions.ParameterError: If an explicit window array
+            does not have length ``win_length``.
+    """
+    if isinstance(window, jax.Array):
+        # librosa's dispatcher recognizes lists and NumPy arrays, not JAX ones.
+        window = np.asarray(window)
+
+    if isinstance(window, str) and window == "sqrt_hann":
+        win = np.sqrt(librosa.filters.get_window("hann", win_length, fftbins=True))
+    else:
+        win = np.asarray(
+            librosa.filters.get_window(window, win_length, fftbins=True),
+            dtype=float,
+        )
+
+    padded_win = np.zeros(n_fft)
+    start = (n_fft - win_length) // 2
+    padded_win[start : start + win_length] = win
+    return padded_win
+
+
 def stft(
     waveform: jnp.ndarray,
     n_fft: int,
     hop_length: int = None,
     win_length: int = None,
-    window: str = "hann",
+    window: _WindowSpec = "hann",
     center: bool = True,
     pad_mode: str = "constant",
 ):
@@ -85,7 +131,16 @@ def stft(
             ``n_fft // 2 + 1``.
         hop_length: Number of samples between successive frames. Default is ``win_length // 4``.
         win_length: Window size. Default is ``n_fft``.
-        window: Window function type. Default is ``"hann"``. Also supports ``"sqrt_hann"``.
+        window: Window specification. Accepts anything
+            ``librosa.filters.get_window`` does: a name such as ``"hann"``, a
+            ``(name, param)`` tuple such as ``("kaiser", 4.0)``, a float
+            (Kaiser beta), a callable invoked as ``window(win_length)`` such as
+            ``np.hanning``, or an explicit array of length ``win_length``.
+            librosax additionally accepts ``"sqrt_hann"``. Default is
+            ``"hann"``.
+
+            Note that ``np.hanning`` is the *symmetric* Hann window, which
+            differs from the periodic window ``"hann"`` selects.
         center: If ``True``, the waveform is padded so that frames are centered. Default is ``True``.
         pad_mode: Padding mode for the waveform. Must be one of ``["constant", "reflect"]``. Default is ``"constant"``.
 
@@ -132,23 +187,11 @@ def stft(
         "reflect": "even",
     }[pad_mode]
 
-    # Pad the window to n_fft size
-    if window == "sqrt_hann":
-        win = np.sqrt(get_window("hann", win_length))
-    elif callable(window):
-        # Handle callable windows (e.g., np.ones)
-        win = window(win_length)
-    else:
-        win = get_window(window, win_length)
-
-    padded_win = np.zeros(n_fft)
-    start = (n_fft - win_length) // 2
-    padded_win[start : start + win_length] = win
-    padded_win = jnp.array(padded_win)
+    win = _analysis_window(window, win_length, n_fft)
 
     _, _, Zxx = signal.stft(
         waveform,
-        window=padded_win,
+        window=jnp.asarray(win),
         nperseg=n_fft,
         noverlap=n_fft - hop_length,
         nfft=n_fft,
@@ -165,7 +208,7 @@ def istft(
     hop_length: int = None,
     win_length: int = None,
     n_fft: int = None,
-    window: str = "hann",
+    window: _WindowSpec = "hann",
     center: bool = True,
     length: int = None,
 ):
@@ -187,7 +230,10 @@ def istft(
         win_length: Window size. Default is ``n_fft``.
         n_fft: FFT size. Default is ``(stft_matrix.shape[-2] - 1) * 2``, inferred from
             the frequency axis of the input.
-        window: Window function type. Default is ``"hann"``. Also supports ``"sqrt_hann"``.
+        window: Window specification, as in ``stft``: a name, a ``(name,
+            param)`` tuple, a Kaiser beta, a callable such as ``np.hanning``,
+            or an explicit array of length ``win_length``. Default is
+            ``"hann"``.
         center: If ``True``, assumes the waveform was padded so that frames were centered. Default is ``True``.
         length: Target length for the reconstructed signal. If ``None``, the entire signal is returned.
 
@@ -236,23 +282,11 @@ def istft(
     if hop_length is None:
         hop_length = win_length // 4
 
-    # Pad the window to n_fft size
-    if window == "sqrt_hann":
-        win = np.sqrt(get_window("hann", win_length))
-    elif callable(window):
-        # Handle callable windows (e.g., np.ones)
-        win = window(win_length)
-    else:
-        win = get_window(window, win_length)
-
-    padded_win = np.zeros(n_fft)
-    start = (n_fft - win_length) // 2
-    padded_win[start : start + win_length] = win
-    padded_win = jnp.array(padded_win)
+    win = _analysis_window(window, win_length, n_fft)
 
     _, reconstructed_signal = signal.istft(
         stft_matrix,
-        window=padded_win,
+        window=jnp.asarray(win),
         nperseg=n_fft,
         noverlap=n_fft - hop_length,
         nfft=n_fft,
@@ -278,41 +312,104 @@ def istft(
     return reconstructed_signal
 
 
+_AxesSpec = Union[str, int, tuple, None]
+
+
+def _resolve_axes(x: jnp.ndarray, axes: _AxesSpec) -> Union[int, tuple, None]:
+    """Resolve the ``axes="auto"`` sentinel against an array's rank.
+
+    Args:
+        x: Array whose rank determines the inferred axes.
+        axes: Either the literal ``"auto"``, or an explicit axis specification
+            that is returned unchanged.
+
+    Returns:
+        ``None`` for scalars, ``(-1,)`` for 1-d input and ``(-2, -1)`` for
+        anything higher, when ``axes`` is ``"auto"``; otherwise ``axes``.
+    """
+    if axes != "auto":
+        return axes
+    if x.ndim >= 2:
+        return (-2, -1)
+    if x.ndim == 1:
+        return (-1,)
+    return None
+
+
 def power_to_db(
-    x: jnp.ndarray,
+    S: jnp.ndarray,
+    *,
+    ref: Union[float, Callable] = 1.0,
     amin: float = 1e-10,
     top_db: Optional[float] = 80.0,
-    ref: Union[float, Callable] = 1.0,
+    axes: _AxesSpec = "auto",
 ) -> jnp.ndarray:
     """Convert a power spectrogram to decibel (dB) units.
 
+    This computes the scaling ``10 * log10(S / ref)`` in a numerically stable
+    way.
+
     Args:
-        x: Input power spectrogram. Any shape; applied element-wise.
+        S: Input power spectrogram. Any shape; applied element-wise.
+        ref: Reference value for scaling. If scalar, the power is scaled
+            relative to ``ref``. If callable, the reference value is computed as
+            ``ref(S, axis=axes, keepdims=True)``, so each slice along ``axes``
+            gets its own reference. Default is 1.0.
         amin: Minimum threshold for input values. Default is 1e-10.
-        top_db: Threshold the output at top_db below the peak. Default is 80.0.
-        ref: Reference value for scaling. Default is 1.0.
-            If scalar, the amplitude is scaled relative to ref.
-            If callable, the reference value is computed as ref(x).
+        top_db: Threshold the output at ``top_db`` below the peak of each slice
+            along ``axes``. Default is 80.0.
+        axes: Axis or axes over which ``ref`` and ``top_db`` are reduced. If
+            ``"auto"`` (default), the axes are inferred from the rank of ``S``:
+            ``None`` for a scalar, ``(-1,)`` for 1-d, and ``(-2, -1)``
+            otherwise, so that batched inputs are scaled independently. Pass
+            ``None`` to reduce over the whole array at once.
 
     Returns:
         dB-scaled spectrogram with same shape as input.
 
     Raises:
-        librosax.util.exceptions.ParameterError: If ``top_db`` is negative.
+        librosax.util.exceptions.ParameterError: If ``amin`` is not strictly
+            positive, if ``top_db`` is negative, or if a callable ``ref`` does
+            not accept ``axis`` and ``keepdims``.
     """
-    # Handle callable ref (e.g., np.max, np.median)
-    if callable(ref):
-        ref_value = ref(x)
-    else:
-        ref_value = ref
+    if amin <= 0:
+        raise ParameterError("amin must be strictly positive")
 
-    log_spec = 10.0 * jnp.log10(jnp.maximum(amin, x))
+    if jnp.issubdtype(S.dtype, jnp.complexfloating):
+        warnings.warn(
+            "power_to_db was called on complex input so phase "
+            "information will be discarded. To suppress this warning, "
+            "call power_to_db(jnp.abs(D)**2) instead.",
+            stacklevel=2,
+        )
+        magnitude = jnp.abs(S)
+    else:
+        magnitude = S
+
+    axes = _resolve_axes(magnitude, axes)
+
+    if callable(ref):
+        # The reference is computed per slice so that batched inputs do not
+        # share a single global reference.
+        try:
+            ref_value = ref(magnitude, axis=axes, keepdims=True)
+        except TypeError as exc:
+            raise ParameterError(
+                "The provided reference function must support 'axis' and "
+                "'keepdims' arguments for proper multichannel processing."
+            ) from exc
+    else:
+        ref_value = jnp.abs(ref)
+
+    log_spec = 10.0 * jnp.log10(jnp.maximum(amin, magnitude))
     log_spec = log_spec - 10.0 * jnp.log10(jnp.maximum(amin, ref_value))
 
     if top_db is not None:
         if top_db < 0:
             raise ParameterError("top_db must be non-negative")
-        log_spec = jnp.maximum(log_spec, log_spec.max() - top_db)
+        log_spec = jnp.maximum(
+            log_spec, jnp.max(log_spec, axis=axes, keepdims=True) - top_db
+        )
 
     return log_spec
 
@@ -343,19 +440,24 @@ def amplitude_to_db(
     ref: Union[float, Callable] = 1.0,
     amin: float = 1e-5,
     top_db: Optional[float] = 80.0,
+    axes: _AxesSpec = "auto",
 ) -> Union[jnp.floating[Any], jnp.ndarray]:
     """Convert an amplitude spectrogram to decibel (dB) units.
 
-    This is equivalent to ``power_to_db(S**2, ref=ref**2, amin=amin**2, top_db=top_db)``,
-    but is provided for convenience.
+    This is equivalent to ``power_to_db(S**2, ref=ref**2, amin=amin**2,
+    top_db=top_db)``, but is provided for convenience.
 
     Args:
         S: Input amplitude spectrogram. Any shape; applied element-wise.
-        ref: Reference value for scaling. If scalar, the amplitude ``abs(S)`` is scaled relative
-            to ref: ``20 * log10(S / ref)``. If callable, the reference value is computed
-            as ``ref(S)``. Default is 1.0.
+        ref: Reference value for scaling. If scalar, the amplitude ``abs(S)`` is
+            scaled relative to ``ref``: ``20 * log10(S / ref)``. If callable,
+            the reference value is computed as
+            ``ref(abs(S), axis=axes, keepdims=True)``. Default is 1.0.
         amin: Minimum threshold for input values. Default is 1e-5.
-        top_db: Threshold the output at top_db below the peak. Default is 80.0.
+        top_db: Threshold the output at ``top_db`` below the peak of each slice
+            along ``axes``. Default is 80.0.
+        axes: Axis or axes over which ``ref`` and ``top_db`` are reduced. See
+            ``power_to_db``.
 
     Returns:
         dB-scaled spectrogram with same shape as input.
@@ -364,16 +466,25 @@ def amplitude_to_db(
         power_to_db, db_to_amplitude
     """
     magnitude = jnp.abs(S)
+    axes = _resolve_axes(magnitude, axes)
 
     if callable(ref):
         # User supplied a function to calculate reference power
-        ref_value = ref(magnitude)
+        try:
+            ref_value = ref(magnitude, axis=axes, keepdims=True)
+        except TypeError as exc:
+            raise ParameterError(
+                "The provided reference function must support 'axis' and "
+                "'keepdims' arguments for proper multichannel processing."
+            ) from exc
     else:
         ref_value = jnp.abs(ref)
 
     power = jnp.square(magnitude)
 
-    db: jnp.ndarray = power_to_db(power, ref=ref_value**2, amin=amin**2, top_db=top_db)
+    db: jnp.ndarray = power_to_db(
+        power, ref=ref_value**2, amin=amin**2, top_db=top_db, axes=axes
+    )
     return db
 
 
@@ -410,6 +521,32 @@ def fft_frequencies(sr: float = 22050, n_fft: int = 2048) -> jnp.ndarray:
     return jnp.fft.rfftfreq(n=n_fft, d=1.0 / sr)
 
 
+def tiny(x: jnp.ndarray) -> float:
+    """Return the smallest positive normal value for an array's dtype.
+
+    Non-floating dtypes have no such value, so float32's is used, matching
+    ``librosa.util.tiny``.
+
+    Args:
+        x: Array whose dtype is inspected.
+
+    Returns:
+        The smallest positive normal representable in the inferred dtype.
+
+    Examples:
+        >>> librosax.core.spectrum.tiny(jnp.zeros(3))
+        1.1754944e-38
+    """
+    dtype = jnp.asarray(x).dtype
+    if not (
+        jnp.issubdtype(dtype, jnp.floating)
+        or jnp.issubdtype(dtype, jnp.complexfloating)
+    ):
+        dtype = jnp.dtype(jnp.float32)
+
+    return jnp.finfo(dtype).tiny
+
+
 def normalize(
     S: jnp.ndarray,
     *,
@@ -419,75 +556,94 @@ def normalize(
     fill: Optional[bool] = None,
 ) -> jnp.ndarray:
     """Normalize an array along a chosen axis.
-    
-    Given a norm and a target axis, the input array is scaled so that:
-        norm(S, axis=axis) == 1
-        
+
+    Given a norm and a target axis, the input array is scaled so that
+    ``norm(S, axis=axis) == 1``.
+
     Args:
-        S: The array to normalize
-        norm: {jnp.inf, -jnp.inf, 0, float > 0, None}
-            - jnp.inf: maximum absolute value
-            - -jnp.inf: minimum absolute value  
-            - 0: number of non-zeros (the support)
-            - float: corresponding l_p norm
-            - None: no normalization is performed
-        axis: Axis along which to compute the norm
-        threshold: Only the columns (or rows) with norm at least threshold are normalized.
-            By default, the threshold is determined from the numerical precision of S.dtype.
-        fill: If None, columns with norm below threshold are left as is.
-            If False, columns with norm below threshold are set to 0.
-            If True, columns with norm below threshold are filled uniformly such that norm is 1.
-            
+        S: The array to normalize.
+        norm: Normalization order.
+
+            - ``jnp.inf``: maximum absolute value
+            - ``-jnp.inf``: minimum absolute value
+            - ``0``: number of non-zeros (the support)
+            - float > 0: the corresponding l_p norm
+            - ``None``: no normalization is performed
+
+        axis: Axis along which to compute the norm. If ``None``, the norm is
+            taken over the whole array.
+        threshold: Only slices with norm of at least ``threshold`` are
+            normalized. Defaults to the numerical precision of ``S.dtype``.
+        fill: If ``None``, slices with norm below ``threshold`` are left as is.
+            If ``False``, they are set to 0. If ``True``, they are filled
+            uniformly such that their norm is 1.
+
     Returns:
-        jnp.ndarray: Normalized array
+        Normalized array with the same shape as ``S``.
+
+    Raises:
+        librosax.util.exceptions.ParameterError: If ``threshold`` is not
+            strictly positive, if ``fill`` is not ``None`` or boolean, if
+            ``norm`` is unsupported, or if ``norm=0`` is combined with
+            ``fill=True``.
+
+    Examples:
+        >>> librosax.util.normalize(jnp.array([[1.0, 2.0], [3.0, 4.0]]), norm=2, axis=0)
+        Array([[0.31622776, 0.4472136 ],
+               [0.9486833 , 0.8944272 ]], dtype=float32)
     """
-    # Avoid div-by-zero
     if threshold is None:
-        threshold = jnp.finfo(S.dtype).tiny
-        
+        threshold = tiny(S)
+    elif threshold <= 0:
+        raise ParameterError(f"threshold={threshold} must be strictly positive")
+
+    if fill not in [None, False, True]:
+        raise ParameterError(f"fill={fill} must be None or boolean")
+
     if norm is None:
         return S
-        
+
     # All norms only depend on magnitude
-    mag = jnp.abs(S)
-    
-    # Compute the appropriate norm
+    mag = jnp.abs(S).astype(float)
+
+    # For max/min/support norms, filling with 1 gives a unit norm
+    fill_norm = 1
+
     if norm == jnp.inf:
         length = jnp.max(mag, axis=axis, keepdims=True)
     elif norm == -jnp.inf:
         length = jnp.min(mag, axis=axis, keepdims=True)
     elif norm == 0:
         if fill is True:
-            raise ValueError("Cannot normalize with norm=0 and fill=True")
+            raise ParameterError("Cannot normalize with norm=0 and fill=True")
         length = jnp.sum(mag > 0, axis=axis, keepdims=True).astype(mag.dtype)
-    elif isinstance(norm, (int, float)) and norm > 0:
+    elif np.issubdtype(type(norm), np.number) and norm > 0:
         length = jnp.sum(mag**norm, axis=axis, keepdims=True) ** (1.0 / norm)
+
+        if axis is None:
+            fill_norm = mag.size ** (-1.0 / norm)
+        else:
+            fill_norm = mag.shape[axis] ** (-1.0 / norm)
     else:
-        raise ValueError(f"Unsupported norm: {repr(norm)}")
-        
-    # Handle small values
+        raise ParameterError(f"Unsupported norm: {norm!r}")
+
+    # Indices where the norm is below the threshold
     small_idx = length < threshold
-    
+
     if fill is None:
         # Leave small indices un-normalized
         length = jnp.where(small_idx, 1.0, length)
         Snorm = S / length
     elif fill:
-        # Fill with uniform values
-        # This is a simplified version - in practice you might want different fill strategies
+        # Divide the small slices to NaN, then substitute the uniform fill
         length = jnp.where(small_idx, jnp.nan, length)
         Snorm = S / length
-        # For simplicity, we'll just use a constant fill value
-        if axis is None:
-            fill_norm = 1.0
-        else:
-            fill_norm = 1.0 / (S.shape[axis] ** (1.0 / norm) if norm > 0 else S.shape[axis])
         Snorm = jnp.where(jnp.isnan(Snorm), fill_norm, Snorm)
     else:
-        # Set small values to zero
+        # Divide the small slices to infinity, which zeroes them
         length = jnp.where(small_idx, jnp.inf, length)
         Snorm = S / length
-        
+
     return Snorm
 
 
@@ -497,7 +653,7 @@ def _spectrogram(
     n_fft: int = 2048,
     hop_length: int = 512,
     win_length: Optional[int] = None,
-    window: str = "hann",
+    window: _WindowSpec = "hann",
     center: bool = True,
     pad_mode: str = "constant",
 ) -> tuple[jnp.ndarray, int]:
@@ -513,7 +669,10 @@ def _spectrogram(
         n_fft: FFT window size
         hop_length: Number of samples between successive frames
         win_length: Window size
-        window: Window function
+        window: Window specification, as in ``stft``: a name, a ``(name,
+            param)`` tuple, a Kaiser beta, a callable such as ``np.hanning``,
+            or an explicit array of length ``win_length``. Default is
+            ``"hann"``.
         center: If True, pad the signal so that frames are centered
         pad_mode: Padding mode
         

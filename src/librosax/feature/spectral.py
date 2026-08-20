@@ -10,6 +10,7 @@ from librosax.core.spectrum import fft_frequencies, normalize, power_to_db, stft
 from librosax.core.convert import note_to_hz
 from librosax import filters
 from librosax.util.exceptions import ParameterError
+from librosax.util._compat import as_numpy
 from functools import partial
 
 __all__ = [
@@ -32,6 +33,36 @@ __all__ = [
     "cqt2010",
     "cqt_frequencies",
 ]
+
+
+def _estimate_tuning_callback(
+    S: jnp.ndarray, *, sr: float, bins_per_octave: int
+) -> jnp.ndarray:
+    """Estimate the tuning deviation of a power spectrogram via ``librosa``.
+
+    ``librosa.estimate_tuning`` has no JAX equivalent, so it is invoked through
+    ``jax.pure_callback``.  JAX hands the callback a ``jax.Array`` rather than a
+    NumPy array, and the numba kernels behind ``librosa.piptrack`` cannot type
+    an arbitrary buffer object, so the input is materialized with
+    ``np.asarray`` before it crosses over.
+
+    Args:
+        S: Power spectrogram with shape ``(..., F, N)``.
+        sr: Sampling rate.
+        bins_per_octave: Number of bins per octave used for the tuning estimate.
+
+    Returns:
+        Scalar tuning deviation, in fractions of a bin.
+    """
+    dtype = jnp.result_type(S.dtype, jnp.float32)
+
+    def _callback(S_arr):
+        tuning = librosa.estimate_tuning(
+            S=np.asarray(S_arr), sr=sr, bins_per_octave=bins_per_octave
+        )
+        return np.asarray(tuning, dtype=dtype)
+
+    return jax.pure_callback(_callback, jax.ShapeDtypeStruct((), dtype), S)
 
 
 def spectral_centroid(
@@ -467,6 +498,18 @@ def rms(
         - ``(B, T)`` → ``(B, 1, N)``
     """
     if y is not None:
+        # librosa 1.0.0 validates the buffer here (#2087).  Only the static
+        # parts of that check are reproduced: testing every sample for
+        # finiteness would force a device-to-host sync and break `jax.jit`.
+        if y.ndim == 0:
+            raise ParameterError(
+                f"Audio data must be at least one-dimensional, given y.shape={y.shape}"
+            )
+        if not jnp.issubdtype(y.dtype, jnp.floating):
+            raise ParameterError(
+                f"Audio data must be of floating-point type, given y.dtype={y.dtype}"
+            )
+
         if center:
             # Pad the signal
             pad_width = [(0, 0) for _ in range(y.ndim)]
@@ -692,7 +735,7 @@ def spectral_contrast(
     if freq is None:
         freq = fft_frequencies(sr=sr, n_fft=n_fft)
 
-    freq = jnp.atleast_1d(freq)
+    freq = jnp.atleast_1d(jnp.asarray(freq))
 
     if freq.ndim != 1 or len(freq) != S.shape[-2]:
         raise ParameterError(f"freq.shape mismatch: expected ({S.shape[-2]},)")
@@ -1104,7 +1147,7 @@ def chroma_filter(
     octwidth: Optional[float] = 2,
     norm: Optional[float] = 2,
     base_c: bool = True,
-    dtype: jnp.dtype = jnp.float64,
+    dtype: Optional[jnp.dtype] = None,
 ) -> jnp.ndarray:
     """Create a chroma filter bank.
 
@@ -1119,7 +1162,8 @@ def chroma_filter(
         octwidth: Gaussian half-width for weighting. None for flat weighting (default: 2)
         norm: Normalization factor for filter weights. None for no normalization (default: 2)
         base_c: If True, start filter bank at C. If False, start at A (default: True)
-        dtype: Data type for filter bank
+        dtype: Data type for filter bank. Defaults to JAX's float dtype,
+            which is float32 unless ``jax_enable_x64`` is set.
 
     Returns:
         jnp.ndarray: Chroma filter bank [shape=(n_chroma, 1 + n_fft/2)]
@@ -1211,6 +1255,54 @@ def cqt_frequencies_np(
     return frequencies
 
 
+def _max_cqt_bins(
+    sr: float,
+    fmin: float,
+    bins_per_octave: int,
+    Q: float,
+    window: str = "hann",
+) -> int:
+    """Return the largest bin count whose filters all stay below Nyquist.
+
+    A bin is usable only if the *upper edge* of its filter's passband clears
+    Nyquist, not merely its center frequency. Clipping on the center would
+    admit one final bin whose main lobe aliases. This matches the criterion
+    librosa applies when ``n_bins=None``.
+
+    Args:
+        sr: Sampling rate.
+        fmin: Frequency of the lowest bin, after any tuning correction.
+        bins_per_octave: Number of bins per octave.
+        Q: Quality factor of the filter bank, ``filter_scale / (2 ** (1 /
+            bins_per_octave) - 1)``.
+        window: Window specification, used to obtain the filter bandwidth.
+
+    Returns:
+        The number of bins whose filter cutoff stays below ``sr / 2``.
+
+    Raises:
+        librosax.util.exceptions.ParameterError: If ``fmin`` is already at or
+            above Nyquist, or if not even the lowest bin fits.
+    """
+    if fmin >= sr / 2.0:
+        raise ParameterError(f"fmin={fmin} must be less than sr/2={sr / 2.0}")
+
+    # Upper edge of a filter centered at f, in units of f.
+    cutoff_ratio = 1 + 0.5 * filters.window_bandwidth(window) / Q
+
+    n_bins = 1 + int(
+        np.floor(bins_per_octave * np.log2((sr / 2.0) / (fmin * cutoff_ratio)))
+    )
+
+    if n_bins < 1:
+        raise ParameterError(
+            f"Unable to construct a filter bank for fmin={fmin:.2f} Hz "
+            f"and sr={sr:.2f} Hz."
+        )
+
+    return n_bins
+
+
 def _create_cqt_kernels(
     Q: float,
     sr: float,
@@ -1248,6 +1340,12 @@ def _create_cqt_kernels(
             n_bins = int(np.ceil(bins_per_octave * np.log2(fmax / fmin)))
         freqs_np = fmin * 2.0 ** (np.arange(n_bins, dtype=np.float64) / float(bins_per_octave))
     
+    if topbin_check and freqs_np[-1] > sr / 2.0:
+        raise ParameterError(
+            f"The top bin {freqs_np[-1]:.2f} Hz has exceeded the Nyquist "
+            f"frequency, please reduce the `n_bins`"
+        )
+
     # Calculate filter lengths using nnAudio's formula
     alpha = 2.0 ** (1.0 / bins_per_octave) - 1.0
     lengths_np = np.ceil(Q * sr / (freqs_np + gamma / alpha)).astype(np.float64)
@@ -1275,12 +1373,15 @@ def _create_cqt_kernels(
         else:
             start = int(np.ceil(fftLen / 2.0 - l / 2.0))
         
-        # Apply window using scipy to match nnAudio exactly
-        if window == "hann":
-            from scipy.signal import get_window
-            window_dispatch = get_window(window, int(l), fftbins=True).astype(np.float64)
-        else:
-            window_dispatch = np.ones(int(l), dtype=np.float64)
+        # librosa's get_window dispatches strings, tuples, callables and
+        # explicit arrays, the same set its own filter builders accept.  It is
+        # called directly rather than through librosax.filters.get_window,
+        # which returns a JAX array; kernel construction stays in NumPy so it
+        # is not staged out when the caller is under jax.jit.
+        window_dispatch = np.asarray(
+            librosa.filters.get_window(as_numpy(window), int(l), fftbins=True),
+            dtype=np.float64,
+        )
         
         # Create complex sinusoid following nnAudio exactly
         sig = window_dispatch * np.exp(np.r_[-l // 2 : l // 2] * 1j * 2 * np.pi * freq / sr) / l
@@ -1307,7 +1408,7 @@ def cqt(
     sr: float = 22050,
     hop_length: int = 512,
     fmin: Optional[float] = None,
-    n_bins: int = 84,
+    n_bins: Optional[int] = 84,
     bins_per_octave: int = 12,
     tuning: Optional[float] = 0.0,
     filter_scale: float = 1.0,
@@ -1344,7 +1445,8 @@ def cqt(
         sr: Sampling rate
         hop_length: Number of samples between successive CQT columns
         fmin: Minimum frequency (default: C1 = 32.70 Hz)
-        n_bins: Number of frequency bins
+        n_bins: Number of frequency bins. If ``None``, use as many bins as fit
+            below the Nyquist frequency.
         bins_per_octave: Number of bins per octave
         tuning: Tuning offset in fractions of a bin
         filter_scale: Filter scale factor (Q = filter_scale / (2^(1/bins_per_octave) - 1))
@@ -1377,6 +1479,9 @@ def cqt(
 
     # Calculate Q factor
     Q = float(filter_scale) / (2.0 ** (1.0 / bins_per_octave) - 1.0)
+
+    if n_bins is None:
+        n_bins = _max_cqt_bins(sr, fmin, bins_per_octave, Q, window)
 
     # Create CQT kernels
     cqt_kernels, kernel_width, lengths, freqs = _create_cqt_kernels(
@@ -1652,7 +1757,7 @@ def cqt2010(
     hop_length: int = 512,
     fmin: Optional[float] = None,
     fmax: Optional[float] = None,
-    n_bins: int = 84,
+    n_bins: Optional[int] = 84,
     bins_per_octave: int = 12,
     tuning: float = 0.0,
     filter_scale: float = 1.0,
@@ -1678,7 +1783,8 @@ def cqt2010(
         hop_length: Number of samples between successive CQT columns
         fmin: Minimum frequency (default: C1 = 32.70 Hz)
         fmax: Maximum frequency (default: inferred from n_bins)
-        n_bins: Number of frequency bins
+        n_bins: Number of frequency bins. If ``None``, use as many bins as fit
+            below the Nyquist frequency.
         bins_per_octave: Number of bins per octave
         tuning: Tuning offset in fractions of a bin
         filter_scale: Filter scale factor
@@ -1700,10 +1806,13 @@ def cqt2010(
         
     # Apply tuning
     fmin = fmin * 2.0 ** (tuning / bins_per_octave)
-    
+
     # Calculate Q factor
     Q = float(filter_scale) / (2.0 ** (1.0 / bins_per_octave) - 1.0)
-    
+
+    if n_bins is None:
+        n_bins = _max_cqt_bins(sr, fmin, bins_per_octave, Q, window)
+
     # Calculate number of octaves
     n_octaves = int(np.ceil(float(n_bins) / bins_per_octave))
     n_filters = min(bins_per_octave, n_bins)
@@ -1730,7 +1839,9 @@ def cqt2010(
     
     # Check Nyquist
     if fmax_t > sr / 2:
-        raise ValueError(f"The top bin {fmax_t}Hz exceeds Nyquist frequency")
+        raise ParameterError(
+            f"The top bin {fmax_t:.2f} Hz exceeds the Nyquist frequency {sr / 2:.2f} Hz"
+        )
         
     # Get early downsample parameters if enabled
     sample_rate = sr
@@ -1785,6 +1896,16 @@ def cqt2010(
     cqt_kernels_real = jnp.real(cqt_kernels)[:, jnp.newaxis, :]
     cqt_kernels_imag = jnp.imag(cqt_kernels)[:, jnp.newaxis, :]
     
+    # Each successive octave halves the hop, so the hop must have at least
+    # that many factors of two left.  Without this check the halving reaches
+    # zero and XLA fails to lower the strided reduction.
+    if hop % 2 ** (n_octaves - 1) != 0:
+        raise ParameterError(
+            f"hop_length={hop_length} must be a multiple of "
+            f"2**{n_octaves - 1}={2 ** (n_octaves - 1)} to cover {n_octaves} "
+            f"octaves ({n_bins} bins at {bins_per_octave} bins per octave)"
+        )
+
     # Get CQT for top octave
     CQT = _get_cqt_complex(y, cqt_kernels_real, cqt_kernels_imag, hop, n_fft // 2, pad_mode)
     
@@ -2080,13 +2201,7 @@ def chroma_stft(
 
     # Estimate tuning if not provided
     if tuning is None:
-        def _estimate_tuning(S_arr):
-            return np.array([librosa.estimate_tuning(S=S_arr, sr=sr, bins_per_octave=n_chroma)])
-        tuning = jax.pure_callback(
-            _estimate_tuning,
-            jax.ShapeDtypeStruct((1,), jnp.float64),
-            S
-        )[0]
+        tuning = _estimate_tuning_callback(S, sr=sr, bins_per_octave=n_chroma)
 
     # Get the filter bank
     chromafb = chroma_filter(
@@ -2231,7 +2346,7 @@ def chroma_vqt(
         V=V,
         hop_length=hop_length,
         fmin=fmin,
-        intervals=intervals,
+        intervals=as_numpy(intervals),
         norm=norm,
         threshold=threshold,
         n_octaves=n_octaves,

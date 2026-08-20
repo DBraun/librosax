@@ -8,6 +8,7 @@ from jax import numpy as jnp, random
 import numpy as np
 
 from librosax import stft, power_to_db, filters
+from librosax.core.spectrum import _WindowSpec
 from librosax.core.spectrum import _dct_flexible
 
 
@@ -309,7 +310,10 @@ class Spectrogram(Module):
         n_fft: FFT size. Default is 2048.
         hop_length: Step between successive frames. Default is ``n_fft // 4``.
         win_length: Window size. Default is ``n_fft``.
-        window: Window function type. Default is ``"hann"``.
+        window: Window specification, as in ``librosax.stft``: a name, a
+            ``(name, param)`` tuple, a Kaiser beta, a callable such as
+            ``np.hanning``, or an explicit array of length ``win_length``.
+            Default is ``"hann"``.
         center: If ``True``, the waveform is padded so that frames are centered. Default is ``True``.
         pad_mode: Padding mode for the waveform. Default is ``"reflect"``.
         power: Exponent for the magnitude (2.0 means power spectrogram). Default is 2.0.
@@ -321,7 +325,7 @@ class Spectrogram(Module):
         n_fft: int = 2048,
         hop_length: int = None,
         win_length: int = None,
-        window: str = "hann",
+        window: _WindowSpec = "hann",
         center: bool = True,
         pad_mode: str = "reflect",
         power: float = 2.0,
@@ -489,8 +493,14 @@ class LogMelFilterBank(Module):
 
         # Logmel spectrogram
         if self.is_log:
+            # axes=None reduces top_db over the whole array rather than per
+            # spectrogram, which is what TorchLibrosa's LogmelFilterBank does.
             output = power_to_db(
-                mel_spectrogram, ref=self.ref, amin=self.amin, top_db=self.top_db
+                mel_spectrogram,
+                ref=self.ref,
+                amin=self.amin,
+                top_db=self.top_db,
+                axes=None,
             )
         else:
             output = mel_spectrogram

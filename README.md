@@ -18,6 +18,8 @@ pip install jax-ai-stack "jax[tpu]"   # JAX + AI stack with TPU support
 pip install librosax
 ```
 
+librosax tracks the librosa API and requires librosa 1.0.0 or newer.
+
 ## Documentation
 
 Documentation is [here](http://dirt.design/librosax).

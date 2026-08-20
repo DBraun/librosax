@@ -54,7 +54,7 @@ The structure follows `librosa` closely.
   - `core/` - Core functionality (spectrum, convert, notation, intervals)
   - `feature/` - Feature extraction functions (spectral analysis, mel-frequency, chromagram, CQT)
   - `layers/` - Neural network layers using `flax.nnx.Module` (`Spectrogram`, `MFCC`, `LogMelFilterBank`, `DropStripes`, `SpecAugmentation`)
-  - `util/` - Utility functions (decorators, exceptions, file handling)
+  - `util/` - Utility functions (array utilities, decorators, exceptions, file handling)
 
 ### Import Patterns
 - Core functions are available at top level: `import librosax; librosax.stft()`

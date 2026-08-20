@@ -1,0 +1,6 @@
+﻿librosax.tone
+=============
+
+.. currentmodule:: librosax
+
+.. autofunction:: tone

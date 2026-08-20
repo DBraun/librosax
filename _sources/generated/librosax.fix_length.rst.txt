@@ -1,0 +1,6 @@
+﻿librosax.fix\_length
+====================
+
+.. currentmodule:: librosax
+
+.. autofunction:: fix_length

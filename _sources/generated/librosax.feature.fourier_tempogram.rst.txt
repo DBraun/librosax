@@ -1,0 +1,6 @@
+﻿librosax.feature.fourier\_tempogram
+===================================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: fourier_tempogram

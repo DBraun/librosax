@@ -1,0 +1,6 @@
+librosax.feature.tempogram
+==========================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: tempogram

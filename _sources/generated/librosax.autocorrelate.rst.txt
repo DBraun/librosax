@@ -1,0 +1,6 @@
+﻿librosax.autocorrelate
+======================
+
+.. currentmodule:: librosax
+
+.. autofunction:: autocorrelate

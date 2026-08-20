@@ -1,0 +1,6 @@
+﻿librosax.to\_mono
+=================
+
+.. currentmodule:: librosax
+
+.. autofunction:: to_mono

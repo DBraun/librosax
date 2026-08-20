@@ -1,0 +1,6 @@
+﻿librosax.feature.hybrid\_tempogram
+==================================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: hybrid_tempogram

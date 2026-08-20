@@ -1,0 +1,6 @@
+librosax.feature.metrogram
+==========================
+
+.. currentmodule:: librosax.feature
+
+.. autofunction:: metrogram

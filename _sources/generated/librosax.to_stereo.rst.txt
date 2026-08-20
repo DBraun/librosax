@@ -1,0 +1,6 @@
+﻿librosax.to\_stereo
+===================
+
+.. currentmodule:: librosax
+
+.. autofunction:: to_stereo

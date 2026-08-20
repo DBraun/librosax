@@ -14,7 +14,8 @@ Core Audio Processing
 * **Spectral analysis**: STFT, iSTFT, magnitude scaling (power_to_db, amplitude_to_db)
 * **Time-frequency transforms**: Constant-Q Transform (CQT), mel spectrograms
 * **Feature extraction**: Spectral features, chromagrams, MFCC, rhythm features
-* **Filter banks**: Mel filters, chroma filters, constant-Q filters
+* **Filter banks**: Mel filters, chroma filters, wavelet (variable-Q) filters
+* **Signal mixing**: ``to_mono``, ``to_stereo``, ``to_multi``
 
 Music Information Utilities
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^

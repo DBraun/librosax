@@ -10,6 +10,7 @@ from scipy.fftpack import dct as scipy_dct
 import warnings
 
 from .audio import fix_length
+from .convert import fft_frequencies as _fft_frequencies
 from ..util.exceptions import ParameterError
 
 
@@ -408,7 +409,8 @@ def power_to_db(
         ref_value = jnp.abs(ref)
 
     log_spec = 10.0 * jnp.log10(jnp.maximum(amin, magnitude))
-    log_spec = log_spec - 10.0 * jnp.log10(jnp.maximum(amin, ref_value))
+    ref_db = 10.0 * jnp.log10(jnp.maximum(amin, ref_value))
+    log_spec = log_spec - ref_db.astype(log_spec.dtype)
 
     if top_db is not None:
         if top_db < 0:
@@ -514,17 +516,21 @@ def db_to_amplitude(S_db: jnp.ndarray, *, ref: float = 1.0) -> jnp.ndarray:
     return jnp.sqrt(db_to_power(S_db, ref=ref**2))
 
 
-def fft_frequencies(sr: float = 22050, n_fft: int = 2048) -> jnp.ndarray:
+def fft_frequencies(
+    sr: float = 22050, n_fft: int = 2048, *, dtype: Optional[jnp.dtype] = None
+) -> jnp.ndarray:
     """Alternative interface for np.fft.rfftfreq, compatible with JAX.
     
     Args:
         sr: Audio sampling rate
         n_fft: FFT window size
+        dtype: Floating-point dtype of the frequency grid. The default follows
+            JAX's precision setting.
         
     Returns:
         jnp.ndarray: Frequencies (0, sr/n_fft, 2*sr/n_fft, ..., sr/2)
     """
-    return jnp.fft.rfftfreq(n=n_fft, d=1.0 / sr)
+    return _fft_frequencies(sr=sr, n_fft=n_fft, dtype=dtype)
 
 
 def tiny(x: jnp.ndarray) -> float:
@@ -610,7 +616,9 @@ def normalize(
         return S
 
     # All norms only depend on magnitude
-    mag = jnp.abs(S).astype(float)
+    mag = jnp.abs(S)
+    if not jnp.issubdtype(mag.dtype, jnp.inexact):
+        mag = mag.astype(float)
 
     # For max/min/support norms, filling with 1 gives a unit norm
     fill_norm = 1

@@ -7,7 +7,7 @@ from jax import numpy as jnp
 from jax.scipy import signal as jssignal
 
 from librosax.core.spectrum import fft_frequencies, normalize, power_to_db, stft, _spectrogram, _dct_flexible
-from librosax.core.convert import note_to_hz
+from librosax.core.convert import cqt_frequencies as _cqt_frequencies, note_to_hz
 from librosax import filters
 from librosax.util.exceptions import ParameterError
 from librosax.util._compat import as_numpy
@@ -129,13 +129,10 @@ def spectral_centroid(
 
     # Compute the center frequencies of each bin
     if freq is None:
-        freq = fft_frequencies(sr=sr, n_fft=n_fft)
+        freq = fft_frequencies(sr=sr, n_fft=n_fft, dtype=jnp.result_type(S.dtype, float))
 
-    # Ensure freq has the right shape for broadcasting
     if freq.ndim == 1:
-        # Reshape freq to match S dimensions
-        # S has shape (..., frequency, time)
-        freq = freq.reshape((-1,) + (1,) * (S.ndim - freq.ndim))
+        freq = freq[:, None]
 
     # Column-normalize S
     # norm=1 means L1 norm (sum of absolute values)
@@ -212,7 +209,7 @@ def spectral_bandwidth(
 
     # Compute the center frequencies of each bin
     if freq is None:
-        freq = fft_frequencies(sr=sr, n_fft=n_fft)
+        freq = fft_frequencies(sr=sr, n_fft=n_fft, dtype=jnp.result_type(S.dtype, float))
 
     # Calculate deviation from centroid
     if freq.ndim == 1:
@@ -295,12 +292,10 @@ def spectral_rolloff(
 
     # Compute the center frequencies of each bin
     if freq is None:
-        freq = fft_frequencies(sr=sr, n_fft=n_fft)
+        freq = fft_frequencies(sr=sr, n_fft=n_fft, dtype=jnp.result_type(S.dtype, float))
 
-    # Make sure that frequency can be broadcast
     if freq.ndim == 1:
-        # Reshape freq to match S dimensions
-        freq = freq.reshape((-1,) + (1,) * (S.ndim - freq.ndim))
+        freq = freq[:, None]
 
     # Compute cumulative energy
     total_energy = jnp.cumsum(S, axis=-2)
@@ -311,12 +306,9 @@ def spectral_rolloff(
     # Reshape threshold for broadcasting
     threshold = jnp.expand_dims(threshold, axis=-2)
 
-    # Find where cumulative energy exceeds threshold
-    # Use where to set values below threshold to nan
-    ind = jnp.where(total_energy < threshold, jnp.nan, 1)
-
-    # Get the minimum frequency that meets the threshold
-    rolloff = jnp.nanmin(ind * freq, axis=-2, keepdims=True)
+    # Get the minimum frequency that meets the threshold.
+    eligible = jnp.where(total_energy < threshold, jnp.nan, freq)
+    rolloff = jnp.nanmin(eligible, axis=-2, keepdims=True)
 
     return rolloff
 
@@ -680,6 +672,8 @@ def spectral_contrast(
     fmin: float = 200.0,
     n_bands: int = 6,
     quantile: float = 0.02,
+    ref: Union[float, Callable] = 1.0,
+    top_db: Optional[float] = 80.0,
     linear: bool = False,
 ) -> jnp.ndarray:
     """Compute spectral contrast.
@@ -711,6 +705,11 @@ def spectral_contrast(
             Subsequent bins will cover [fmin, 2*fmin], [2*fmin, 4*fmin], etc.
         n_bands: Number of frequency bands
         quantile: Quantile for determining peaks and valleys
+        ref: Reference for each peak and valley dB conversion. A callable
+            reduces over frequency and time independently for each channel.
+        top_db: Limit each peak and valley spectrum to this many dB below its
+            own maximum, independently for each channel. Use None to disable
+            clipping. The dB conversion options apply when linear is False.
         linear: If True, return the linear difference of magnitudes: peaks - valleys.
             If False, return the logarithmic difference: log(peaks) - log(valleys).
 
@@ -733,7 +732,7 @@ def spectral_contrast(
 
     # Compute the center frequencies of each bin
     if freq is None:
-        freq = fft_frequencies(sr=sr, n_fft=n_fft)
+        freq = fft_frequencies(sr=sr, n_fft=n_fft, dtype=jnp.result_type(S.dtype, float))
 
     freq = jnp.atleast_1d(jnp.asarray(freq))
 
@@ -749,140 +748,45 @@ def spectral_contrast(
     if fmin <= 0:
         raise ParameterError("fmin must be a positive number")
 
-    # Create octave bands
-    octa = jnp.zeros(n_bands + 2)
-    octa = octa.at[1:].set(fmin * (2.0 ** jnp.arange(0, n_bands + 1)))
+    if isinstance(sr, (int, float, np.number)) and fmin * 2 ** (n_bands - 1) >= sr / 2:
+        raise ParameterError("Frequency band exceeds Nyquist. Reduce either fmin or n_bands.")
 
-    # Calculate maximum possible quantile index size
-    # The largest band is typically the last one, which can extend to all remaining bins
-    # from the lowest frequency of that band to the Nyquist frequency
-    # In the worst case, this could be nearly all frequency bins
-    max_possible_band_size = S.shape[-2]  # Conservative upper bound
-    # Use Python int() to ensure it's a static value
-    max_quantile_size = int(max_possible_band_size * float(quantile)) + 1
-    
-    # Process bands using scan for JIT compatibility
-    def process_band(carry, k):
-        S, freq, octa, sr, n_bands, quantile = carry
-        
-        f_low = octa[k]
-        f_high = jax.lax.cond(
-            k < n_bands,
-            lambda: octa[k + 1],
-            lambda: sr / 2
-        )
-        
-        # Create band mask
-        band_mask = jnp.logical_and(freq >= f_low, freq <= f_high)
-        
-        # Find first and last indices
-        # Use cumsum trick to find positions
-        cumsum = jnp.cumsum(band_mask)
-        has_true = cumsum[-1] > 0
-        
-        # Find first True (where cumsum goes from 0 to 1)
-        first_idx = jnp.where(has_true,
-                             jnp.argmax(cumsum > 0),
-                             0)
-        
-        # Find last True
-        reverse_cumsum = jnp.cumsum(band_mask[::-1])
-        last_idx = jnp.where(has_true,
-                            len(band_mask) - 1 - jnp.argmax(reverse_cumsum > 0),
-                            0)
-        
-        # Adjust boundaries as in librosa
-        # For k > 0, include one bin below
-        first_idx = jax.lax.cond(
-            jnp.logical_and(k > 0, first_idx > 0),
-            lambda: first_idx - 1,
-            lambda: first_idx
-        )
-        
-        # For the last band, extend to the end
-        last_idx = jax.lax.cond(
-            k == n_bands,
-            lambda: len(freq) - 1,
-            lambda: last_idx
-        )
-        
-        # Update band mask with adjusted boundaries
-        indices = jnp.arange(len(freq))
-        band_mask_adjusted = jnp.logical_and(indices >= first_idx, indices <= last_idx)
-        
-        # For non-final bands, exclude the last bin
-        band_mask_final = jax.lax.cond(
-            k < n_bands,
-            lambda: jnp.logical_and(band_mask_adjusted, indices < last_idx),
-            lambda: band_mask_adjusted
-        )
-        
-        # Count bins for quantile calculation (use original band mask count)
-        n_bins_for_quantile = jnp.sum(band_mask_adjusted)
-        
-        # Extract sub-band values
-        # Use masking approach
-        sub_band_values = jnp.where(band_mask_final[:, None], S, -jnp.inf)
-        
-        # Sort along frequency axis
-        sorted_sub = jnp.sort(sub_band_values, axis=0)
-        
-        # Find where valid values start (first non-(-inf) value)
-        valid_mask = sorted_sub > -jnp.inf
-        n_valid = jnp.sum(valid_mask, axis=0)
-        
-        # Calculate quantile index
-        n_idx = jnp.maximum(jnp.rint(quantile * n_bins_for_quantile).astype(jnp.int32), 1)
-        
-        # For each time frame, we need to extract bottom n_idx and top n_idx values
-        # max_quantile_size is captured from the outer scope as a static value
-        
-        # Create index arrays for gathering
-        time_frames = S.shape[-1]
-        frame_indices = jnp.arange(time_frames)
-        idx_range = jnp.arange(max_quantile_size)
-        
-        # Find first valid index per frame
-        first_valid_idx = jnp.argmax(valid_mask, axis=0)
-        
-        # Valley indices: first n_idx valid values
-        valley_indices = first_valid_idx[None, :] + idx_range[:, None]
-        valley_indices = jnp.clip(valley_indices, 0, sorted_sub.shape[0] - 1)
-        
-        # Gather valley values
-        valley_values = sorted_sub[valley_indices, frame_indices]
-        valley_mask = idx_range[:, None] < jnp.minimum(n_idx, n_valid)[None, :]
-        valley_values = jnp.where(valley_mask, valley_values, 0)
-        valley = jnp.sum(valley_values, axis=0) / jnp.maximum(jnp.sum(valley_mask, axis=0), 1)
-        
-        # Peak indices: last n_idx valid values
-        last_valid_idx = first_valid_idx + n_valid - 1
-        peak_start_idx = jnp.maximum(last_valid_idx - n_idx + 1, first_valid_idx)
-        
-        peak_indices = peak_start_idx[None, :] + idx_range[:, None]
-        peak_indices = jnp.clip(peak_indices, 0, sorted_sub.shape[0] - 1)
-        
-        # Gather peak values
-        peak_values = sorted_sub[peak_indices, frame_indices]
-        peak_mask = idx_range[:, None] < jnp.minimum(n_idx, n_valid)[None, :]
-        peak_values = jnp.where(peak_mask, peak_values, 0)
-        peak = jnp.sum(peak_values, axis=0) / jnp.maximum(jnp.sum(peak_mask, axis=0), 1)
-        
-        return carry, (valley, peak)
-    
-    # Process all bands
-    carry = (S, freq, octa, sr, n_bands, quantile)
-    _, (valleys, peaks) = jax.lax.scan(
-        process_band, carry, jnp.arange(n_bands + 1)
-    )
-    
-    # Compute contrast
+    # Sort masked bands along the frequency axis while retaining all leading
+    # batch and channel dimensions for the independent dB reductions below.
+    octa = jnp.concatenate([jnp.zeros(1), fmin * 2.0 ** jnp.arange(n_bands + 1)])
+    bin_indices = jnp.arange(freq.size)
+
+    def process_band(_, band):
+        in_band = (freq >= octa[band]) & (freq <= octa[band + 1])
+        first = jnp.argmax(in_band)
+        last = freq.size - 1 - jnp.argmax(in_band[::-1])
+        in_band |= (band > 0) & (bin_indices == first - 1)
+        in_band |= (band == n_bands) & (bin_indices > last)
+
+        count = jnp.maximum(jnp.rint(quantile * jnp.sum(in_band)).astype(jnp.int32), 1)
+        # For each band except the last, drop the last bin after sizing the quantiles.
+        in_band &= (band == n_bands) | (bin_indices != last)
+        values = jnp.sort(jnp.where(in_band[:, None], S, -jnp.inf), axis=-2)
+        width = jnp.sum(in_band)
+        count = jnp.minimum(count, width)
+        first_valid = freq.size - width
+        take_low = (bin_indices >= first_valid) & (bin_indices < first_valid + count)
+        take_high = bin_indices >= freq.size - count
+        denominator = jnp.maximum(count, 1)
+        valley = jnp.sum(jnp.where(take_low[:, None], values, 0), axis=-2) / denominator
+        peak = jnp.sum(jnp.where(take_high[:, None], values, 0), axis=-2) / denominator
+        return None, (valley, peak)
+
+    _, (valleys, peaks) = jax.lax.scan(process_band, None, jnp.arange(n_bands + 1))
+    peaks = jnp.moveaxis(peaks, 0, -2)
+    valleys = jnp.moveaxis(valleys, 0, -2)
+
     if linear:
-        contrast = peaks - valleys
-    else:
-        contrast = power_to_db(peaks) - power_to_db(valleys)
-    
-    return contrast
+        return peaks - valleys
+
+    return power_to_db(peaks, ref=ref, top_db=top_db) - power_to_db(
+        valleys, ref=ref, top_db=top_db
+    )
 
 
 def melspectrogram(
@@ -1019,6 +923,8 @@ def mfcc(
     fmax: Optional[float] = None,
     htk: bool = False,
     melspectrogram_params: Optional[dict] = None,
+    ref: Union[float, Callable] = 1.0,
+    top_db: Optional[float] = 80.0,
 ) -> jnp.ndarray:
     """Compute Mel-frequency cepstral coefficients (MFCCs).
 
@@ -1055,6 +961,11 @@ def mfcc(
         htk: Use HTK formula for mel scale (used if y is provided)
         melspectrogram_params: Additional keyword arguments for melspectrogram
             (used if y is provided)
+        ref: Reference for converting the mel spectrogram to dB. A callable
+            reduces over frequency and time independently for each channel.
+        top_db: Limit the mel spectrogram to this many dB below each channel's
+            peak. Use None to disable clipping. Both dB conversion options
+            apply only when computing the mel spectrogram from y.
 
     Returns:
         MFCCs with shape ``(..., n_mfcc, N)``.
@@ -1088,7 +999,7 @@ def mfcc(
         S = melspectrogram(**mel_params)
 
         # Convert to log scale
-        S = power_to_db(S)
+        S = power_to_db(S, ref=ref, top_db=top_db)
 
     # Note: S has shape (..., n_mels, t)
     # Need to transpose for DCT which expects (..., t, n_mels)
@@ -1219,6 +1130,7 @@ def cqt_frequencies(
     bins_per_octave: int = 12,
     fmin: float = 32.70,
     tuning: float = 0.0,
+    dtype: Optional[jnp.dtype] = None,
 ) -> jnp.ndarray:
     """Compute the center frequencies of Constant-Q bins.
 
@@ -1227,16 +1139,15 @@ def cqt_frequencies(
         bins_per_octave: Number of bins per octave
         fmin: Minimum frequency (Hz)
         tuning: Tuning deviation from A440 in fractions of a bin
+        dtype: Floating-point dtype of the frequency grid. The default follows
+            JAX's precision setting.
 
     Returns:
         jnp.ndarray: Center frequencies for each CQT bin
     """
-    correction = 2.0 ** (tuning / bins_per_octave)
-
-    # Generate geometric sequence of frequencies
-    frequencies = fmin * correction * (2.0 ** (jnp.arange(n_bins) / bins_per_octave))
-
-    return frequencies
+    return _cqt_frequencies(
+        n_bins, fmin=fmin, bins_per_octave=bins_per_octave, tuning=tuning, dtype=dtype
+    )
 
 
 def cqt_frequencies_np(
@@ -1245,14 +1156,15 @@ def cqt_frequencies_np(
     bins_per_octave: int = 12,
     fmin: float = 32.70,
     tuning: float = 0.0,
+    dtype: np.dtype = np.float64,
 ) -> np.ndarray:
     """Compute the center frequencies of Constant-Q bins using numpy.
     
     This is used internally for filter bank creation to avoid JIT issues.
     """
-    correction = 2.0 ** (tuning / bins_per_octave)
-    frequencies = fmin * correction * (2.0 ** (np.arange(n_bins) / bins_per_octave))
-    return frequencies
+    return librosa.cqt_frequencies(
+        n_bins, fmin=fmin, bins_per_octave=bins_per_octave, tuning=tuning, dtype=dtype
+    )
 
 
 def _max_cqt_bins(
@@ -2274,6 +2186,8 @@ def poly_features(
         y = np.asarray(y)
     if S is not None:
         S = np.asarray(S)
+        if not np.issubdtype(S.dtype, np.inexact):
+            S = S.astype(float)
     if freq is not None:
         freq = np.asarray(freq)
 

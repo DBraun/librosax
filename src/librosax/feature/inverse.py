@@ -22,8 +22,8 @@ def mel_to_stft(
 ) -> jnp.ndarray:
     """Approximate STFT magnitude from a Mel power spectrogram.
 
-    This is the inverse of melspectrogram. It uses pseudo-inverse of the mel
-    basis to map mel-scaled features back to STFT-scaled features.
+    Uses librosa's non-negative least-squares solver to map mel-scaled
+    features back to STFT magnitudes.
 
     Args:
         M: Mel spectrogram with shape (..., n_mels, t).

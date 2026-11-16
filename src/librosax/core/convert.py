@@ -7,6 +7,7 @@ import warnings
 import jax
 from jax import numpy as jnp
 import numpy as np
+from numpy.typing import DTypeLike
 from . import notation
 from ..util.exceptions import ParameterError
 from ..util.decorators import vectorize
@@ -1527,7 +1528,9 @@ def tuning_to_A4(
     return 440.0 * 2.0 ** (jnp.asarray(tuning) / bins_per_octave)
 
 
-def fft_frequencies(*, sr: float = 22050, n_fft: int = 2048) -> jnp.ndarray:
+def fft_frequencies(
+    *, sr: float = 22050, n_fft: int = 2048, dtype: DTypeLike | None = None
+) -> jnp.ndarray:
     """Alternative interface for `jnp.fft.rfftfreq`
 
     Parameters
@@ -1536,6 +1539,8 @@ def fft_frequencies(*, sr: float = 22050, n_fft: int = 2048) -> jnp.ndarray:
         Audio sampling rate
     n_fft : int > 0 [scalar]
         FFT window size
+    dtype : dtype, optional
+        The output floating-point dtype. If omitted, JAX infers the precision.
 
     Returns
     -------
@@ -1548,11 +1553,16 @@ def fft_frequencies(*, sr: float = 22050, n_fft: int = 2048) -> jnp.ndarray:
     array([     0.   ,   1378.125,   2756.25 ,   4134.375,
              5512.5  ,   6890.625,   8268.75 ,   9646.875,  11025.   ])
     """
-    return jnp.fft.rfftfreq(n=n_fft, d=1.0 / sr)
+    return jnp.fft.rfftfreq(n=n_fft, d=1.0 / sr, dtype=dtype)
 
 
 def cqt_frequencies(
-    n_bins: int, *, fmin: float, bins_per_octave: int = 12, tuning: float = 0.0
+    n_bins: int,
+    *,
+    fmin: float,
+    bins_per_octave: int = 12,
+    tuning: float = 0.0,
+    dtype: DTypeLike | None = None,
 ) -> jnp.ndarray:
     """Compute the center frequencies of Constant-Q bins.
 
@@ -1575,22 +1585,26 @@ def cqt_frequencies(
         Number of bins per octave
     tuning : float
         Deviation from A440 tuning in fractional bins
+    dtype : dtype, optional
+        The output floating-point dtype. If omitted, JAX infers the precision.
 
     Returns
     -------
     frequencies : jnp.ndarray [shape=(n_bins,)]
         Center frequency for each CQT bin
     """
-    correction: float = 2.0 ** (float(tuning) / bins_per_octave)
-    frequencies: jnp.ndarray = 2.0 ** (
-        jnp.arange(0, n_bins, dtype=float) / bins_per_octave
-    )
-
-    return correction * fmin * frequencies
+    correction = 2.0 ** (jnp.asarray(tuning, dtype=dtype) / bins_per_octave)
+    frequencies = 2.0 ** (jnp.arange(n_bins, dtype=dtype or float) / bins_per_octave)
+    return jnp.asarray(fmin, dtype=dtype) * correction * frequencies
 
 
 def mel_frequencies(
-    n_mels: int = 128, *, fmin: float = 0.0, fmax: float = 11025.0, htk: bool = False
+    n_mels: int = 128,
+    *,
+    fmin: float = 0.0,
+    fmax: float = 11025.0,
+    htk: bool = False,
+    dtype: DTypeLike | None = None,
 ) -> jnp.ndarray:
     """Compute an array of acoustic frequencies tuned to the mel scale.
 
@@ -1641,6 +1655,8 @@ def mel_frequencies(
     htk : bool
         If True, use HTK formula to convert Hz to mel.
         Otherwise (False), use Slaney's Auditory Toolbox.
+    dtype : dtype, optional
+        The output floating-point dtype. If omitted, JAX infers the precision.
 
     Returns
     -------
@@ -1667,14 +1683,18 @@ def mel_frequencies(
     min_mel = hz_to_mel(fmin, htk=htk)
     max_mel = hz_to_mel(fmax, htk=htk)
 
-    mels = jnp.linspace(min_mel, max_mel, n_mels)
+    mels = jnp.linspace(min_mel, max_mel, n_mels, dtype=dtype)
 
     hz: jnp.ndarray = mel_to_hz(mels, htk=htk)
     return hz
 
 
 def tempo_frequencies(
-    n_bins: int, *, hop_length: int = 512, sr: float = 22050
+    n_bins: int,
+    *,
+    hop_length: int = 512,
+    sr: float = 22050,
+    dtype: DTypeLike | None = None,
 ) -> jnp.ndarray:
     """Compute the frequencies (in beats per minute) corresponding
     to an onset auto-correlation or tempogram matrix.
@@ -1687,6 +1707,8 @@ def tempo_frequencies(
         The number of samples between each bin
     sr : number > 0
         The audio sampling rate
+    dtype : dtype, optional
+        The output floating-point dtype. If omitted, JAX infers the precision.
 
     Returns
     -------
@@ -1703,15 +1725,18 @@ def tempo_frequencies(
     array([      inf,  2583.984,  1291.992, ...,     6.782,
                6.764,     6.747])
     """
-    # Construct array with inf at index 0 and tempo frequencies for rest
     tempo_values = 60.0 * sr / (hop_length * jnp.arange(1.0, n_bins))
-    bin_frequencies = jnp.concatenate([jnp.array([jnp.inf]), tempo_values])
-
-    return bin_frequencies
+    return jnp.concatenate(
+        [jnp.array([jnp.inf], dtype=dtype), jnp.asarray(tempo_values, dtype=dtype)]
+    )
 
 
 def fourier_tempo_frequencies(
-    *, sr: float = 22050, win_length: int = 384, hop_length: int = 512
+    *,
+    sr: float = 22050,
+    win_length: int = 384,
+    hop_length: int = 512,
+    dtype: DTypeLike | None = None,
 ) -> jnp.ndarray:
     """Compute the frequencies (in beats per minute) corresponding
     to a Fourier tempogram matrix.
@@ -1724,6 +1749,8 @@ def fourier_tempo_frequencies(
         The number of frames per analysis window
     hop_length : int > 0
         The number of samples between each bin
+    dtype : dtype, optional
+        The output floating-point dtype. If omitted, JAX infers the precision.
 
     Returns
     -------
@@ -1739,7 +1766,7 @@ def fourier_tempo_frequencies(
     """
     # sr / hop_length gets the frame rate
     # multiplying by 60 turns frames / sec into frames / minute
-    return fft_frequencies(sr=sr * 60 / float(hop_length), n_fft=win_length)
+    return fft_frequencies(sr=sr * 60 / float(hop_length), n_fft=win_length, dtype=dtype)
 
 
 def _warn_nonfinite_weights(weights: jnp.ndarray, kind: str) -> None:

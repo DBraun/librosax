@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 """Unit conversion utilities"""
 from __future__ import annotations
+import warnings
+
+import jax
 from jax import numpy as jnp
 import numpy as np
 from . import notation
@@ -607,30 +610,32 @@ def blocks_to_time(
 
 
 @overload
-def note_to_hz(note: str, **kwargs: Any) -> jnp.floating[Any]:
+def note_to_hz(note: str, *, round_midi: bool = ...) -> jnp.floating[Any]:
     ...
 
 
 @overload
-def note_to_hz(note: _IterableLike[str], **kwargs: Any) -> jnp.ndarray:
+def note_to_hz(note: _IterableLike[str], *, round_midi: bool = ...) -> jnp.ndarray:
     ...
 
 
 @overload
 def note_to_hz(
-    note: Union[str, _IterableLike[str], Iterable[str]], **kwargs: Any
+    note: Union[str, _IterableLike[str], Iterable[str]], *, round_midi: bool = ...
 ) -> Union[jnp.floating[Any], jnp.ndarray]:
     ...
 
 
 def note_to_hz(
-    note: Union[str, _IterableLike[str], Iterable[str]], **kwargs: Any
+    note: Union[str, _IterableLike[str], Iterable[str]], *, round_midi: bool = False
 ) -> Union[jnp.floating[Any], jnp.ndarray]:
     """Convert one or more note names to frequency (Hz).
 
     Args:
         note: One or more note names to convert.
-        **kwargs: Additional parameters to `note_to_midi`.
+        round_midi: If ``True``, quantize to the nearest semitone before
+            converting to frequency. Defaults to ``False``, so tuning
+            deviations spelled in the note name are preserved.
 
     Returns:
         Array of frequencies (in Hz) corresponding to ``note``.
@@ -647,11 +652,14 @@ def note_to_hz(
         >>> # Or multiple notes
         >>> librosax.note_to_hz(['A3', 'A4', 'A5'])
         array([ 220.,  440.,  880.])
-        >>> # Or notes with tuning deviations
-        >>> librosax.note_to_hz('C2-32', round_midi=False)
+        >>> # Tuning deviations are preserved by default
+        >>> librosax.note_to_hz('C2-32')
         array([ 64.209])
+        >>> # Quantize to the nearest semitone instead
+        >>> librosax.note_to_hz('C2-32', round_midi=True)
+        array([ 65.406])
     """
-    return midi_to_hz(note_to_midi(note, **kwargs))
+    return midi_to_hz(note_to_midi(note, round_midi=round_midi))
 
 
 @overload
@@ -725,6 +733,11 @@ def note_to_midi(
             return np.array([note_to_midi(n, round_midi=round_midi) for n in note])
         else:
             return jnp.array([note_to_midi(n, round_midi=round_midi) for n in note])
+
+    if note == "":
+        # An unspecified note has no MIDI number; this is the inverse of
+        # `midi_to_note`, which maps non-finite input to the empty string.
+        return np.nan
 
     pitch_map: Dict[str, int] = {
         "C": 0,
@@ -902,6 +915,11 @@ def midi_to_note(
     """
     if cents and not octave:
         raise ParameterError("Cannot encode cents without octave information.")
+
+    if not jnp.isfinite(midi):
+        # NaN and infinities have no spelling; `note_to_midi` maps the empty
+        # string back to NaN.
+        return ""
 
     note_map = notation.key_to_notes(key=key, unicode=unicode)
 
@@ -1724,6 +1742,28 @@ def fourier_tempo_frequencies(
     return fft_frequencies(sr=sr * 60 / float(hop_length), n_fft=win_length)
 
 
+def _warn_nonfinite_weights(weights: jnp.ndarray, kind: str) -> None:
+    """Warn when a frequency weighting produced non-finite values.
+
+    A weighting curve is ``-inf`` at 0 Hz because the log of zero frequency is
+    undefined, which silently poisons any downstream sum. The check is skipped
+    for traced values, since a data-dependent branch is not available under
+    ``jax.jit``.
+
+    Args:
+        weights: Weighting curve, in dB.
+        kind: Single-letter name of the weighting, used in the message.
+    """
+    if isinstance(weights, jax.core.Tracer):
+        return
+    if not jnp.all(jnp.isfinite(weights)):
+        warnings.warn(
+            f"{kind}-weighting returned non-finite values. "
+            "This is likely due to low (~0 Hz) frequencies.",
+            stacklevel=3,
+        )
+
+
 # A-weighting should be capitalized: suppress the naming warning
 @overload
 def A_weighting(
@@ -1799,6 +1839,7 @@ def A_weighting(
     )
 
     if min_db is None:
+        _warn_nonfinite_weights(weights, "A")
         return weights
     else:
         return jnp.maximum(min_db, weights)
@@ -1876,7 +1917,10 @@ def B_weighting(
         - 0.5 * jnp.log10(f_sq + const[2])
     )
 
-    return weights if min_db is None else jnp.maximum(min_db, weights)
+    if min_db is None:
+        _warn_nonfinite_weights(weights, "B")
+        return weights
+    return jnp.maximum(min_db, weights)
 
 
 @overload
@@ -1949,7 +1993,10 @@ def C_weighting(
         - jnp.log10(f_sq + const[1])
     )
 
-    return weights if min_db is None else jnp.maximum(min_db, weights)
+    if min_db is None:
+        _warn_nonfinite_weights(weights, "C")
+        return weights
+    return jnp.maximum(min_db, weights)
 
 
 @overload
@@ -2028,6 +2075,7 @@ def D_weighting(
     )
 
     if min_db is None:
+        _warn_nonfinite_weights(weights, "D")
         return weights
     else:
         return jnp.maximum(min_db, weights)
@@ -2431,6 +2479,10 @@ def midi_to_svara_h(
     >>> librosax.midi_to_svara_h([72, 73, 74], Sa=60, abbr=False)
     array(['Ṡa', 'ṙe', 'Ṙe'], dtype='<U3')
     """
+    if not jnp.isfinite(midi):
+        # NaN and infinities have no svara; mirrors `midi_to_note`.
+        return ""
+
     SVARA_MAP = [
         "Sa",
         "re",
@@ -2764,6 +2816,10 @@ def midi_to_svara_c(
     mela_to_svara
     list_mela
     """
+    if not jnp.isfinite(midi):
+        # NaN and infinities have no svara; mirrors `midi_to_note`.
+        return ""
+
     svara_num = int(jnp.round(midi - Sa))
 
     svara_map = notation.mela_to_svara(mela, abbr=abbr, unicode=unicode)

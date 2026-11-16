@@ -489,8 +489,14 @@ class LogMelFilterBank(Module):
 
         # Logmel spectrogram
         if self.is_log:
+            # axes=None reduces top_db over the whole array rather than per
+            # spectrogram, which is what TorchLibrosa's LogmelFilterBank does.
             output = power_to_db(
-                mel_spectrogram, ref=self.ref, amin=self.amin, top_db=self.top_db
+                mel_spectrogram,
+                ref=self.ref,
+                amin=self.amin,
+                top_db=self.top_db,
+                axes=None,
             )
         else:
             output = mel_spectrogram

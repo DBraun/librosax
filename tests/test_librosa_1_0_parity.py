@@ -27,6 +27,258 @@ def y_mono():
     return (np.sin(2 * np.pi * 220 * t / sr) * (t % 5512 < 400)).astype(np.float32)
 
 
+# -- librosa #2051: axes-aware decibel conversion --#
+
+
+@pytest.mark.parametrize("fn_name", ["power_to_db", "amplitude_to_db"])
+@pytest.mark.parametrize("shape", [(), (17,), (5, 7), (3, 5, 7), (2, 3, 5, 7)])
+def test_db_matches_librosa_default_axes(fn_name, shape):
+    rs = np.random.RandomState(0)
+    S = np.abs(rs.randn(*shape)).astype(np.float64) + 1e-3
+
+    expected = getattr(librosa, fn_name)(S)
+    actual = getattr(librosax, fn_name)(jnp.asarray(S))
+
+    assert np.allclose(np.asarray(actual), expected, atol=1e-5)
+
+
+@pytest.mark.parametrize("fn_name", ["power_to_db", "amplitude_to_db"])
+@pytest.mark.parametrize("ref", [np.max, np.median])
+@pytest.mark.parametrize("axes", ["auto", None, -1, (-2, -1)])
+def test_db_callable_ref_matches_librosa(fn_name, ref, axes):
+    rs = np.random.RandomState(1)
+    S = np.abs(rs.randn(3, 5, 7)).astype(np.float64) + 1e-3
+
+    expected = getattr(librosa, fn_name)(S, ref=ref, axes=axes)
+    actual = getattr(librosax, fn_name)(jnp.asarray(S), ref=ref, axes=axes)
+
+    assert np.allclose(np.asarray(actual), expected, atol=1e-5)
+
+
+def test_power_to_db_top_db_is_per_slice():
+    # Two spectrograms whose peaks differ by far more than top_db.  Reducing
+    # top_db globally flattens the quiet one to a constant; reducing it per
+    # slice keeps its internal structure.
+    quiet = jnp.reshape(jnp.linspace(1e-9, 2e-9, 16), (4, 4))
+    S = jnp.stack([jnp.full((4, 4), 1.0), quiet])
+
+    per_slice = librosax.power_to_db(S, top_db=80.0, amin=1e-12)
+    global_reduction = librosax.power_to_db(S, top_db=80.0, amin=1e-12, axes=None)
+
+    assert np.ptp(np.asarray(per_slice[1])) > 1.0
+    assert np.ptp(np.asarray(global_reduction[1])) == 0.0
+
+    # librosa's default is the per-slice reduction.
+    assert np.allclose(
+        np.asarray(per_slice),
+        librosa.power_to_db(np.asarray(S), top_db=80.0, amin=1e-12),
+        atol=1e-4,
+    )
+
+
+def test_power_to_db_rejects_ref_without_axis():
+    with pytest.raises(librosax.ParameterError):
+        librosax.power_to_db(jnp.ones((3, 3)), ref=lambda x: x.max())
+
+
+def test_power_to_db_rejects_negative_top_db():
+    with pytest.raises(librosax.ParameterError):
+        librosax.power_to_db(jnp.ones((3, 3)), top_db=-1.0)
+
+
+# -- librosa #1947 / #1948: note and MIDI conversion --#
+
+
+def test_note_to_hz_keeps_tuning_deviation_by_default():
+    assert np.isclose(
+        float(librosax.note_to_hz("C2-32")), float(librosa.note_to_hz("C2-32"))
+    )
+    assert not np.isclose(
+        float(librosax.note_to_hz("C2-32")), float(librosax.note_to_hz("C2"))
+    )
+
+
+def test_note_to_hz_round_midi_quantizes():
+    assert np.isclose(
+        float(librosax.note_to_hz("C2-32", round_midi=True)),
+        float(librosax.note_to_hz("C2")),
+    )
+
+
+def test_note_to_midi_empty_string_is_nan():
+    assert np.isnan(librosax.note_to_midi(""))
+    assert np.isnan(librosa.note_to_midi(""))
+
+
+@pytest.mark.parametrize("bad", [np.nan, np.inf, -np.inf])
+def test_midi_to_note_nonfinite_is_empty(bad):
+    assert librosax.midi_to_note(bad) == ""
+    assert librosax.midi_to_svara_h(bad, Sa=60) == ""
+    assert librosax.midi_to_svara_c(bad, Sa=60, mela=1) == ""
+
+
+def test_note_midi_roundtrip_through_empty():
+    assert librosax.midi_to_note(librosax.note_to_midi("")) == ""
+
+
+# -- librosa #1955: non-finite weighting curves --#
+
+
+@pytest.mark.parametrize("kind", ["A", "B", "C", "D"])
+def test_weighting_warns_at_zero_hz(kind):
+    fn = getattr(librosax, f"{kind}_weighting")
+    with pytest.warns(UserWarning, match=f"{kind}-weighting returned non-finite"):
+        weights = fn(jnp.asarray([0.0, 440.0]), min_db=None)
+    assert not np.all(np.isfinite(np.asarray(weights)))
+
+
+@pytest.mark.parametrize("kind", ["A", "B", "C", "D"])
+def test_weighting_silent_when_finite(kind):
+    fn = getattr(librosax, f"{kind}_weighting")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        fn(jnp.asarray([100.0, 440.0]), min_db=None)
+
+
+@pytest.mark.parametrize("kind", ["A", "B", "C", "D"])
+def test_weighting_matches_librosa(kind):
+    freqs = np.geomspace(20.0, 10000.0, 64)
+    expected = getattr(librosa, f"{kind}_weighting")(freqs)
+    actual = getattr(librosax, f"{kind}_weighting")(jnp.asarray(freqs))
+    assert np.allclose(np.asarray(actual), expected, atol=1e-4)
+
+
+# -- librosa #1927: peak picking --#
+
+
+@pytest.mark.parametrize("method", ["greedy", "dp_count", "dp_value"])
+def test_peak_pick_methods_match_librosa(method, y_mono):
+    onset = np.abs(librosa.stft(y_mono)).sum(axis=0).astype(np.float64)
+    kwargs = dict(
+        pre_max=3, post_max=3, pre_avg=3, post_avg=5, delta=0.5, wait=10, method=method
+    )
+
+    expected = librosa.util.peak_pick(onset, **kwargs)
+    actual = librosax.util.peak_pick(jnp.asarray(onset), **kwargs)
+
+    assert np.array_equal(np.asarray(actual), expected)
+
+
+def test_peak_pick_dense_is_multidimensional(y_mono):
+    S = np.abs(librosa.stft(y_mono)).astype(np.float64)
+    kwargs = dict(
+        pre_max=1, post_max=1, pre_avg=1, post_avg=1, delta=0.0, wait=2, sparse=False
+    )
+
+    expected = librosa.util.peak_pick(S, **kwargs)
+    actual = librosax.util.peak_pick(jnp.asarray(S), **kwargs)
+
+    assert actual.shape == S.shape
+    assert np.array_equal(np.asarray(actual), expected)
+
+
+def test_peak_pick_rejects_unknown_method():
+    with pytest.raises(librosa.ParameterError):
+        librosax.util.peak_pick(
+            jnp.arange(16.0),
+            pre_max=1,
+            post_max=1,
+            pre_avg=1,
+            post_avg=1,
+            delta=0.0,
+            wait=1,
+            method="nonsense",
+        )
+
+
+# -- librosa #1964: signal mixing helpers --#
+
+
+@pytest.fixture
+def signals():
+    y1 = np.asarray(librosax.tone(440.0, sr=22050, duration=0.1), dtype=np.float32)
+    y2 = np.asarray(librosax.tone(550.0, sr=22050, duration=0.1), dtype=np.float32)
+    y3 = np.asarray(librosax.tone(660.0, sr=22050, duration=0.05), dtype=np.float32)
+    return y1, y2, y3
+
+
+@pytest.mark.parametrize("pad", [True, False])
+@pytest.mark.parametrize("norm", [True, False])
+def test_to_mono_matches_librosa(signals, pad, norm):
+    y1, y2, y3 = signals
+    expected = librosa.to_mono(y1, y2, y3, pad=pad, norm=norm)
+    actual = librosax.to_mono(
+        *(jnp.asarray(y) for y in (y1, y2, y3)), pad=pad, norm=norm
+    )
+    assert np.allclose(np.asarray(actual), expected, atol=1e-6)
+
+
+def test_to_mono_downmixes_channels(signals):
+    y1, y2, _ = signals
+    stereo = np.stack([y1, y2])
+    expected = librosa.to_mono(stereo)
+    actual = librosax.to_mono(jnp.asarray(stereo))
+    assert np.allclose(np.asarray(actual), expected, atol=1e-6)
+
+
+@pytest.mark.parametrize("downmix", [True, False])
+@pytest.mark.parametrize("norm", [True, False])
+def test_to_stereo_matches_librosa(signals, downmix, norm):
+    y1, y2, _ = signals
+    expected = librosa.to_stereo(left=y1, right=y2, downmix=downmix, norm=norm)
+    actual = librosax.to_stereo(
+        left=jnp.asarray(y1), right=jnp.asarray(y2), downmix=downmix, norm=norm
+    )
+    assert np.allclose(np.asarray(actual), expected, atol=1e-6)
+
+
+@pytest.mark.parametrize("side", ["left", "right"])
+def test_to_stereo_one_sided(signals, side):
+    y1, _, _ = signals
+    kwargs = {"left": None, "right": None, side: y1}
+    expected = librosa.to_stereo(**kwargs)
+    kwargs[side] = jnp.asarray(y1)
+    actual = librosax.to_stereo(**kwargs)
+    assert np.allclose(np.asarray(actual), expected, atol=1e-6)
+
+
+def test_to_stereo_requires_a_channel():
+    with pytest.raises(librosax.ParameterError):
+        librosax.to_stereo(left=None, right=None)
+
+
+@pytest.mark.parametrize("downmix", [True, False])
+def test_to_multi_matches_librosa(signals, downmix):
+    y1, y2, _ = signals
+    expected = librosa.to_multi(y1, y2, downmix=downmix)
+    actual = librosax.to_multi(
+        jnp.asarray(y1), jnp.asarray(y2), downmix=downmix
+    )
+    assert np.allclose(np.asarray(actual), expected, atol=1e-6)
+
+
+def test_to_multi_rejects_mismatched_layouts(signals):
+    y1, y2, _ = signals
+    with pytest.raises(librosax.ParameterError):
+        librosax.to_multi(
+            jnp.asarray(y1), jnp.asarray(np.stack([y1, y2])), downmix=False
+        )
+
+
+def test_mixing_rejects_empty_input():
+    with pytest.raises(librosax.ParameterError):
+        librosax.to_mono()
+
+
+@pytest.mark.parametrize("size", [3, 7, 12])
+def test_fix_length_matches_librosa(size):
+    x = np.arange(7, dtype=np.float32)
+    assert np.array_equal(
+        np.asarray(librosax.fix_length(jnp.asarray(x), size=size)),
+        librosa.util.fix_length(x, size=size),
+    )
+
+
 # -- librosa 1.0.0 expired the constant_q deprecation --#
 
 
@@ -34,6 +286,47 @@ def test_constant_q_is_gone():
     for module in (librosa.filters, librosax.filters):
         assert not hasattr(module, "constant_q")
         assert not hasattr(module, "constant_q_lengths")
+
+
+# -- JAX-native reimplementations --#
+
+
+@pytest.mark.parametrize("shape,axis", [((32,), 0), ((8, 32), 0), ((8, 32), 1), ((4, 8, 32), -1)])
+@pytest.mark.parametrize("fn_name", ["localmax", "localmin"])
+def test_local_extrema_match_librosa(fn_name, shape, axis):
+    x = np.random.RandomState(5).randint(0, 4, size=shape).astype(np.float64)
+
+    expected = getattr(librosa.util, fn_name)(x, axis=axis)
+    actual = getattr(librosax.util, fn_name)(jnp.asarray(x), axis=axis)
+
+    assert np.array_equal(np.asarray(actual), expected)
+
+
+@pytest.mark.parametrize("fn_name", ["localmax", "localmin"])
+def test_local_extrema_are_jittable(fn_name):
+    fn = jax.jit(getattr(librosax.util, fn_name), static_argnames=("axis",))
+    x = jnp.asarray(np.random.RandomState(6).randn(64))
+    assert np.array_equal(
+        np.asarray(fn(x)), np.asarray(getattr(librosax.util, fn_name)(x))
+    )
+
+
+@pytest.mark.parametrize("max_size", [None, 32])
+@pytest.mark.parametrize("shape", [(512,), (3, 512)])
+def test_autocorrelate_matches_librosa(max_size, shape):
+    x = np.random.RandomState(7).randn(*shape)
+
+    expected = librosa.autocorrelate(x, max_size=max_size)
+    actual = librosax.autocorrelate(jnp.asarray(x), max_size=max_size)
+
+    assert actual.shape == expected.shape
+    assert np.allclose(np.asarray(actual), expected, rtol=1e-4, atol=1e-4 * np.abs(expected).max())
+
+
+def test_autocorrelate_is_jittable():
+    x = jnp.asarray(np.random.RandomState(8).randn(512))
+    fn = jax.jit(librosax.autocorrelate, static_argnames=("max_size", "axis"))
+    assert np.allclose(np.asarray(fn(x)), np.asarray(librosax.autocorrelate(x)))
 
 
 @pytest.mark.parametrize(
@@ -75,3 +368,129 @@ def test_filters_agree_on_jax_and_numpy_input():
 
     assert np.allclose(F_jax, F_np)
     assert np.allclose(lengths_jax, lengths_np)
+
+
+def test_plimit_intervals_accepts_a_list():
+    assert np.allclose(
+        np.asarray(librosax.plimit_intervals(primes=[3, 5], bins_per_octave=7)),
+        librosa.plimit_intervals(primes=[3, 5], bins_per_octave=7),
+    )
+
+
+# -- util.normalize must stay equivalent to librosa's --#
+
+
+@pytest.mark.parametrize("norm", [np.inf, -np.inf, 0, 1, 2, 3.5, None])
+@pytest.mark.parametrize("axis", [0, -1, None])
+@pytest.mark.parametrize("fill", [None, False, True])
+def test_normalize_matches_librosa(norm, axis, fill):
+    if norm == 0 and fill is True:
+        pytest.skip("librosa rejects this combination")
+
+    rs = np.random.RandomState(11)
+    # Include an all-zero slice so the sub-threshold `fill` branch is exercised.
+    S = np.concatenate([rs.randn(4, 5), np.zeros((4, 1))], axis=-1)
+
+    expected = librosa.util.normalize(S, norm=norm, axis=axis, fill=fill)
+    actual = librosax.util.normalize(jnp.asarray(S), norm=norm, axis=axis, fill=fill)
+
+    assert np.allclose(np.asarray(actual), expected, atol=1e-6, equal_nan=True)
+
+
+@pytest.mark.parametrize("norm", [2, 3.0])
+@pytest.mark.parametrize("axis", [0, None])
+def test_normalize_fill_produces_unit_norm(norm, axis):
+    # A previous implementation filled with 1.0 regardless of the norm order,
+    # which is only unit-norm for the max/min norms.
+    out = np.asarray(
+        librosax.util.normalize(jnp.zeros((2, 3)), norm=norm, axis=axis, fill=True)
+    )
+    length = np.sum(np.abs(out) ** norm, axis=axis) ** (1.0 / norm)
+    assert np.allclose(length, 1.0)
+
+
+def test_normalize_accepts_numpy_scalar_norm():
+    S = jnp.asarray(np.random.RandomState(12).randn(4, 5))
+    assert np.allclose(
+        np.asarray(librosax.util.normalize(S, norm=np.float32(2), axis=0)),
+        np.asarray(librosax.util.normalize(S, norm=2, axis=0)),
+    )
+
+
+def test_normalize_accepts_integer_input():
+    out = np.asarray(librosax.util.normalize(jnp.array([[1, 2], [3, 4]]), norm=2, axis=0))
+    assert np.allclose(np.sum(out**2, axis=0), 1.0)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"norm": "bogus"},
+        {"norm": -2},
+        {"threshold": -1.0},
+        {"fill": "yes"},
+        {"norm": 0, "fill": True},
+    ],
+)
+def test_normalize_rejects_bad_parameters(kwargs):
+    with pytest.raises(librosax.ParameterError):
+        librosax.util.normalize(jnp.ones((4, 5)), **kwargs)
+
+
+def test_tiny_matches_librosa():
+    for x in (jnp.zeros(3, dtype=jnp.float32), jnp.arange(3)):
+        assert librosax.util.tiny(x) == librosa.util.tiny(np.asarray(x))
+
+
+# -- power_to_db input validation --#
+
+
+def test_power_to_db_rejects_nonpositive_amin():
+    with pytest.raises(librosax.ParameterError, match="amin must be strictly positive"):
+        librosax.power_to_db(jnp.ones((3, 3)), amin=0.0)
+
+
+def test_power_to_db_rectifies_complex_input():
+    rs = np.random.RandomState(13)
+    D = (rs.randn(4, 5) + 1j * rs.randn(4, 5)).astype(np.complex64)
+
+    with pytest.warns(UserWarning, match="complex input"):
+        actual = librosax.power_to_db(jnp.asarray(D))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        expected = librosa.power_to_db(D)
+
+    assert not np.iscomplexobj(np.asarray(actual))
+    assert np.allclose(np.asarray(actual), expected, atol=1e-4)
+
+
+# -- regressions found in review of this branch --#
+
+
+def test_autocorrelate_accepts_array_likes():
+    # The JAX rewrite briefly dropped the input coercion.
+    expected = librosa.autocorrelate(np.array([1.0, 2.0, 3.0]))
+    actual = librosax.autocorrelate([1.0, 2.0, 3.0])
+    assert np.allclose(np.asarray(actual), expected, atol=1e-5)
+
+
+@pytest.mark.parametrize("fn", ["to_mono", "to_multi"])
+def test_mixing_helpers_do_not_warn_on_numpy_float64(fn):
+    y = np.arange(8, dtype=np.float64)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        getattr(librosax, fn)(y)
+
+
+def test_to_stereo_does_not_warn_on_numpy_float64():
+    y = np.arange(8, dtype=np.float64)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        librosax.to_stereo(left=y, right=None)
+
+
+def test_util_exposes_librosa_array_helpers():
+    # Code ported from librosa reaches for these under `util`.
+    for name in ("fix_length", "tiny", "normalize", "peak_pick", "localmax", "localmin"):
+        assert hasattr(librosax.util, name), name
+        assert hasattr(librosa.util, name), name

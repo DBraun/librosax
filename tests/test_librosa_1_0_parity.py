@@ -649,3 +649,97 @@ def test_util_exposes_librosa_array_helpers():
     for name in ("fix_length", "tiny", "normalize", "peak_pick", "localmax", "localmin"):
         assert hasattr(librosax.util, name), name
         assert hasattr(librosa.util, name), name
+
+
+# -- window specifications accepted by stft / istft --#
+
+
+@pytest.mark.parametrize(
+    "window",
+    ["hann", "hamming", "sqrt_hann", ("kaiser", 4.0), 4.0, np.hanning, np.hanning(2048)],
+    ids=["str", "str-hamming", "sqrt_hann", "tuple", "float", "callable", "ndarray"],
+)
+def test_stft_accepts_every_window_spec(window):
+    y = jnp.asarray(np.random.RandomState(15).randn(8192).astype(np.float32))
+
+    S = librosax.stft(y, n_fft=2048, hop_length=512, window=window)
+    assert S.shape == (1025, 17)
+    assert np.all(np.isfinite(np.asarray(S)))
+
+    y_hat = librosax.istft(S, n_fft=2048, hop_length=512, window=window)
+    assert np.all(np.isfinite(np.asarray(y_hat)))
+
+
+def test_stft_accepts_a_jax_window_array():
+    y = jnp.asarray(np.random.RandomState(15).randn(8192).astype(np.float32))
+    expected = librosax.stft(y, n_fft=2048, hop_length=512, window=np.hanning(2048))
+    actual = librosax.stft(y, n_fft=2048, hop_length=512, window=jnp.hanning(2048))
+    assert np.allclose(np.asarray(actual), np.asarray(expected), atol=1e-5)
+
+
+def test_stft_callable_and_array_windows_agree():
+    # np.hanning as a callable and its evaluated array must select the same
+    # window; both are the symmetric variant.
+    y = jnp.asarray(np.random.RandomState(16).randn(8192).astype(np.float32))
+    kwargs = dict(n_fft=2048, hop_length=512)
+
+    from_callable = librosax.stft(y, window=np.hanning, **kwargs)
+    from_array = librosax.stft(y, window=np.hanning(2048), **kwargs)
+
+    assert np.allclose(np.asarray(from_callable), np.asarray(from_array), atol=1e-5)
+
+
+def test_np_hanning_is_the_symmetric_hann():
+    # np.hanning differs from the periodic window "hann" selects, so the two
+    # must not be silently interchangeable.
+    y = jnp.asarray(np.random.RandomState(17).randn(8192).astype(np.float32))
+    kwargs = dict(n_fft=2048, hop_length=512)
+
+    symmetric = np.asarray(librosax.stft(y, window=np.hanning, **kwargs))
+    periodic = np.asarray(librosax.stft(y, window="hann", **kwargs))
+    explicit = np.asarray(
+        librosax.stft(y, window=scipy.signal.get_window("hann", 2048, fftbins=False), **kwargs)
+    )
+
+    assert not np.allclose(symmetric, periodic)
+    assert np.allclose(symmetric, explicit, atol=1e-5)
+
+
+def test_stft_rejects_a_window_of_the_wrong_length():
+    y = jnp.asarray(np.random.RandomState(18).randn(8192).astype(np.float32))
+    with pytest.raises(librosa.ParameterError, match="Window size mismatch"):
+        librosax.stft(y, n_fft=2048, hop_length=512, window=np.hanning(1024))
+
+
+@pytest.mark.parametrize("window", ["hann", np.hanning, np.hanning(2048)])
+def test_stft_roundtrips_under_every_window_spec(window):
+    n = 8192
+    y = np.random.RandomState(19).randn(n).astype(np.float32)
+
+    S = librosax.stft(jnp.asarray(y), n_fft=2048, hop_length=512, window=window)
+    y_hat = np.asarray(
+        librosax.istft(S, n_fft=2048, hop_length=512, window=window, length=n)
+    )
+
+    interior = slice(2048, n - 2048)
+    assert np.allclose(y_hat[interior], y[interior], atol=1e-4)
+
+
+@pytest.mark.parametrize("shape", [(8197,), (2, 8197)])
+def test_hanning_roundtrip_with_non_multiple_of_hop_length(shape):
+    y = np.random.default_rng(0).standard_normal(shape, dtype=np.float32)
+    kwargs = dict(n_fft=2048, hop_length=512, window=np.hanning)
+
+    S = librosax.stft(y, **kwargs)
+    y_hat = librosax.istft(S, length=y.shape[-1], **kwargs)
+
+    np.testing.assert_allclose(y_hat, y, atol=1e-6, rtol=1e-6)
+
+
+def test_spectrogram_layer_accepts_a_callable_window():
+    from librosax.layers import Spectrogram
+
+    y = jnp.asarray(np.random.RandomState(20).randn(2, 8192).astype(np.float32))
+    layer = Spectrogram(n_fft=2048, hop_length=512, window=np.hanning)
+    out = layer(y)
+    assert np.all(np.isfinite(np.asarray(out)))

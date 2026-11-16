@@ -148,6 +148,25 @@ def test_weighting_matches_librosa(kind):
     assert np.allclose(np.asarray(actual), expected, atol=1e-4)
 
 
+# -- librosa #2087: rms buffer validation --#
+
+
+def test_rms_rejects_scalar_input():
+    with pytest.raises(librosax.ParameterError):
+        librosax.feature.rms(y=jnp.asarray(1.0))
+
+
+def test_rms_rejects_integer_input():
+    with pytest.raises(librosax.ParameterError):
+        librosax.feature.rms(y=jnp.arange(2048))
+
+
+def test_rms_still_jits():
+    y = jnp.asarray(np.random.RandomState(2).randn(4096).astype(np.float32))
+    fn = jax.jit(librosax.feature.rms, static_argnames=("frame_length", "hop_length"))
+    assert np.all(np.isfinite(np.asarray(fn(y=y))))
+
+
 # -- librosa #1927: peak picking --#
 
 
@@ -279,6 +298,86 @@ def test_fix_length_matches_librosa(size):
     )
 
 
+# -- librosa #2004 / #1986: new rhythm features --#
+
+
+def test_hybrid_tempogram_matches_librosa(y_mono):
+    expected = librosa.feature.hybrid_tempogram(y=y_mono, sr=22050)
+    actual = librosax.feature.hybrid_tempogram(y=jnp.asarray(y_mono), sr=22050)
+    assert np.allclose(np.asarray(actual), expected, atol=1e-5, equal_nan=True)
+
+
+def test_metrogram_matches_librosa(y_mono):
+    tg = librosa.feature.tempogram(y=y_mono, sr=22050)
+    freqs = librosa.tempo_frequencies(tg.shape[-2], sr=22050)
+
+    expected = librosa.feature.metrogram(tg=tg, freqs=freqs)
+    actual = librosax.feature.metrogram(tg=jnp.asarray(tg), freqs=jnp.asarray(freqs))
+
+    assert np.allclose(np.asarray(actual), expected, atol=1e-5, equal_nan=True)
+
+
+def test_metrogram_unaggregated_shape(y_mono):
+    tg = librosa.feature.tempogram(y=y_mono, sr=22050)
+    freqs = librosa.tempo_frequencies(tg.shape[-2], sr=22050)
+
+    out = librosax.feature.metrogram(
+        tg=jnp.asarray(tg), freqs=jnp.asarray(freqs), aggregate=None
+    )
+    assert out.shape == (4, tg.shape[-2], tg.shape[-1])
+
+
+# -- librosa #2066: automatic CQT bin count --#
+
+
+@pytest.mark.parametrize("cqt_fn", ["cqt", "cqt2010"])
+@pytest.mark.parametrize("bins_per_octave", [12, 24, 36])
+def test_cqt_infers_same_n_bins_as_librosa(cqt_fn, bins_per_octave):
+    # Clipping on the center frequency rather than the filter cutoff admits one
+    # extra bin whose passband crosses Nyquist, which librosa drops.
+    sr = 22050
+    y = np.random.RandomState(3).randn(sr).astype(np.float32)
+
+    expected = librosa.cqt(
+        y=y, sr=sr, n_bins=None, bins_per_octave=bins_per_octave, hop_length=512
+    ).shape[-2]
+    actual = getattr(librosax.feature, cqt_fn)(
+        jnp.asarray(y), sr=sr, n_bins=None, bins_per_octave=bins_per_octave
+    ).shape[-2]
+
+    assert actual == expected
+
+
+def test_cqt_inferred_bins_stay_below_nyquist():
+    sr = 22050
+    fmin = float(librosax.note_to_hz("C1"))
+    bins_per_octave = 24
+    Q = 1.0 / (2.0 ** (1.0 / bins_per_octave) - 1.0)
+    cutoff_ratio = 1 + 0.5 * librosax.filters.window_bandwidth("hann") / Q
+
+    y = jnp.asarray(np.random.RandomState(3).randn(sr).astype(np.float32))
+    n_bins = librosax.feature.cqt(
+        y, sr=sr, n_bins=None, bins_per_octave=bins_per_octave
+    ).shape[-2]
+
+    top = fmin * 2 ** ((n_bins - 1) / bins_per_octave)
+    just_past = fmin * 2 ** (n_bins / bins_per_octave)
+    assert top * cutoff_ratio <= sr / 2
+    assert just_past * cutoff_ratio > sr / 2
+
+
+def test_cqt2010_rejects_hop_that_cannot_cover_the_octaves():
+    y = jnp.asarray(np.random.RandomState(3).randn(22050).astype(np.float32))
+    with pytest.raises(librosax.ParameterError, match="must be a multiple of"):
+        librosax.feature.cqt2010(y, sr=22050, hop_length=128, n_bins=None)
+
+
+def test_cqt_rejects_bins_above_nyquist():
+    y = jnp.asarray(np.random.RandomState(4).randn(22050).astype(np.float32))
+    with pytest.raises(librosax.ParameterError):
+        librosax.feature.cqt(y, sr=22050, n_bins=200)
+
+
 # -- librosa 1.0.0 expired the constant_q deprecation --#
 
 
@@ -329,6 +428,20 @@ def test_autocorrelate_is_jittable():
     assert np.allclose(np.asarray(fn(x)), np.asarray(librosax.autocorrelate(x)))
 
 
+def test_cqt_honors_window_choice():
+    # Every window other than "hann" used to fall back to a rectangular window.
+    y = jnp.asarray(np.random.RandomState(9).randn(22050).astype(np.float32))
+    kwargs = dict(sr=22050, n_bins=24, bins_per_octave=12)
+
+    hann = np.asarray(librosax.feature.cqt(y, window="hann", **kwargs))
+    hamming = np.asarray(librosax.feature.cqt(y, window="hamming", **kwargs))
+    boxcar = np.asarray(librosax.feature.cqt(y, window="boxcar", **kwargs))
+
+    assert not np.allclose(hann, hamming)
+    assert not np.allclose(hann, boxcar)
+    assert not np.allclose(hamming, boxcar)
+
+
 @pytest.mark.parametrize(
     "call",
     [
@@ -375,6 +488,25 @@ def test_plimit_intervals_accepts_a_list():
         np.asarray(librosax.plimit_intervals(primes=[3, 5], bins_per_octave=7)),
         librosa.plimit_intervals(primes=[3, 5], bins_per_octave=7),
     )
+
+
+def test_spectral_contrast_accepts_a_list_of_freqs(y_mono):
+    S = np.abs(librosa.stft(y_mono, n_fft=2048))
+    freq = list(librosa.fft_frequencies(sr=22050, n_fft=2048))
+
+    actual = librosax.feature.spectral_contrast(S=jnp.asarray(S), sr=22050, freq=freq)
+    expected = librosa.feature.spectral_contrast(S=S, sr=22050, freq=np.asarray(freq))
+
+    assert np.allclose(np.asarray(actual), expected, atol=1e-4)
+
+
+def test_chroma_stft_estimates_tuning(y_mono):
+    # Tuning estimation crosses into librosa through jax.pure_callback.
+    actual = librosax.feature.chroma_stft(y=jnp.asarray(y_mono), sr=22050)
+    expected = librosa.feature.chroma_stft(y=y_mono, sr=22050)
+
+    assert actual.shape == expected.shape
+    assert np.allclose(np.asarray(actual), expected, atol=1e-4)
 
 
 # -- util.normalize must stay equivalent to librosa's --#
@@ -472,6 +604,29 @@ def test_autocorrelate_accepts_array_likes():
     expected = librosa.autocorrelate(np.array([1.0, 2.0, 3.0]))
     actual = librosax.autocorrelate([1.0, 2.0, 3.0])
     assert np.allclose(np.asarray(actual), expected, atol=1e-5)
+
+
+@pytest.mark.parametrize(
+    "window",
+    ["hann", "hamming", ("kaiser", 4.0), np.hanning],
+    ids=["str", "str-hamming", "tuple", "callable"],
+)
+def test_cqt_accepts_every_window_spec(window):
+    # A CQT filter bank has a different length per bin, so only specs that can
+    # be evaluated at an arbitrary length are meaningful here; librosa has the
+    # same restriction.
+    y = jnp.asarray(np.random.RandomState(14).randn(22050).astype(np.float32))
+    C = librosax.feature.cqt(y, sr=22050, n_bins=12, bins_per_octave=12, window=window)
+    assert C.shape[-2] == 12
+    assert np.all(np.isfinite(np.asarray(C)))
+
+
+def test_cqt_reports_a_fixed_length_window_clearly():
+    # librosa raises "unhashable type: 'numpy.ndarray'" for this; routing
+    # through filters.get_window gives the actual reason.
+    y = jnp.asarray(np.random.RandomState(14).randn(22050).astype(np.float32))
+    with pytest.raises(librosax.ParameterError, match="Window size mismatch"):
+        librosax.feature.cqt(y, sr=22050, n_bins=12, window=np.hanning(2048))
 
 
 @pytest.mark.parametrize("fn", ["to_mono", "to_multi"])

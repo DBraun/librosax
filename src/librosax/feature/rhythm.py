@@ -8,12 +8,16 @@ This module provides wrappers around librosa.feature for rhythm and tempo analys
 import librosa.feature as _lf
 from jax import numpy as jnp
 import numpy as np
-from typing import Optional, Union, Callable
+from typing import Any, Optional, Union, Callable
+
+from librosax.util._compat import as_numpy
 
 
 __all__ = [
     'tempogram',
     'fourier_tempogram',
+    'hybrid_tempogram',
+    'metrogram',
     'tempogram_ratio',
     'tempo',
 ]
@@ -140,6 +144,128 @@ def fourier_tempogram(
         win_length=win_length,
         center=center,
         window=window,
+    )
+
+    return result
+
+
+def hybrid_tempogram(
+    *,
+    y: Optional[np.ndarray] = None,
+    sr: float = 22050,
+    onset_envelope: Optional[np.ndarray] = None,
+    hop_length: int = 512,
+    win_length: int = 384,
+    center: bool = True,
+    window: str = 'hann',
+    **kwargs: Any,
+) -> np.ndarray:
+    """Compute a hybrid tempogram.
+
+    The Fourier tempogram and the autocorrelation tempogram are resampled onto a
+    common frequency grid and merged with a geometric mean.
+
+    This is a wrapper around librosa.feature.hybrid_tempogram.
+
+    Parameters
+    ----------
+    y : np.ndarray [shape=(..., n)] or None
+        Audio time series. Required if `onset_envelope` is not provided.
+    sr : float > 0
+        Sampling rate of the audio time series
+    onset_envelope : np.ndarray [shape=(..., n)] or None
+        Optional pre-computed onset strength envelope
+    hop_length : int > 0
+        Number of audio samples between successive onset measurements
+    win_length : int > 0
+        Length of the analysis window (in frames/onset measurements)
+    center : bool
+        If `True`, analysis windows are centered.
+        If `False`, windows are left-aligned.
+    window : str, tuple, number, callable, or list-like
+        A window specification as in `get_window`
+    **kwargs
+        Additional keyword arguments passed to `scipy.interpolate.interp1d`
+
+    Returns
+    -------
+    hybrid : np.ndarray [shape=(..., win_length // 2 + 1, n)]
+        The hybrid tempogram
+
+    See Also
+    --------
+    tempogram
+    fourier_tempogram
+    librosa.feature.hybrid_tempogram
+    """
+    result = _lf.hybrid_tempogram(
+        y=as_numpy(y),
+        sr=sr,
+        onset_envelope=as_numpy(onset_envelope),
+        hop_length=hop_length,
+        win_length=win_length,
+        center=center,
+        window=as_numpy(window),
+        **kwargs,
+    )
+
+    return result
+
+
+def metrogram(
+    *,
+    tg: np.ndarray,
+    freqs: np.ndarray,
+    factors: Optional[np.ndarray] = None,
+    aggregate: Optional[Callable] = np.sum,
+    kind: str = 'linear',
+    fill_value: float = 0,
+) -> np.ndarray:
+    """Summarize the presence of rhythmic ratios in a tempogram.
+
+    A tempogram with simultaneous energy at 90 BPM and 30 BPM has a strong 1/3
+    ratio, which makes meter estimation possible by looking for the ratio
+    between the beat and downbeat frequencies. The default factors 1/3, 1/4,
+    1/5 and 1/7 correspond to 3/4, 4/4, 5/4 and 7/4 time.
+
+    This is a wrapper around librosa.feature.metrogram.
+
+    Parameters
+    ----------
+    tg : np.ndarray [shape=(..., n_freqs, n)]
+        Tempogram, as produced by `tempogram` or `fourier_tempogram`
+    freqs : np.ndarray [shape=(n_freqs,)]
+        Frequencies (in BPM) of the tempogram rows
+    factors : np.ndarray or None
+        Rhythmic ratios to evaluate. Defaults to `[1/3, 1/4, 1/5, 1/7]`.
+    aggregate : callable or None
+        Aggregation over the ratio axis. If `None`, the un-aggregated product
+        is returned with the ratio axis at -3.
+    kind : str
+        Interpolation kind, as in `scipy.interpolate.interp1d`
+    fill_value : float
+        Value used outside the interpolation range
+
+    Returns
+    -------
+    metrogram : np.ndarray
+        Ratio energies with shape `(..., n_factors, n)`. If `aggregate` is
+        `None` the un-aggregated product is returned instead, with the tempo
+        axis retained: `(..., n_factors, n_freqs, n)`.
+
+    See Also
+    --------
+    tempogram
+    fourier_tempogram
+    librosa.feature.metrogram
+    """
+    result = _lf.metrogram(
+        tg=as_numpy(tg),
+        freqs=as_numpy(freqs),
+        factors=as_numpy(factors),
+        aggregate=aggregate,
+        kind=kind,
+        fill_value=fill_value,
     )
 
     return result

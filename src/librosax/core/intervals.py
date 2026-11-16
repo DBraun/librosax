@@ -379,7 +379,7 @@ def plimit_intervals(
             {2: -3, 3: 1, 5: 1}
         ]
     """
-    primes = jnp.asarray(jnp.atleast_1d(primes), dtype=jnp.float64)
+    primes = jnp.atleast_1d(jnp.asarray(primes, dtype=float))
     logs = jnp.log2(primes)
 
     # The seed set are primes and their reciprocals

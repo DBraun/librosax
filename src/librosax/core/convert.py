@@ -2,8 +2,12 @@
 # -*- coding: utf-8 -*-
 """Unit conversion utilities"""
 from __future__ import annotations
+import warnings
+
+import jax
 from jax import numpy as jnp
 import numpy as np
+from numpy.typing import DTypeLike
 from . import notation
 from ..util.exceptions import ParameterError
 from ..util.decorators import vectorize
@@ -607,30 +611,32 @@ def blocks_to_time(
 
 
 @overload
-def note_to_hz(note: str, **kwargs: Any) -> jnp.floating[Any]:
+def note_to_hz(note: str, *, round_midi: bool = ...) -> jnp.floating[Any]:
     ...
 
 
 @overload
-def note_to_hz(note: _IterableLike[str], **kwargs: Any) -> jnp.ndarray:
+def note_to_hz(note: _IterableLike[str], *, round_midi: bool = ...) -> jnp.ndarray:
     ...
 
 
 @overload
 def note_to_hz(
-    note: Union[str, _IterableLike[str], Iterable[str]], **kwargs: Any
+    note: Union[str, _IterableLike[str], Iterable[str]], *, round_midi: bool = ...
 ) -> Union[jnp.floating[Any], jnp.ndarray]:
     ...
 
 
 def note_to_hz(
-    note: Union[str, _IterableLike[str], Iterable[str]], **kwargs: Any
+    note: Union[str, _IterableLike[str], Iterable[str]], *, round_midi: bool = False
 ) -> Union[jnp.floating[Any], jnp.ndarray]:
     """Convert one or more note names to frequency (Hz).
 
     Args:
         note: One or more note names to convert.
-        **kwargs: Additional parameters to `note_to_midi`.
+        round_midi: If ``True``, quantize to the nearest semitone before
+            converting to frequency. Defaults to ``False``, so tuning
+            deviations spelled in the note name are preserved.
 
     Returns:
         Array of frequencies (in Hz) corresponding to ``note``.
@@ -647,11 +653,14 @@ def note_to_hz(
         >>> # Or multiple notes
         >>> librosax.note_to_hz(['A3', 'A4', 'A5'])
         array([ 220.,  440.,  880.])
-        >>> # Or notes with tuning deviations
-        >>> librosax.note_to_hz('C2-32', round_midi=False)
+        >>> # Tuning deviations are preserved by default
+        >>> librosax.note_to_hz('C2-32')
         array([ 64.209])
+        >>> # Quantize to the nearest semitone instead
+        >>> librosax.note_to_hz('C2-32', round_midi=True)
+        array([ 65.406])
     """
-    return midi_to_hz(note_to_midi(note, **kwargs))
+    return midi_to_hz(note_to_midi(note, round_midi=round_midi))
 
 
 @overload
@@ -725,6 +734,11 @@ def note_to_midi(
             return np.array([note_to_midi(n, round_midi=round_midi) for n in note])
         else:
             return jnp.array([note_to_midi(n, round_midi=round_midi) for n in note])
+
+    if note == "":
+        # An unspecified note has no MIDI number; this is the inverse of
+        # `midi_to_note`, which maps non-finite input to the empty string.
+        return np.nan
 
     pitch_map: Dict[str, int] = {
         "C": 0,
@@ -902,6 +916,11 @@ def midi_to_note(
     """
     if cents and not octave:
         raise ParameterError("Cannot encode cents without octave information.")
+
+    if not jnp.isfinite(midi):
+        # NaN and infinities have no spelling; `note_to_midi` maps the empty
+        # string back to NaN.
+        return ""
 
     note_map = notation.key_to_notes(key=key, unicode=unicode)
 
@@ -1509,7 +1528,9 @@ def tuning_to_A4(
     return 440.0 * 2.0 ** (jnp.asarray(tuning) / bins_per_octave)
 
 
-def fft_frequencies(*, sr: float = 22050, n_fft: int = 2048) -> jnp.ndarray:
+def fft_frequencies(
+    *, sr: float = 22050, n_fft: int = 2048, dtype: DTypeLike | None = None
+) -> jnp.ndarray:
     """Alternative interface for `jnp.fft.rfftfreq`
 
     Parameters
@@ -1518,6 +1539,8 @@ def fft_frequencies(*, sr: float = 22050, n_fft: int = 2048) -> jnp.ndarray:
         Audio sampling rate
     n_fft : int > 0 [scalar]
         FFT window size
+    dtype : dtype, optional
+        The output floating-point dtype. If omitted, JAX infers the precision.
 
     Returns
     -------
@@ -1530,11 +1553,16 @@ def fft_frequencies(*, sr: float = 22050, n_fft: int = 2048) -> jnp.ndarray:
     array([     0.   ,   1378.125,   2756.25 ,   4134.375,
              5512.5  ,   6890.625,   8268.75 ,   9646.875,  11025.   ])
     """
-    return jnp.fft.rfftfreq(n=n_fft, d=1.0 / sr)
+    return jnp.fft.rfftfreq(n=n_fft, d=1.0 / sr, dtype=dtype)
 
 
 def cqt_frequencies(
-    n_bins: int, *, fmin: float, bins_per_octave: int = 12, tuning: float = 0.0
+    n_bins: int,
+    *,
+    fmin: float,
+    bins_per_octave: int = 12,
+    tuning: float = 0.0,
+    dtype: DTypeLike | None = None,
 ) -> jnp.ndarray:
     """Compute the center frequencies of Constant-Q bins.
 
@@ -1557,22 +1585,26 @@ def cqt_frequencies(
         Number of bins per octave
     tuning : float
         Deviation from A440 tuning in fractional bins
+    dtype : dtype, optional
+        The output floating-point dtype. If omitted, JAX infers the precision.
 
     Returns
     -------
     frequencies : jnp.ndarray [shape=(n_bins,)]
         Center frequency for each CQT bin
     """
-    correction: float = 2.0 ** (float(tuning) / bins_per_octave)
-    frequencies: jnp.ndarray = 2.0 ** (
-        jnp.arange(0, n_bins, dtype=float) / bins_per_octave
-    )
-
-    return correction * fmin * frequencies
+    correction = 2.0 ** (jnp.asarray(tuning, dtype=dtype) / bins_per_octave)
+    frequencies = 2.0 ** (jnp.arange(n_bins, dtype=dtype or float) / bins_per_octave)
+    return jnp.asarray(fmin, dtype=dtype) * correction * frequencies
 
 
 def mel_frequencies(
-    n_mels: int = 128, *, fmin: float = 0.0, fmax: float = 11025.0, htk: bool = False
+    n_mels: int = 128,
+    *,
+    fmin: float = 0.0,
+    fmax: float = 11025.0,
+    htk: bool = False,
+    dtype: DTypeLike | None = None,
 ) -> jnp.ndarray:
     """Compute an array of acoustic frequencies tuned to the mel scale.
 
@@ -1623,6 +1655,8 @@ def mel_frequencies(
     htk : bool
         If True, use HTK formula to convert Hz to mel.
         Otherwise (False), use Slaney's Auditory Toolbox.
+    dtype : dtype, optional
+        The output floating-point dtype. If omitted, JAX infers the precision.
 
     Returns
     -------
@@ -1649,14 +1683,18 @@ def mel_frequencies(
     min_mel = hz_to_mel(fmin, htk=htk)
     max_mel = hz_to_mel(fmax, htk=htk)
 
-    mels = jnp.linspace(min_mel, max_mel, n_mels)
+    mels = jnp.linspace(min_mel, max_mel, n_mels, dtype=dtype)
 
     hz: jnp.ndarray = mel_to_hz(mels, htk=htk)
     return hz
 
 
 def tempo_frequencies(
-    n_bins: int, *, hop_length: int = 512, sr: float = 22050
+    n_bins: int,
+    *,
+    hop_length: int = 512,
+    sr: float = 22050,
+    dtype: DTypeLike | None = None,
 ) -> jnp.ndarray:
     """Compute the frequencies (in beats per minute) corresponding
     to an onset auto-correlation or tempogram matrix.
@@ -1669,6 +1707,8 @@ def tempo_frequencies(
         The number of samples between each bin
     sr : number > 0
         The audio sampling rate
+    dtype : dtype, optional
+        The output floating-point dtype. If omitted, JAX infers the precision.
 
     Returns
     -------
@@ -1685,15 +1725,18 @@ def tempo_frequencies(
     array([      inf,  2583.984,  1291.992, ...,     6.782,
                6.764,     6.747])
     """
-    # Construct array with inf at index 0 and tempo frequencies for rest
     tempo_values = 60.0 * sr / (hop_length * jnp.arange(1.0, n_bins))
-    bin_frequencies = jnp.concatenate([jnp.array([jnp.inf]), tempo_values])
-
-    return bin_frequencies
+    return jnp.concatenate(
+        [jnp.array([jnp.inf], dtype=dtype), jnp.asarray(tempo_values, dtype=dtype)]
+    )
 
 
 def fourier_tempo_frequencies(
-    *, sr: float = 22050, win_length: int = 384, hop_length: int = 512
+    *,
+    sr: float = 22050,
+    win_length: int = 384,
+    hop_length: int = 512,
+    dtype: DTypeLike | None = None,
 ) -> jnp.ndarray:
     """Compute the frequencies (in beats per minute) corresponding
     to a Fourier tempogram matrix.
@@ -1706,6 +1749,8 @@ def fourier_tempo_frequencies(
         The number of frames per analysis window
     hop_length : int > 0
         The number of samples between each bin
+    dtype : dtype, optional
+        The output floating-point dtype. If omitted, JAX infers the precision.
 
     Returns
     -------
@@ -1721,7 +1766,29 @@ def fourier_tempo_frequencies(
     """
     # sr / hop_length gets the frame rate
     # multiplying by 60 turns frames / sec into frames / minute
-    return fft_frequencies(sr=sr * 60 / float(hop_length), n_fft=win_length)
+    return fft_frequencies(sr=sr * 60 / float(hop_length), n_fft=win_length, dtype=dtype)
+
+
+def _warn_nonfinite_weights(weights: jnp.ndarray, kind: str) -> None:
+    """Warn when a frequency weighting produced non-finite values.
+
+    A weighting curve is ``-inf`` at 0 Hz because the log of zero frequency is
+    undefined, which silently poisons any downstream sum. The check is skipped
+    for traced values, since a data-dependent branch is not available under
+    ``jax.jit``.
+
+    Args:
+        weights: Weighting curve, in dB.
+        kind: Single-letter name of the weighting, used in the message.
+    """
+    if isinstance(weights, jax.core.Tracer):
+        return
+    if not jnp.all(jnp.isfinite(weights)):
+        warnings.warn(
+            f"{kind}-weighting returned non-finite values. "
+            "This is likely due to low (~0 Hz) frequencies.",
+            stacklevel=3,
+        )
 
 
 # A-weighting should be capitalized: suppress the naming warning
@@ -1799,6 +1866,7 @@ def A_weighting(
     )
 
     if min_db is None:
+        _warn_nonfinite_weights(weights, "A")
         return weights
     else:
         return jnp.maximum(min_db, weights)
@@ -1876,7 +1944,10 @@ def B_weighting(
         - 0.5 * jnp.log10(f_sq + const[2])
     )
 
-    return weights if min_db is None else jnp.maximum(min_db, weights)
+    if min_db is None:
+        _warn_nonfinite_weights(weights, "B")
+        return weights
+    return jnp.maximum(min_db, weights)
 
 
 @overload
@@ -1949,7 +2020,10 @@ def C_weighting(
         - jnp.log10(f_sq + const[1])
     )
 
-    return weights if min_db is None else jnp.maximum(min_db, weights)
+    if min_db is None:
+        _warn_nonfinite_weights(weights, "C")
+        return weights
+    return jnp.maximum(min_db, weights)
 
 
 @overload
@@ -2028,6 +2102,7 @@ def D_weighting(
     )
 
     if min_db is None:
+        _warn_nonfinite_weights(weights, "D")
         return weights
     else:
         return jnp.maximum(min_db, weights)
@@ -2431,6 +2506,10 @@ def midi_to_svara_h(
     >>> librosax.midi_to_svara_h([72, 73, 74], Sa=60, abbr=False)
     array(['Ṡa', 'ṙe', 'Ṙe'], dtype='<U3')
     """
+    if not jnp.isfinite(midi):
+        # NaN and infinities have no svara; mirrors `midi_to_note`.
+        return ""
+
     SVARA_MAP = [
         "Sa",
         "re",
@@ -2764,6 +2843,10 @@ def midi_to_svara_c(
     mela_to_svara
     list_mela
     """
+    if not jnp.isfinite(midi):
+        # NaN and infinities have no svara; mirrors `midi_to_note`.
+        return ""
+
     svara_num = int(jnp.round(midi - Sa))
 
     svara_map = notation.mela_to_svara(mela, abbr=abbr, unicode=unicode)

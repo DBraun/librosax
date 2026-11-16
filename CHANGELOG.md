@@ -5,7 +5,144 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Effort-based Versioning](https://jacobtomlinson.dev/effver/).
 
-## [0.1.3] - Unreleased
+## [0.2.0] - 2026-11-16
+
+### Summary
+
+Librosax 0.2.0 tracks librosa 1.0.1, improves inverse STFT reconstruction,
+and adds opt-in sparse CQT projection. It requires Python 3.12 or newer
+and librosa 1.0.1 or newer.
+
+### Added
+
+- `istft()` supports `center=False` for spectrograms computed without
+  centering. Samples with zero window coverage remain zero
+  ([#2](https://github.com/DBraun/librosax/issues/2)).
+- `mfcc()` and `spectral_contrast()` accept `ref` and `top_db` for their
+  decibel conversions (librosa #2095). Pass `top_db=None` to disable
+  clipping.
+- `fft_frequencies()`, `cqt_frequencies()`, `mel_frequencies()`,
+  `tempo_frequencies()` and `fourier_tempo_frequencies()` accept `dtype=`
+  (librosa #2106).
+- **Full window specifications in `stft()`, `istft()` and the `Spectrogram`
+  layer**: alongside names like `"hann"`, they now accept `(name, param)`
+  tuples, a float Kaiser beta, a callable such as `np.hanning`, and an explicit
+  window array — the same set `librosa.filters.get_window` takes. Note that
+  `np.hanning` is the *symmetric* Hann window, which differs from the periodic
+  window `"hann"` selects.
+- **Signal mixing** (`core.audio`, exported at the top level):
+  - `to_mono()` - variadic downmix of one or more signals (librosa #1964)
+  - `to_stereo()` - combine a left and right signal into a stereo pair
+  - `to_multi()` - combine signals into a multi-channel signal
+  - `fix_length()` - trim or zero-pad an array along an axis
+- **Rhythm features** (`feature.rhythm`):
+  - `hybrid_tempogram()` - geometric mean of the Fourier and autocorrelation
+    tempograms (librosa #2004)
+  - `metrogram()` - rhythmic-ratio summary of a tempogram (librosa #1986)
+- **Decibel conversion**: `power_to_db()` and `amplitude_to_db()` take an
+  `axes` argument (librosa #2051). A callable `ref` is evaluated per slice and
+  `top_db` clamps per slice, so a batch of spectrograms is no longer scaled
+  against a single global peak. Pass `axes=None` for the previous behavior.
+- **Automatic CQT bin count**: `feature.cqt()` and `feature.cqt2010()` accept
+  `n_bins=None` and fill the spectrum up to Nyquist (librosa #2066). As in
+  librosa, a bin is kept only if the upper edge of its filter's passband
+  clears Nyquist, not merely its center frequency.
+- **Peak picking**: `util.peak_pick()` exposes `sparse`, `axis` and the new
+  `method` selector, with `"dp_count"` and `"dp_value"` performing optimal
+  selection by dynamic programming (librosa #1927).
+- **Non-finite handling in conversions** (librosa #1948):
+  - `note_to_midi("")` returns NaN
+  - `midi_to_note()`, `midi_to_svara_h()` and `midi_to_svara_c()` return `""`
+    for non-finite input
+- `A_weighting()`, `B_weighting()`, `C_weighting()` and `D_weighting()` warn
+  when the curve is non-finite, which happens near 0 Hz (librosa #1955).
+- `feature.rms()` validates its audio buffer (librosa #2087).
+
+### Changed
+
+- `feature.cqt()` defaults to `sparsity=0.0`, which preserves the dense
+  projection. Explicit positive values now enable approximate projection
+  using only the retained FFT bins. The sparse path processes frames in
+  blocks to limit temporary memory use.
+- **`note_to_hz()` no longer quantizes by default** (librosa #1947). It takes
+  `round_midi` explicitly, defaulting to `False`, so tuning deviations spelled
+  in a note name are preserved. Pass `round_midi=True` for the old behavior.
+- **`power_to_db()`'s signature now matches librosa's**: its first parameter is
+  renamed `x` -> `S` and the rest are keyword-only. The previous positional
+  order placed `amin` where librosa places `ref`, so a positional call ported
+  from librosa was silently wrong. `power_to_db(x=...)` must become
+  `power_to_db(S=...)`. `amplitude_to_db()` was already keyword-only.
+- **`power_to_db()` validates `amin` and rectifies complex input**, matching
+  librosa: `amin <= 0` raises `ParameterError`, and complex `S` warns and is
+  converted to magnitude rather than returning a complex result.
+- `localmax()`, `localmin()` and `autocorrelate()` are implemented in JAX
+  rather than delegating to librosa, so they now compose with `jit` and `vmap`
+  instead of raising on traced input. `autocorrelate()` is also differentiable;
+  `localmax()` and `localmin()` return boolean masks and carry no gradient.
+- `util.normalize()` re-exports the JAX implementation from `core.spectrum`
+  instead of round-tripping through NumPy. That implementation has been brought
+  in line with librosa: `fill=True` now uses the correct uniform fill value for
+  `axis=None` and for `norm=-inf` (it previously produced non-unit norms),
+  NumPy scalar norms are accepted, invalid `norm`, `threshold` and `fill`
+  values raise `ParameterError` rather than `ValueError`, and `threshold`
+  defaults through the new `util.tiny()` so integer input no longer raises.
+  Integer input returns floats, where the NumPy path truncated to zeros.
+- `util.fix_length()` and `util.tiny()` are exported under `librosax.util`,
+  matching where librosa puts them.
+- `feature.chroma_filter()` and `plimit_intervals()` follow JAX's configured
+  float dtype instead of hardcoding float64, which warned and truncated on
+  every call unless `jax_enable_x64` was set.
+
+### Removed
+
+- `filters.constant_q()` and `filters.constant_q_lengths()`, whose deprecation
+  expired in librosa 1.0.0. Use `filters.wavelet()` and
+  `filters.wavelet_lengths()`.
+- Support for Python 3.11, which librosa 1.0.0 does not support. The CI matrix
+  and the packaging metadata now start at 3.12.
+
+### Fixed
+
+- `istft()` preserves recoverable trailing samples when given an explicit
+  `length`, including for waveforms whose lengths are between hop boundaries.
+  Round-trip tests now cover short, hop-aligned, and unaligned waveforms
+  ([#3](https://github.com/DBraun/librosax/issues/3)).
+- JAX-native overlap-add reconstructs short spectrograms whose frame counts
+  previously caused the inverse STFT to truncate the output.
+- Spectral centroid, bandwidth, contrast, rolloff and polynomial features
+  preserve float32 precision with their default frequency grids, including
+  when JAX 64-bit mode is enabled (librosa #2106).
+- Spectral contrast preserves leading batch and channel dimensions and
+  validates the octave bands against Nyquist for a fixed sample rate.
+- Inverse mel transforms use librosa 1.0.1's dtype-aware NNLS initialization
+  (librosa #2122), and chroma tuning uses its lower-memory pitch tracker
+  (librosa #2120).
+- The `librosax.filters` wrappers forwarded `jax.Array` values into librosa,
+  whose numba kernels cannot type a non-NumPy buffer. The failure was masked
+  whenever an earlier NumPy call had warmed the same ufunc loop.
+- `chroma_stft()` estimated tuning through `jax.pure_callback`, which now hands
+  the callback a `jax.Array`; `librosa.piptrack` raised a `NumbaTypeError` on
+  it.
+- `plimit_intervals()` and `feature.spectral_contrast()` called
+  `jnp.atleast_1d` on a Python list, which JAX rejects.
+- `feature.cqt()` built a window only for `window="hann"` and silently used a
+  rectangular window for every other specification.
+- `feature.cqt()` accepted bin counts whose center frequencies exceeded
+  Nyquist; the `topbin_check` guard is now enforced.
+- `util.valid_audio()` documented a `False` return it never made; invalid input
+  raises, as in librosa.
+- Passing an explicit window array to `stft()` or `istft()` raised
+  `ValueError: The truth value of an array with more than one element is
+  ambiguous`, because the `"sqrt_hann"` check compared the array to a string.
+- `feature.cqt2010()` produced an opaque XLA lowering failure when `hop_length`
+  had fewer factors of two than the bin count needs octaves. It now raises
+  `ParameterError` naming the required multiple.
+- `feature.cqt()` and `feature.cqt2010()` accept callable and array window
+  specifications again, which the window fix above had narrowed to the set
+  `scipy.signal.get_window` accepts.
+- `to_mono()`, `to_stereo()` and `to_multi()` coerce their inputs before
+  promoting dtypes, so passing a NumPy float64 array no longer requests an
+  unavailable dtype and warns.
 
 ## [0.1.2] - 2026-02-02
 

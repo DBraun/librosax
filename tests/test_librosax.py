@@ -77,7 +77,7 @@ def test_stft(
         [None, 256, 320],
         [None, 512],
         ["hann"],
-        [True],  # todo: need to test center==False
+        [False, True],
         ["constant", "reflect"],
         [None],
     ),

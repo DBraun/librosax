@@ -14,6 +14,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 import warnings
+import librosa as upstream
 import librosax as librosa
 import numpy as np
 import pytest
@@ -381,6 +382,52 @@ def test_fourier_tempo_frequencies(sr, hop_length, win_length):
     # Ensure that the frequencies increase linearly
     dels = np.diff(freqs)
     assert np.allclose(dels, dels[0])
+
+
+@pytest.mark.parametrize(
+    "constructor, kwargs",
+    [
+        ("fft_frequencies", {"sr": 44100, "n_fft": 257}),
+        ("cqt_frequencies", {"n_bins": 24, "fmin": 65.4, "tuning": 0.25}),
+        ("mel_frequencies", {"n_mels": 40}),
+        ("mel_frequencies", {"n_mels": 40, "htk": True}),
+        ("tempo_frequencies", {"n_bins": 28, "hop_length": 500}),
+        ("fourier_tempo_frequencies", {"win_length": 193, "hop_length": 500}),
+    ],
+)
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_frequency_constructor_dtype(constructor, kwargs, dtype):
+    actual = getattr(librosa, constructor)(**kwargs, dtype=dtype)
+    expected = getattr(upstream, constructor)(**kwargs, dtype=dtype)
+
+    assert actual.dtype == expected.dtype == dtype
+    np.testing.assert_allclose(actual, expected, rtol=2e-6)
+
+
+def test_cqt_frequencies_dtype_with_typed_fmin():
+    fmin = np.float64(65.4)
+    actual = librosa.cqt_frequencies(24, fmin=fmin, dtype=np.float32)
+    expected = upstream.cqt_frequencies(24, fmin=float(fmin), dtype=np.float32)
+
+    assert actual.dtype == np.float32
+    np.testing.assert_allclose(actual, expected, rtol=2e-6)
+
+
+def test_feature_cqt_frequencies_with_traced_tuning():
+    @jax.jit
+    def frequencies(tuning):
+        return librosa.feature.cqt_frequencies(
+            n_bins=24, fmin=65.4, tuning=tuning, dtype=np.float32
+        )
+
+    tuning = np.float64(0.25)
+    actual = frequencies(tuning)
+    expected = upstream.cqt_frequencies(
+        24, fmin=65.4, tuning=tuning, dtype=np.float32
+    )
+
+    assert actual.dtype == np.float32
+    np.testing.assert_allclose(actual, expected, rtol=2e-6)
 
 
 @pytest.mark.parametrize("min_db", [None, -40, -80])

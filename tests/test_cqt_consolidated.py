@@ -40,6 +40,44 @@ def cqt2010_jit():
     )
 
 
+@pytest.mark.parametrize("shape", [(4097,), (2, 4097), (2, 4033), (2, 128)])
+@pytest.mark.parametrize("pad_mode", ["constant", "reflect"])
+def test_sparse_cqt_matches_dense_projection_of_sparsified_filters(shape, pad_mode):
+    from librosax.feature.spectral import _create_cqt_kernels
+
+    sr, fmin, n_bins, hop_length = 22050, 220.0, 36, 128
+    sparsity = 0.05
+    y = np.random.default_rng(0).standard_normal(shape, dtype=np.float32)
+    Q = 1 / (2 ** (1 / 12) - 1)
+    kernels, width, _, _ = _create_cqt_kernels(Q, sr, fmin, n_bins, 12, 1)
+    basis = np.fft.fft(kernels, axis=-1)[:, : width // 2 + 1].conj()
+    sparse_basis = librosa.util.sparsify_rows(basis, quantile=sparsity).toarray()
+    D = librosa.stft(
+        y, n_fft=width, hop_length=hop_length, window="boxcar", pad_mode=pad_mode
+    ) / width
+    expected = np.einsum("bf,...ft->...bt", sparse_basis, D)
+
+    kwargs = dict(
+        sr=sr, fmin=fmin, n_bins=n_bins, hop_length=hop_length, pad_mode=pad_mode, scale=False
+    )
+    project = jax.jit(lambda x: librosax.feature.cqt(x, sparsity=sparsity, **kwargs))
+    actual = np.asarray(project(y))
+    dense = np.asarray(librosax.feature.cqt(y, **kwargs))
+    zero_sparsity = np.asarray(librosax.feature.cqt(y, sparsity=0.0, **kwargs))
+
+    assert actual.shape == dense.shape
+    assert actual.dtype == dense.dtype
+    np.testing.assert_allclose(actual, expected, atol=1e-7, rtol=1e-5)
+    np.testing.assert_array_equal(dense, zero_sparsity)
+    assert not np.allclose(actual, dense)
+
+
+@pytest.mark.parametrize("sparsity", [-0.01, 1.0, np.nan])
+def test_cqt_rejects_invalid_sparsity(sparsity):
+    with pytest.raises(librosax.ParameterError, match="sparsity must be"):
+        librosax.feature.cqt(jnp.zeros(1024), sparsity=sparsity)
+
+
 class TestCQTCore:
     """Core CQT functionality tests."""
     

@@ -217,7 +217,7 @@ def cqt(
     tuning: float = 0.0,
     filter_scale: float = 1.0,
     norm: Optional[float] = 1.0,
-    sparsity: float = 0.01,
+    sparsity: float = 0.0,
     window: str = "hann",
     scale: bool = True,
     pad_mode: str = "constant",
@@ -229,6 +229,11 @@ def cqt(
     use_1992_version: bool = True
 ) -> jnp.ndarray
 ```
+
+Pass `sparsity=0.01` to discard up to 1% of each filter's total FFT
+magnitude and gather only the retained bins. This changes the
+coefficients slightly. The default `sparsity=0.0` uses the dense path.
+Treat `sparsity` as static when compiling with `jax.jit`.
 
 ### `cqt2010()`
 ```python

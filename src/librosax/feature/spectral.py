@@ -1227,7 +1227,7 @@ def _create_cqt_kernels(
     topbin_check: bool = True,
     gamma: float = 0.0,
     n_fft_fixed: Optional[int] = None,
-) -> tuple[jnp.ndarray, int, jnp.ndarray, jnp.ndarray]:
+) -> tuple[np.ndarray, int, jnp.ndarray, jnp.ndarray]:
     """Create CQT kernels following nnAudio's implementation.
     
     This function creates the CQT kernels in time domain, similar to nnAudio's
@@ -1306,12 +1306,93 @@ def _create_cqt_kernels(
         # Place kernel in the array
         kernels_np[k, start:start + l] = sig
     
-    # Convert to JAX arrays at the end
-    kernels = jnp.array(kernels_np, dtype=jnp.complex64)
+    # Keep the kernels on the host so sparsification can run at trace time.
+    kernels = kernels_np.astype(np.complex64)
     lengths = jnp.array(lengths_np, dtype=jnp.float32)
     freqs = jnp.array(freqs_np, dtype=jnp.float32)
     
     return kernels, fftLen, lengths, freqs
+
+
+def _sparse_cqt_basis(
+    kernels: np.ndarray, sparsity: float
+) -> tuple[list[tuple[np.ndarray, np.ndarray]], np.ndarray]:
+    """Pack retained FFT bins into groups of similarly sized filters."""
+    n_freq = kernels.shape[-1] // 2 + 1
+    basis = np.fft.fft(kernels, axis=-1)[:, :n_freq].conj()
+    sparse_basis = librosa.util.sparsify_rows(basis, quantile=sparsity)
+
+    # Group rows by the next power of two of their support size. Padding all
+    # rows to the widest filter would inflate the gathered spectrogram.
+    groups: dict[int, list[int]] = {}
+    for row, count in enumerate(np.diff(sparse_basis.indptr)):
+        width = 1 << (max(int(count), 1) - 1).bit_length()
+        groups.setdefault(width, []).append(row)
+
+    packed = []
+    row_order = []
+    for width, rows in groups.items():
+        indices = np.zeros((len(rows), width), dtype=np.int32)
+        weights = np.zeros((len(rows), width), dtype=basis.dtype)
+        for i, row in enumerate(rows):
+            start, stop = sparse_basis.indptr[row : row + 2]
+            indices[i, : stop - start] = sparse_basis.indices[start:stop]
+            weights[i, : stop - start] = sparse_basis.data[start:stop]
+        packed.append((indices, weights))
+        row_order.extend(rows)
+
+    return packed, np.argsort(row_order)
+
+
+def _project_sparse_cqt(
+    y: jnp.ndarray, kernels: np.ndarray, hop_length: int, sparsity: float
+) -> jnp.ndarray:
+    """Compute and project small blocks of frames to bound temporary buffers."""
+    kernel_width = kernels.shape[-1]
+    packed_basis, row_order = _sparse_cqt_basis(kernels, sparsity)
+    n_frames = 1 + (y.shape[-1] - kernel_width) // hop_length
+
+    def project(segment):
+        frames = _cqt_stft(segment, kernel_width, hop_length).swapaxes(-2, -1)
+        projected = [
+            jnp.sum(frames[..., indices] * weights, axis=-1)
+            for indices, weights in packed_basis
+        ]
+        return jnp.concatenate(projected, axis=-1)[..., row_order].swapaxes(-2, -1)
+
+    # Budget 32 frames across the batch to limit both FFT and gather buffers.
+    block_size = max(1, 32 // max(1, y.shape[0]))
+    if n_frames <= block_size:
+        return project(y)
+
+    n_blocks, remainder = divmod(n_frames, block_size)
+    segment_length = kernel_width + (block_size - 1) * hop_length
+
+    def project_block(block):
+        start = block * block_size * hop_length
+        segment = jax.lax.dynamic_slice_in_dim(y, start, segment_length, axis=-1)
+        return project(segment)
+
+    blocks = jax.lax.map(project_block, jnp.arange(n_blocks))
+    result = jnp.moveaxis(blocks, 0, -2).reshape(*blocks.shape[1:-1], n_blocks * block_size)
+    if remainder:
+        tail = y[..., n_blocks * block_size * hop_length :]
+        result = jnp.concatenate([result, project(tail)], axis=-1)
+    return result
+
+
+def _cqt_stft(y: jnp.ndarray, kernel_width: int, hop_length: int) -> jnp.ndarray:
+    _, _, D = jssignal.stft(
+        y,
+        window="boxcar",  # CQT kernels already have windows.
+        nperseg=kernel_width,
+        noverlap=kernel_width - hop_length,
+        nfft=kernel_width,
+        boundary=None,  # The caller pads the waveform.
+        padded=False,
+        axis=-1,
+    )
+    return D
 
 
 def cqt(
@@ -1325,7 +1406,7 @@ def cqt(
     tuning: Optional[float] = 0.0,
     filter_scale: float = 1.0,
     norm: Optional[float] = 1.0,
-    sparsity: float = 0.01,
+    sparsity: float = 0.0,
     window: str = "hann",
     scale: bool = True,
     pad_mode: str = "constant",
@@ -1363,7 +1444,11 @@ def cqt(
         tuning: Tuning offset in fractions of a bin
         filter_scale: Filter scale factor (Q = filter_scale / (2^(1/bins_per_octave) - 1))
         norm: Normalization type for basis functions (1, 2, or None)
-        sparsity: Sparsification factor (not implemented)
+        sparsity: Fraction of each filter's FFT magnitude to discard, in
+            ``[0, 1)``. The default ``0.0`` uses the dense projection.
+            Positive values enable an approximate projection that gathers only
+            retained FFT bins. The speed and error depend on the filter bank
+            and input.
         window: Window function
         scale: If True, scale by sqrt(filter_lengths) following librosa normalization
         pad_mode: Padding mode
@@ -1382,6 +1467,9 @@ def cqt(
     """
     if y is None:
         raise ParameterError("y cannot be None - audio input is required for CQT")
+
+    if not 0 <= sparsity < 1:
+        raise ParameterError("sparsity must be in [0, 1)")
 
     if fmin is None:
         fmin = note_to_hz("C1")
@@ -1420,28 +1508,14 @@ def cqt(
     elif pad_mode == "reflect":
         y = jnp.pad(y, ((0, 0), (kernel_width // 2, kernel_width // 2)), mode="reflect")
 
-    # Take FFT of kernels once
-    cqt_kernels_fft = jnp.fft.fft(cqt_kernels, axis=1)
-    # Extract only the positive frequencies
-    cqt_kernels_fft = cqt_kernels_fft[:, :kernel_width // 2 + 1]
-    
-    # Compute STFT for all batch elements at once
-    _, _, D = jssignal.stft(
-        y,
-        window="boxcar",  # rectangular window since CQT kernels already have windows
-        nperseg=kernel_width,
-        noverlap=kernel_width - hop_length,
-        nfft=kernel_width,
-        boundary=None,  # No padding, we already padded
-        padded=False,
-        axis=-1,
-    )
-    
-    # Multiply in frequency domain
-    # D shape: (batch, freq_bins, time_frames) for batched input
-    # cqt_kernels_fft shape: (n_bins, freq_bins)
-    # Result shape: (batch, n_bins, time_frames)
-    C = jnp.einsum('bf,...ft->...bt', cqt_kernels_fft.conj(), D)
+    if sparsity > 0:
+        if hop_length <= 0:
+            raise ParameterError("hop_length must be positive")
+        C = _project_sparse_cqt(y, cqt_kernels, hop_length, sparsity)
+    else:
+        D = _cqt_stft(y, kernel_width, hop_length)
+        cqt_kernels_fft = jnp.fft.fft(cqt_kernels, axis=1)[:, :kernel_width // 2 + 1]
+        C = jnp.einsum('bf,...ft->...bt', cqt_kernels_fft.conj(), D)
 
     # Apply normalization based on type
     if normalization_type == "librosa":
@@ -1805,6 +1879,7 @@ def cqt2010(
             y = jax.vmap(downsample_fn)(y)
         
     # Split kernels
+    cqt_kernels = jnp.asarray(cqt_kernels)
     cqt_kernels_real = jnp.real(cqt_kernels)[:, jnp.newaxis, :]
     cqt_kernels_imag = jnp.imag(cqt_kernels)[:, jnp.newaxis, :]
     

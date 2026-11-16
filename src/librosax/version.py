@@ -1,5 +1,5 @@
-version = "0.1.3"
-short_version = "0.1"
+version = "0.2.0"
+short_version = "0.2"
 
 import sys
 import importlib
@@ -28,50 +28,41 @@ def __get_mod_version(modname):
 
 
 def show_versions() -> None:
-    """Return the version information for all librosa dependencies.
-    
+    """Print the version information for librosax and its dependencies.
+
     Prints a formatted list of all core and extra dependencies along with
     their installed versions.
     """
     core_deps = [
-        "audioread",
+        "jax",
+        "jaxlib",
+        "flax",
+        "einops",
+        "librosa",
         "numpy",
         "scipy",
-        "sklearn",
-        "joblib",
-        "decorator",
         "numba",
         "soundfile",
-        "pooch",
         "soxr",
-        "typing_extensions",
         "lazy_loader",
-        "msgpack",
+        "typing_extensions",
     ]
 
     extra_deps = [
-        "numpydoc",
-        "sphinx",
-        "sphinx_rtd_theme",
+        "torch",
+        "torchlibrosa",
         "matplotlib",
-        "sphinx_multiversion",
-        "sphinx_gallery",
-        "mir_eval",
-        "ipython",
-        "sphinxcontrib.rsvgconverter",
+        "sphinx",
+        "furo",
+        "m2r2",
         "pytest",
-        "pytest_mpl",
         "pytest_cov",
-        "samplerate",
-        "resampy",
-        "presets",
-        "packaging",
     ]
 
     print("INSTALLED VERSIONS")
     print("------------------")
     print(f"python: {sys.version}\n")
-    print(f"librosa: {version}\n")
+    print(f"librosax: {version}\n")
     for dep in core_deps:
         print("{}: {}".format(dep, __get_mod_version(dep)))
     print("")

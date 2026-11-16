@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Librosax" href="librosax.html"><link rel="prev" title="Scope and Design Philosophy" href="scope.html">
 
-    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+    <!-- Generated with Sphinx 9.1.1 and Furo 2025.12.19 -->
         <title>Changelog - Librosax Documentation, v0.2.0</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
@@ -317,20 +317,28 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a class="reference external" href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a class="reference external" href="https://jacobtomlinson.dev/effver/">Effort-based Versioning</a>.</p>
-<section id="unreleased">
-<h2>[0.2.0] - Unreleased<a class="headerlink" href="#unreleased" title="Link to this heading">¶</a></h2>
+<section id="id2">
+<h2>[0.2.0] - 2026-11-16<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h2>
 <section id="summary">
 <h3>Summary<a class="headerlink" href="#summary" title="Link to this heading">¶</a></h3>
-<p>Tracks librosa through its 1.0.0 release. librosa 1.0.0 is now the minimum
-supported version, which raises the Python floor to 3.12: librosa adopted
-<a class="reference external" href="https://scientific-python.org/specs/spec-0000/">SPEC 0</a> in 1.0.0 and declares
-<code class="docutils literal notranslate"><span class="pre">requires-python</span> <span class="pre">&gt;=3.12</span></code>, so librosax cannot resolve on 3.11.</p>
+<p>Librosax 0.2.0 tracks librosa 1.0.1, improves inverse STFT reconstruction,
+and adds opt-in sparse CQT projection. It requires Python 3.12 or newer
+and librosa 1.0.1 or newer.</p>
 </section>
 <section id="added">
 <h3>Added<a class="headerlink" href="#added" title="Link to this heading">¶</a></h3>
 <ul class="simple">
-<li><p><strong>Full window specifications in ``stft()``, ``istft()`` and the ``Spectrogram``
-layer</strong>: alongside names like <code class="docutils literal notranslate"><span class="pre">&quot;hann&quot;</span></code>, they now accept <code class="docutils literal notranslate"><span class="pre">(name,</span> <span class="pre">param)</span></code>
+<li><p><code class="docutils literal notranslate"><span class="pre">istft()</span></code> supports <code class="docutils literal notranslate"><span class="pre">center=False</span></code> for spectrograms computed without
+centering. Samples with zero window coverage remain zero
+(<a class="reference external" href="https://github.com/DBraun/librosax/issues/2">#2</a>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mfcc()</span></code> and <code class="docutils literal notranslate"><span class="pre">spectral_contrast()</span></code> accept <code class="docutils literal notranslate"><span class="pre">ref</span></code> and <code class="docutils literal notranslate"><span class="pre">top_db</span></code> for their
+decibel conversions (librosa #2095). Pass <code class="docutils literal notranslate"><span class="pre">top_db=None</span></code> to disable
+clipping.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fft_frequencies()</span></code>, <code class="docutils literal notranslate"><span class="pre">cqt_frequencies()</span></code>, <code class="docutils literal notranslate"><span class="pre">mel_frequencies()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tempo_frequencies()</span></code> and <code class="docutils literal notranslate"><span class="pre">fourier_tempo_frequencies()</span></code> accept <code class="docutils literal notranslate"><span class="pre">dtype=</span></code>
+(librosa #2106).</p></li>
+<li><p><strong>Full window specifications in</strong> <code class="docutils literal notranslate"><span class="pre">stft()</span></code><strong>,</strong> <code class="docutils literal notranslate"><span class="pre">istft()</span></code> <strong>and the</strong> <code class="docutils literal notranslate"><span class="pre">Spectrogram</span></code>
+<strong>layer</strong>: alongside names like <code class="docutils literal notranslate"><span class="pre">&quot;hann&quot;</span></code>, they now accept <code class="docutils literal notranslate"><span class="pre">(name,</span> <span class="pre">param)</span></code>
 tuples, a float Kaiser beta, a callable such as <code class="docutils literal notranslate"><span class="pre">np.hanning</span></code>, and an explicit
 window array — the same set <code class="docutils literal notranslate"><span class="pre">librosa.filters.get_window</span></code> takes. Note that
 <code class="docutils literal notranslate"><span class="pre">np.hanning</span></code> is the <em>symmetric</em> Hann window, which differs from the periodic
@@ -376,15 +384,19 @@ when the curve is non-finite, which happens near 0 Hz (librosa #1955).</p></li>
 <section id="changed">
 <h3>Changed<a class="headerlink" href="#changed" title="Link to this heading">¶</a></h3>
 <ul class="simple">
-<li><p><strong>``note_to_hz()`` no longer quantizes by default</strong> (librosa #1947). It takes
+<li><p><code class="docutils literal notranslate"><span class="pre">feature.cqt()</span></code> defaults to <code class="docutils literal notranslate"><span class="pre">sparsity=0.0</span></code>, which preserves the dense
+projection. Explicit positive values now enable approximate projection
+using only the retained FFT bins. The sparse path processes frames in
+blocks to limit temporary memory use.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">note_to_hz()</span></code> <strong>no longer quantizes by default</strong> (librosa #1947). It takes
 <code class="docutils literal notranslate"><span class="pre">round_midi</span></code> explicitly, defaulting to <code class="docutils literal notranslate"><span class="pre">False</span></code>, so tuning deviations spelled
 in a note name are preserved. Pass <code class="docutils literal notranslate"><span class="pre">round_midi=True</span></code> for the old behavior.</p></li>
-<li><p><strong>``power_to_db()``‘s signature now matches librosa’s</strong>: its first parameter is
+<li><p><code class="docutils literal notranslate"><span class="pre">power_to_db()</span></code><strong>‘s signature now matches librosa’s</strong>: its first parameter is
 renamed <code class="docutils literal notranslate"><span class="pre">x</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">S</span></code> and the rest are keyword-only. The previous positional
 order placed <code class="docutils literal notranslate"><span class="pre">amin</span></code> where librosa places <code class="docutils literal notranslate"><span class="pre">ref</span></code>, so a positional call ported
 from librosa was silently wrong. <code class="docutils literal notranslate"><span class="pre">power_to_db(x=...)</span></code> must become
 <code class="docutils literal notranslate"><span class="pre">power_to_db(S=...)</span></code>. <code class="docutils literal notranslate"><span class="pre">amplitude_to_db()</span></code> was already keyword-only.</p></li>
-<li><p><strong>``power_to_db()`` validates ``amin`` and rectifies complex input</strong>, matching
+<li><p><code class="docutils literal notranslate"><span class="pre">power_to_db()</span></code> <strong>validates</strong> <code class="docutils literal notranslate"><span class="pre">amin</span></code> <strong>and rectifies complex input</strong>, matching
 librosa: <code class="docutils literal notranslate"><span class="pre">amin</span> <span class="pre">&lt;=</span> <span class="pre">0</span></code> raises <code class="docutils literal notranslate"><span class="pre">ParameterError</span></code>, and complex <code class="docutils literal notranslate"><span class="pre">S</span></code> warns and is
 converted to magnitude rather than returning a complex result.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">localmax()</span></code>, <code class="docutils literal notranslate"><span class="pre">localmin()</span></code> and <code class="docutils literal notranslate"><span class="pre">autocorrelate()</span></code> are implemented in JAX
@@ -419,6 +431,20 @@ and the packaging metadata now start at 3.12.</p></li>
 <section id="fixed">
 <h3>Fixed<a class="headerlink" href="#fixed" title="Link to this heading">¶</a></h3>
 <ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">istft()</span></code> preserves recoverable trailing samples when given an explicit
+<code class="docutils literal notranslate"><span class="pre">length</span></code>, including for waveforms whose lengths are between hop boundaries.
+Round-trip tests now cover short, hop-aligned, and unaligned waveforms
+(<a class="reference external" href="https://github.com/DBraun/librosax/issues/3">#3</a>).</p></li>
+<li><p>JAX-native overlap-add reconstructs short spectrograms whose frame counts
+previously caused the inverse STFT to truncate the output.</p></li>
+<li><p>Spectral centroid, bandwidth, contrast, rolloff and polynomial features
+preserve float32 precision with their default frequency grids, including
+when JAX 64-bit mode is enabled (librosa #2106).</p></li>
+<li><p>Spectral contrast preserves leading batch and channel dimensions and
+validates the octave bands against Nyquist for a fixed sample rate.</p></li>
+<li><p>Inverse mel transforms use librosa 1.0.1’s dtype-aware NNLS initialization
+(librosa #2122), and chroma tuning uses its lower-memory pitch tracker
+(librosa #2120).</p></li>
 <li><p>The <code class="docutils literal notranslate"><span class="pre">librosax.filters</span></code> wrappers forwarded <code class="docutils literal notranslate"><span class="pre">jax.Array</span></code> values into librosa,
 whose numba kernels cannot type a non-NumPy buffer. The failure was masked
 whenever an earlier NumPy call had warmed the same ufunc loop.</p></li>
@@ -434,8 +460,7 @@ Nyquist; the <code class="docutils literal notranslate"><span class="pre">topbin
 <li><p><code class="docutils literal notranslate"><span class="pre">util.valid_audio()</span></code> documented a <code class="docutils literal notranslate"><span class="pre">False</span></code> return it never made; invalid input
 raises, as in librosa.</p></li>
 <li><p>Passing an explicit window array to <code class="docutils literal notranslate"><span class="pre">stft()</span></code> or <code class="docutils literal notranslate"><span class="pre">istft()</span></code> raised
-<code class="docutils literal notranslate"><span class="pre">ValueError:</span> <span class="pre">The</span> <span class="pre">truth</span> <span class="pre">value</span> <span class="pre">of</span> <span class="pre">an</span> <span class="pre">array</span> <span class="pre">with</span> <span class="pre">more</span> <span class="pre">than</span> <span class="pre">one</span> <span class="pre">element</span> <span class="pre">is</span>
-<span class="pre">ambiguous</span></code>, because the <code class="docutils literal notranslate"><span class="pre">&quot;sqrt_hann&quot;</span></code> check compared the array to a string.</p></li>
+<code class="docutils literal notranslate"><span class="pre">ValueError:</span> <span class="pre">The</span> <span class="pre">truth</span> <span class="pre">value</span> <span class="pre">of</span> <span class="pre">an</span> <span class="pre">array</span> <span class="pre">with</span> <span class="pre">more</span> <span class="pre">than</span> <span class="pre">one</span> <span class="pre">element</span> <span class="pre">is</span> <span class="pre">ambiguous</span></code>, because the <code class="docutils literal notranslate"><span class="pre">&quot;sqrt_hann&quot;</span></code> check compared the array to a string.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">feature.cqt2010()</span></code> produced an opaque XLA lowering failure when <code class="docutils literal notranslate"><span class="pre">hop_length</span></code>
 had fewer factors of two than the bin count needs octaves. It now raises
 <code class="docutils literal notranslate"><span class="pre">ParameterError</span></code> naming the required multiple.</p></li>
@@ -448,17 +473,14 @@ unavailable dtype and warns.</p></li>
 </ul>
 </section>
 </section>
-<section id="id2">
-<h2>[0.1.3] - Unreleased<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h2>
-</section>
-<section id="id3">
-<h2>[0.1.2] - 2026-02-02<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h2>
-<section id="id4">
-<h3>Summary<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h3>
+<section id="id5">
+<h2>[0.1.2] - 2026-02-02<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h2>
+<section id="id6">
+<h3>Summary<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
 <p>Major API expansion with new modules, functions, and fixes for librosa compatibility.</p>
 </section>
-<section id="id5">
-<h3>Added<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
+<section id="id7">
+<h3>Added<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p><strong>Filter module enhancements</strong>:</p>
 <ul>
@@ -568,8 +590,8 @@ unavailable dtype and warns.</p></li>
 </li>
 </ul>
 </section>
-<section id="id6">
-<h3>Fixed<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
+<section id="id8">
+<h3>Fixed<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p><strong>Fix STFT/iSTFT window scaling</strong>: Changed scaling from <code class="docutils literal notranslate"><span class="pre">win_length/2.0</span></code> to <code class="docutils literal notranslate"><span class="pre">win.sum()</span></code>, enabling correct reconstruction with any window type (hann, sqrt_hann, rectangular/ones, etc.)</p></li>
 <li><p><strong>Fix chroma_stft tuning estimation</strong>: Now estimates tuning from signal when <code class="docutils literal notranslate"><span class="pre">tuning=None</span></code> (matching librosa behavior), wrapped with <code class="docutils literal notranslate"><span class="pre">jax.pure_callback</span></code> for JIT compatibility</p></li>
@@ -588,7 +610,7 @@ unavailable dtype and warns.</p></li>
 <li><p>Converted <code class="docutils literal notranslate"><span class="pre">stack_memory()</span></code> to wrapper to support all parameter combinations (including negative delays)</p></li>
 </ul>
 </li>
-<li><p><a href="#id7"><span class="problematic" id="id8">**</span></a>Fix <code class="docutils literal notranslate"><span class="pre">istft()</span></code>** to maintain JAX-native implementation:</p>
+<li><p><strong>Fix</strong> <code class="docutils literal notranslate"><span class="pre">istft()</span></code> to maintain JAX-native implementation:</p>
 <ul>
 <li><p>Raises NotImplementedError for center=False (not yet supported)</p></li>
 <li><p>center=True works correctly and remains GPU-accelerable and JIT-compilable</p></li>
@@ -803,7 +825,7 @@ unavailable dtype and warns.</p></li>
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">Changelog</a><ul>
-<li><a class="reference internal" href="#unreleased">[0.2.0] - Unreleased</a><ul>
+<li><a class="reference internal" href="#id2">[0.2.0] - 2026-11-16</a><ul>
 <li><a class="reference internal" href="#summary">Summary</a></li>
 <li><a class="reference internal" href="#added">Added</a></li>
 <li><a class="reference internal" href="#changed">Changed</a></li>
@@ -811,11 +833,10 @@ unavailable dtype and warns.</p></li>
 <li><a class="reference internal" href="#fixed">Fixed</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#id2">[0.1.3] - Unreleased</a></li>
-<li><a class="reference internal" href="#id3">[0.1.2] - 2026-02-02</a><ul>
-<li><a class="reference internal" href="#id4">Summary</a></li>
-<li><a class="reference internal" href="#id5">Added</a></li>
-<li><a class="reference internal" href="#id6">Fixed</a></li>
+<li><a class="reference internal" href="#id5">[0.1.2] - 2026-02-02</a><ul>
+<li><a class="reference internal" href="#id6">Summary</a></li>
+<li><a class="reference internal" href="#id7">Added</a></li>
+<li><a class="reference internal" href="#id8">Fixed</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#id9">[0.1.1] - 2025-11-14</a></li>

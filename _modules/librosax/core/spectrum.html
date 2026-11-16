@@ -4,7 +4,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
 
-    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+    <!-- Generated with Sphinx 9.1.1 and Furo 2025.12.19 -->
         <title>librosax.core.spectrum - Librosax Documentation, v0.2.0</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
@@ -323,6 +323,8 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">scipy.fftpack</span><span class="w"> </span><span class="kn">import</span> <span class="n">dct</span> <span class="k">as</span> <span class="n">scipy_dct</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">.audio</span><span class="w"> </span><span class="kn">import</span> <span class="n">fix_length</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.convert</span><span class="w"> </span><span class="kn">import</span> <span class="n">fft_frequencies</span> <span class="k">as</span> <span class="n">_fft_frequencies</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">..util.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ParameterError</span>
 
 
@@ -503,7 +505,9 @@
         <span class="s2">"reflect"</span><span class="p">:</span> <span class="s2">"even"</span><span class="p">,</span>
     <span class="p">}[</span><span class="n">pad_mode</span><span class="p">]</span>
 
-    <span class="n">win</span> <span class="o">=</span> <span class="n">_analysis_window</span><span class="p">(</span><span class="n">window</span><span class="p">,</span> <span class="n">win_length</span><span class="p">,</span> <span class="n">n_fft</span><span class="p">)</span>
+    <span class="c1"># Match the analysis window to the waveform precision even in x64 mode.</span>
+    <span class="n">window_dtype</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">result_type</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">waveform</span><span class="p">)</span><span class="o">.</span><span class="n">real</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+    <span class="n">win</span> <span class="o">=</span> <span class="n">_analysis_window</span><span class="p">(</span><span class="n">window</span><span class="p">,</span> <span class="n">win_length</span><span class="p">,</span> <span class="n">n_fft</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">window_dtype</span><span class="p">)</span>
 
     <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">Zxx</span> <span class="o">=</span> <span class="n">signal</span><span class="o">.</span><span class="n">stft</span><span class="p">(</span>
         <span class="n">waveform</span><span class="p">,</span>
@@ -533,7 +537,8 @@
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Compute the Inverse Short-Time Fourier Transform (ISTFT).</span>
 
-<span class="sd">    This function reconstructs a waveform from an STFT matrix using JAX's ``scipy.signal.istft`` implementation.</span>
+<span class="sd">    Windowed inverse FFT frames are added at their sample offsets and</span>
+<span class="sd">    normalized by the sum of squared windows.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        stft_matrix: Complex STFT matrix. The second-to-last axis must be frequency</span>
@@ -553,8 +558,12 @@
 <span class="sd">            param)`` tuple, a Kaiser beta, a callable such as ``np.hanning``,</span>
 <span class="sd">            or an explicit array of length ``win_length``. Default is</span>
 <span class="sd">            ``"hann"``.</span>
-<span class="sd">        center: If ``True``, assumes the waveform was padded so that frames were centered. Default is ``True``.</span>
-<span class="sd">        length: Target length for the reconstructed signal. If ``None``, the entire signal is returned.</span>
+<span class="sd">        center: If ``True`` (default), remove the leading padding used to</span>
+<span class="sd">            center the analysis frames. If ``False``, the first frame starts</span>
+<span class="sd">            at sample zero. Samples with zero window coverage remain zero.</span>
+<span class="sd">        length: Target length for the reconstructed signal. If supplied, trim</span>
+<span class="sd">            or zero-pad to this length. If ``None`` and ``center=True``, also</span>
+<span class="sd">            remove the trailing centered padding.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Reconstructed time-domain signal. The last axis is time (samples).</span>
@@ -567,7 +576,8 @@
 <span class="sd">        where T is the reconstructed signal length.</span>
 
 <span class="sd">    Raises:</span>
-<span class="sd">        AssertionError: If center is ``False`` because the function is only tested for ``center=True``.</span>
+<span class="sd">        ValueError: If the spectrum has no frames, or if the FFT size or hop</span>
+<span class="sd">            length is invalid.</span>
 
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; import jax.numpy as jnp</span>
@@ -587,48 +597,45 @@
 <span class="sd">        &gt;&gt;&gt; y_trimmed.shape</span>
 <span class="sd">        (22050,)</span>
 <span class="sd">    """</span>
-    <span class="c1"># Only center=True is currently supported</span>
-    <span class="c1"># center=False would require different padding/trimming logic</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">center</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"istft currently only supports center=True"</span><span class="p">)</span>
+    <span class="n">stft_matrix</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">stft_matrix</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">stft_matrix</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">stft_matrix</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"istft requires a spectrogram with at least one frame"</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">n_fft</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">n_fft</span> <span class="o">=</span> <span class="p">(</span><span class="n">stft_matrix</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="mi">2</span>
+    <span class="k">if</span> <span class="n">n_fft</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"n_fft must be a positive integer"</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">win_length</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">win_length</span> <span class="o">=</span> <span class="n">n_fft</span>
 
     <span class="k">if</span> <span class="n">hop_length</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">hop_length</span> <span class="o">=</span> <span class="n">win_length</span> <span class="o">//</span> <span class="mi">4</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="n">hop_length</span> <span class="o">&lt;=</span> <span class="n">n_fft</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"hop_length must be positive and no greater than n_fft"</span><span class="p">)</span>
 
-    <span class="n">win</span> <span class="o">=</span> <span class="n">_analysis_window</span><span class="p">(</span><span class="n">window</span><span class="p">,</span> <span class="n">win_length</span><span class="p">,</span> <span class="n">n_fft</span><span class="p">)</span>
+    <span class="n">win</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">_analysis_window</span><span class="p">(</span><span class="n">window</span><span class="p">,</span> <span class="n">win_length</span><span class="p">,</span> <span class="n">n_fft</span><span class="p">))</span>
+    <span class="n">frames</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">irfft</span><span class="p">(</span><span class="n">stft_matrix</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">n_fft</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">swapaxes</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">windowed_frames</span> <span class="o">=</span> <span class="n">frames</span> <span class="o">*</span> <span class="n">win</span>
+    <span class="n">n_frames</span> <span class="o">=</span> <span class="n">frames</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
+    <span class="n">padded_length</span> <span class="o">=</span> <span class="n">n_fft</span> <span class="o">+</span> <span class="n">hop_length</span> <span class="o">*</span> <span class="p">(</span><span class="n">n_frames</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">offsets</span> <span class="o">=</span> <span class="n">hop_length</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_frames</span><span class="p">)[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">+</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_fft</span><span class="p">)</span>
 
-    <span class="n">_</span><span class="p">,</span> <span class="n">reconstructed_signal</span> <span class="o">=</span> <span class="n">signal</span><span class="o">.</span><span class="n">istft</span><span class="p">(</span>
-        <span class="n">stft_matrix</span><span class="p">,</span>
-        <span class="n">window</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">win</span><span class="p">),</span>
-        <span class="n">nperseg</span><span class="o">=</span><span class="n">n_fft</span><span class="p">,</span>
-        <span class="n">noverlap</span><span class="o">=</span><span class="n">n_fft</span> <span class="o">-</span> <span class="n">hop_length</span><span class="p">,</span>
-        <span class="n">nfft</span><span class="o">=</span><span class="n">n_fft</span><span class="p">,</span>
-        <span class="n">boundary</span><span class="o">=</span><span class="n">center</span><span class="p">,</span>
-    <span class="p">)</span>
+    <span class="n">waveform</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="o">*</span><span class="n">frames</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">],</span> <span class="n">padded_length</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">windowed_frames</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="n">waveform</span> <span class="o">=</span> <span class="n">waveform</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">offsets</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">windowed_frames</span><span class="p">)</span>
+    <span class="n">envelope</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">padded_length</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">win</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">offsets</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">win</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
 
-    <span class="n">reconstructed_signal</span> <span class="o">=</span> <span class="n">reconstructed_signal</span> <span class="o">/</span> <span class="n">win</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
-
-    <span class="c1"># Trim or pad the output signal to the desired length</span>
-    <span class="k">if</span> <span class="n">length</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">length</span> <span class="o">&gt;</span> <span class="n">reconstructed_signal</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
-            <span class="c1"># Pad the signal if it is shorter than the desired length</span>
-            <span class="n">pad_width</span> <span class="o">=</span> <span class="n">length</span> <span class="o">-</span> <span class="n">reconstructed_signal</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-            <span class="n">reconstructed_signal</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span>
-                <span class="n">reconstructed_signal</span><span class="p">,</span>
-                <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)]</span> <span class="o">*</span> <span class="p">(</span><span class="n">reconstructed_signal</span><span class="o">.</span><span class="n">ndim</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="n">pad_width</span><span class="p">)],</span>
-                <span class="n">mode</span><span class="o">=</span><span class="s2">"constant"</span><span class="p">,</span>
-            <span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># Trim the signal if it is longer than the desired length</span>
-            <span class="n">reconstructed_signal</span> <span class="o">=</span> <span class="n">reconstructed_signal</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span><span class="n">length</span><span class="p">]</span>
-
-    <span class="k">return</span> <span class="n">reconstructed_signal</span></div>
+    <span class="n">start</span> <span class="o">=</span> <span class="n">n_fft</span> <span class="o">//</span> <span class="mi">2</span> <span class="k">if</span> <span class="n">center</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="n">stop</span> <span class="o">=</span> <span class="n">padded_length</span> <span class="o">-</span> <span class="n">start</span> <span class="k">if</span> <span class="n">length</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">start</span> <span class="o">+</span> <span class="n">length</span>
+    <span class="n">waveform</span> <span class="o">=</span> <span class="n">waveform</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span><span class="n">stop</span><span class="p">]</span>
+    <span class="n">envelope</span> <span class="o">=</span> <span class="n">envelope</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">stop</span><span class="p">]</span>
+    <span class="c1"># Uncentered Hann edges can have small but valid coverage. Use librosa's</span>
+    <span class="c1"># dtype-dependent floor there and retain the centered normalization floor.</span>
+    <span class="n">floor</span> <span class="o">=</span> <span class="mf">1e-10</span> <span class="k">if</span> <span class="n">center</span> <span class="k">else</span> <span class="n">jnp</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">envelope</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">tiny</span>
+    <span class="n">waveform</span> <span class="o">=</span> <span class="n">waveform</span> <span class="o">/</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">envelope</span> <span class="o">&gt;</span> <span class="n">floor</span><span class="p">,</span> <span class="n">envelope</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">length</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">waveform</span>
+    <span class="k">return</span> <span class="n">fix_length</span><span class="p">(</span><span class="n">waveform</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">length</span><span class="p">)</span></div>
 
 
 
@@ -724,7 +731,8 @@
         <span class="n">ref_value</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">ref</span><span class="p">)</span>
 
     <span class="n">log_spec</span> <span class="o">=</span> <span class="mf">10.0</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">amin</span><span class="p">,</span> <span class="n">magnitude</span><span class="p">))</span>
-    <span class="n">log_spec</span> <span class="o">=</span> <span class="n">log_spec</span> <span class="o">-</span> <span class="mf">10.0</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">amin</span><span class="p">,</span> <span class="n">ref_value</span><span class="p">))</span>
+    <span class="n">ref_db</span> <span class="o">=</span> <span class="mf">10.0</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">amin</span><span class="p">,</span> <span class="n">ref_value</span><span class="p">))</span>
+    <span class="n">log_spec</span> <span class="o">=</span> <span class="n">log_spec</span> <span class="o">-</span> <span class="n">ref_db</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">log_spec</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">top_db</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">top_db</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
@@ -834,17 +842,21 @@
     <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">db_to_power</span><span class="p">(</span><span class="n">S_db</span><span class="p">,</span> <span class="n">ref</span><span class="o">=</span><span class="n">ref</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">fft_frequencies</span><span class="p">(</span><span class="n">sr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">22050</span><span class="p">,</span> <span class="n">n_fft</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2048</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">fft_frequencies</span><span class="p">(</span>
+    <span class="n">sr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">22050</span><span class="p">,</span> <span class="n">n_fft</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2048</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">dtype</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">jnp</span><span class="o">.</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Alternative interface for np.fft.rfftfreq, compatible with JAX.</span>
 <span class="sd">    </span>
 <span class="sd">    Args:</span>
 <span class="sd">        sr: Audio sampling rate</span>
 <span class="sd">        n_fft: FFT window size</span>
+<span class="sd">        dtype: Floating-point dtype of the frequency grid. The default follows</span>
+<span class="sd">            JAX's precision setting.</span>
 <span class="sd">        </span>
 <span class="sd">    Returns:</span>
 <span class="sd">        jnp.ndarray: Frequencies (0, sr/n_fft, 2*sr/n_fft, ..., sr/2)</span>
 <span class="sd">    """</span>
-    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">rfftfreq</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="n">n_fft</span><span class="p">,</span> <span class="n">d</span><span class="o">=</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">sr</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_fft_frequencies</span><span class="p">(</span><span class="n">sr</span><span class="o">=</span><span class="n">sr</span><span class="p">,</span> <span class="n">n_fft</span><span class="o">=</span><span class="n">n_fft</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">tiny</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
@@ -930,7 +942,9 @@
         <span class="k">return</span> <span class="n">S</span>
 
     <span class="c1"># All norms only depend on magnitude</span>
-    <span class="n">mag</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">S</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">mag</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">S</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">jnp</span><span class="o">.</span><span class="n">issubdtype</span><span class="p">(</span><span class="n">mag</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">inexact</span><span class="p">):</span>
+        <span class="n">mag</span> <span class="o">=</span> <span class="n">mag</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
 
     <span class="c1"># For max/min/support norms, filling with 1 gives a unit norm</span>
     <span class="n">fill_norm</span> <span class="o">=</span> <span class="mi">1</span>

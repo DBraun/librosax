@@ -4,7 +4,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
 
-    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+    <!-- Generated with Sphinx 9.1.1 and Furo 2025.12.19 -->
         <title>librosax.core.convert - Librosax Documentation, v0.2.0</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
@@ -321,6 +321,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">numpy</span> <span class="k">as</span> <span class="n">jnp</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">numpy.typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">DTypeLike</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">notation</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">..util.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ParameterError</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">..util.decorators</span><span class="w"> </span><span class="kn">import</span> <span class="n">vectorize</span>
@@ -1846,7 +1847,9 @@
 
 <div class="viewcode-block" id="fft_frequencies">
 <a class="viewcode-back" href="../../../generated/librosax.fft_frequencies.html#librosax.feature.fft_frequencies">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">fft_frequencies</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">sr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">22050</span><span class="p">,</span> <span class="n">n_fft</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2048</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">fft_frequencies</span><span class="p">(</span>
+    <span class="o">*</span><span class="p">,</span> <span class="n">sr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">22050</span><span class="p">,</span> <span class="n">n_fft</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2048</span><span class="p">,</span> <span class="n">dtype</span><span class="p">:</span> <span class="n">DTypeLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Alternative interface for `jnp.fft.rfftfreq`</span>
 
 <span class="sd">    Parameters</span>
@@ -1855,6 +1858,8 @@
 <span class="sd">        Audio sampling rate</span>
 <span class="sd">    n_fft : int &gt; 0 [scalar]</span>
 <span class="sd">        FFT window size</span>
+<span class="sd">    dtype : dtype, optional</span>
+<span class="sd">        The output floating-point dtype. If omitted, JAX infers the precision.</span>
 
 <span class="sd">    Returns</span>
 <span class="sd">    -------</span>
@@ -1867,12 +1872,17 @@
 <span class="sd">    array([     0.   ,   1378.125,   2756.25 ,   4134.375,</span>
 <span class="sd">             5512.5  ,   6890.625,   8268.75 ,   9646.875,  11025.   ])</span>
 <span class="sd">    """</span>
-    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">rfftfreq</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="n">n_fft</span><span class="p">,</span> <span class="n">d</span><span class="o">=</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">sr</span><span class="p">)</span></div>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">rfftfreq</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="n">n_fft</span><span class="p">,</span> <span class="n">d</span><span class="o">=</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">sr</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span></div>
 
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">cqt_frequencies</span><span class="p">(</span>
-    <span class="n">n_bins</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">fmin</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">bins_per_octave</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">12</span><span class="p">,</span> <span class="n">tuning</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">n_bins</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">fmin</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">bins_per_octave</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">12</span><span class="p">,</span>
+    <span class="n">tuning</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="n">dtype</span><span class="p">:</span> <span class="n">DTypeLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Compute the center frequencies of Constant-Q bins.</span>
 
@@ -1895,22 +1905,26 @@
 <span class="sd">        Number of bins per octave</span>
 <span class="sd">    tuning : float</span>
 <span class="sd">        Deviation from A440 tuning in fractional bins</span>
+<span class="sd">    dtype : dtype, optional</span>
+<span class="sd">        The output floating-point dtype. If omitted, JAX infers the precision.</span>
 
 <span class="sd">    Returns</span>
 <span class="sd">    -------</span>
 <span class="sd">    frequencies : jnp.ndarray [shape=(n_bins,)]</span>
 <span class="sd">        Center frequency for each CQT bin</span>
 <span class="sd">    """</span>
-    <span class="n">correction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">**</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">tuning</span><span class="p">)</span> <span class="o">/</span> <span class="n">bins_per_octave</span><span class="p">)</span>
-    <span class="n">frequencies</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">**</span> <span class="p">(</span>
-        <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_bins</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="o">/</span> <span class="n">bins_per_octave</span>
-    <span class="p">)</span>
-
-    <span class="k">return</span> <span class="n">correction</span> <span class="o">*</span> <span class="n">fmin</span> <span class="o">*</span> <span class="n">frequencies</span>
+    <span class="n">correction</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">**</span> <span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">tuning</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span> <span class="o">/</span> <span class="n">bins_per_octave</span><span class="p">)</span>
+    <span class="n">frequencies</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">**</span> <span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_bins</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span> <span class="ow">or</span> <span class="nb">float</span><span class="p">)</span> <span class="o">/</span> <span class="n">bins_per_octave</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">fmin</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span> <span class="o">*</span> <span class="n">correction</span> <span class="o">*</span> <span class="n">frequencies</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">mel_frequencies</span><span class="p">(</span>
-    <span class="n">n_mels</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">128</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">fmin</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">fmax</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">11025.0</span><span class="p">,</span> <span class="n">htk</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">n_mels</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">128</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">fmin</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="n">fmax</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">11025.0</span><span class="p">,</span>
+    <span class="n">htk</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">dtype</span><span class="p">:</span> <span class="n">DTypeLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Compute an array of acoustic frequencies tuned to the mel scale.</span>
 
@@ -1961,6 +1975,8 @@
 <span class="sd">    htk : bool</span>
 <span class="sd">        If True, use HTK formula to convert Hz to mel.</span>
 <span class="sd">        Otherwise (False), use Slaney's Auditory Toolbox.</span>
+<span class="sd">    dtype : dtype, optional</span>
+<span class="sd">        The output floating-point dtype. If omitted, JAX infers the precision.</span>
 
 <span class="sd">    Returns</span>
 <span class="sd">    -------</span>
@@ -1987,14 +2003,18 @@
     <span class="n">min_mel</span> <span class="o">=</span> <span class="n">hz_to_mel</span><span class="p">(</span><span class="n">fmin</span><span class="p">,</span> <span class="n">htk</span><span class="o">=</span><span class="n">htk</span><span class="p">)</span>
     <span class="n">max_mel</span> <span class="o">=</span> <span class="n">hz_to_mel</span><span class="p">(</span><span class="n">fmax</span><span class="p">,</span> <span class="n">htk</span><span class="o">=</span><span class="n">htk</span><span class="p">)</span>
 
-    <span class="n">mels</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">min_mel</span><span class="p">,</span> <span class="n">max_mel</span><span class="p">,</span> <span class="n">n_mels</span><span class="p">)</span>
+    <span class="n">mels</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">min_mel</span><span class="p">,</span> <span class="n">max_mel</span><span class="p">,</span> <span class="n">n_mels</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
 
     <span class="n">hz</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="n">mel_to_hz</span><span class="p">(</span><span class="n">mels</span><span class="p">,</span> <span class="n">htk</span><span class="o">=</span><span class="n">htk</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">hz</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">tempo_frequencies</span><span class="p">(</span>
-    <span class="n">n_bins</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">hop_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">512</span><span class="p">,</span> <span class="n">sr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">22050</span>
+    <span class="n">n_bins</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">hop_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">512</span><span class="p">,</span>
+    <span class="n">sr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">22050</span><span class="p">,</span>
+    <span class="n">dtype</span><span class="p">:</span> <span class="n">DTypeLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Compute the frequencies (in beats per minute) corresponding</span>
 <span class="sd">    to an onset auto-correlation or tempogram matrix.</span>
@@ -2007,6 +2027,8 @@
 <span class="sd">        The number of samples between each bin</span>
 <span class="sd">    sr : number &gt; 0</span>
 <span class="sd">        The audio sampling rate</span>
+<span class="sd">    dtype : dtype, optional</span>
+<span class="sd">        The output floating-point dtype. If omitted, JAX infers the precision.</span>
 
 <span class="sd">    Returns</span>
 <span class="sd">    -------</span>
@@ -2023,15 +2045,18 @@
 <span class="sd">    array([      inf,  2583.984,  1291.992, ...,     6.782,</span>
 <span class="sd">               6.764,     6.747])</span>
 <span class="sd">    """</span>
-    <span class="c1"># Construct array with inf at index 0 and tempo frequencies for rest</span>
     <span class="n">tempo_values</span> <span class="o">=</span> <span class="mf">60.0</span> <span class="o">*</span> <span class="n">sr</span> <span class="o">/</span> <span class="p">(</span><span class="n">hop_length</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">n_bins</span><span class="p">))</span>
-    <span class="n">bin_frequencies</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">jnp</span><span class="o">.</span><span class="n">inf</span><span class="p">]),</span> <span class="n">tempo_values</span><span class="p">])</span>
-
-    <span class="k">return</span> <span class="n">bin_frequencies</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span>
+        <span class="p">[</span><span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">jnp</span><span class="o">.</span><span class="n">inf</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">),</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">tempo_values</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)]</span>
+    <span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">fourier_tempo_frequencies</span><span class="p">(</span>
-    <span class="o">*</span><span class="p">,</span> <span class="n">sr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">22050</span><span class="p">,</span> <span class="n">win_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">384</span><span class="p">,</span> <span class="n">hop_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">512</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">sr</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">22050</span><span class="p">,</span>
+    <span class="n">win_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">384</span><span class="p">,</span>
+    <span class="n">hop_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">512</span><span class="p">,</span>
+    <span class="n">dtype</span><span class="p">:</span> <span class="n">DTypeLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Compute the frequencies (in beats per minute) corresponding</span>
 <span class="sd">    to a Fourier tempogram matrix.</span>
@@ -2044,6 +2069,8 @@
 <span class="sd">        The number of frames per analysis window</span>
 <span class="sd">    hop_length : int &gt; 0</span>
 <span class="sd">        The number of samples between each bin</span>
+<span class="sd">    dtype : dtype, optional</span>
+<span class="sd">        The output floating-point dtype. If omitted, JAX infers the precision.</span>
 
 <span class="sd">    Returns</span>
 <span class="sd">    -------</span>
@@ -2059,7 +2086,7 @@
 <span class="sd">    """</span>
     <span class="c1"># sr / hop_length gets the frame rate</span>
     <span class="c1"># multiplying by 60 turns frames / sec into frames / minute</span>
-    <span class="k">return</span> <span class="n">fft_frequencies</span><span class="p">(</span><span class="n">sr</span><span class="o">=</span><span class="n">sr</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="n">hop_length</span><span class="p">),</span> <span class="n">n_fft</span><span class="o">=</span><span class="n">win_length</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">fft_frequencies</span><span class="p">(</span><span class="n">sr</span><span class="o">=</span><span class="n">sr</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="n">hop_length</span><span class="p">),</span> <span class="n">n_fft</span><span class="o">=</span><span class="n">win_length</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_warn_nonfinite_weights</span><span class="p">(</span><span class="n">weights</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">kind</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>

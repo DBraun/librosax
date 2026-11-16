@@ -4,7 +4,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
 
-    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+    <!-- Generated with Sphinx 9.1.1 and Furo 2025.12.19 -->
         <title>librosax.feature.spectral - Librosax Documentation, v0.2.0</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
@@ -321,7 +321,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">jax.scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">signal</span> <span class="k">as</span> <span class="n">jssignal</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">librosax.core.spectrum</span><span class="w"> </span><span class="kn">import</span> <span class="n">fft_frequencies</span><span class="p">,</span> <span class="n">normalize</span><span class="p">,</span> <span class="n">power_to_db</span><span class="p">,</span> <span class="n">stft</span><span class="p">,</span> <span class="n">_spectrogram</span><span class="p">,</span> <span class="n">_dct_flexible</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">librosax.core.convert</span><span class="w"> </span><span class="kn">import</span> <span class="n">note_to_hz</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">librosax.core.convert</span><span class="w"> </span><span class="kn">import</span> <span class="n">cqt_frequencies</span> <span class="k">as</span> <span class="n">_cqt_frequencies</span><span class="p">,</span> <span class="n">note_to_hz</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">librosax</span><span class="w"> </span><span class="kn">import</span> <span class="n">filters</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">librosax.util.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ParameterError</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">librosax.util._compat</span><span class="w"> </span><span class="kn">import</span> <span class="n">as_numpy</span>
@@ -445,13 +445,10 @@
 
     <span class="c1"># Compute the center frequencies of each bin</span>
     <span class="k">if</span> <span class="n">freq</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">freq</span> <span class="o">=</span> <span class="n">fft_frequencies</span><span class="p">(</span><span class="n">sr</span><span class="o">=</span><span class="n">sr</span><span class="p">,</span> <span class="n">n_fft</span><span class="o">=</span><span class="n">n_fft</span><span class="p">)</span>
+        <span class="n">freq</span> <span class="o">=</span> <span class="n">fft_frequencies</span><span class="p">(</span><span class="n">sr</span><span class="o">=</span><span class="n">sr</span><span class="p">,</span> <span class="n">n_fft</span><span class="o">=</span><span class="n">n_fft</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">result_type</span><span class="p">(</span><span class="n">S</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="nb">float</span><span class="p">))</span>
 
-    <span class="c1"># Ensure freq has the right shape for broadcasting</span>
     <span class="k">if</span> <span class="n">freq</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="c1"># Reshape freq to match S dimensions</span>
-        <span class="c1"># S has shape (..., frequency, time)</span>
-        <span class="n">freq</span> <span class="o">=</span> <span class="n">freq</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="p">,)</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)</span> <span class="o">*</span> <span class="p">(</span><span class="n">S</span><span class="o">.</span><span class="n">ndim</span> <span class="o">-</span> <span class="n">freq</span><span class="o">.</span><span class="n">ndim</span><span class="p">))</span>
+        <span class="n">freq</span> <span class="o">=</span> <span class="n">freq</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span>
 
     <span class="c1"># Column-normalize S</span>
     <span class="c1"># norm=1 means L1 norm (sum of absolute values)</span>
@@ -531,7 +528,7 @@
 
     <span class="c1"># Compute the center frequencies of each bin</span>
     <span class="k">if</span> <span class="n">freq</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">freq</span> <span class="o">=</span> <span class="n">fft_frequencies</span><span class="p">(</span><span class="n">sr</span><span class="o">=</span><span class="n">sr</span><span class="p">,</span> <span class="n">n_fft</span><span class="o">=</span><span class="n">n_fft</span><span class="p">)</span>
+        <span class="n">freq</span> <span class="o">=</span> <span class="n">fft_frequencies</span><span class="p">(</span><span class="n">sr</span><span class="o">=</span><span class="n">sr</span><span class="p">,</span> <span class="n">n_fft</span><span class="o">=</span><span class="n">n_fft</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">result_type</span><span class="p">(</span><span class="n">S</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="nb">float</span><span class="p">))</span>
 
     <span class="c1"># Calculate deviation from centroid</span>
     <span class="k">if</span> <span class="n">freq</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
@@ -617,12 +614,10 @@
 
     <span class="c1"># Compute the center frequencies of each bin</span>
     <span class="k">if</span> <span class="n">freq</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">freq</span> <span class="o">=</span> <span class="n">fft_frequencies</span><span class="p">(</span><span class="n">sr</span><span class="o">=</span><span class="n">sr</span><span class="p">,</span> <span class="n">n_fft</span><span class="o">=</span><span class="n">n_fft</span><span class="p">)</span>
+        <span class="n">freq</span> <span class="o">=</span> <span class="n">fft_frequencies</span><span class="p">(</span><span class="n">sr</span><span class="o">=</span><span class="n">sr</span><span class="p">,</span> <span class="n">n_fft</span><span class="o">=</span><span class="n">n_fft</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">result_type</span><span class="p">(</span><span class="n">S</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="nb">float</span><span class="p">))</span>
 
-    <span class="c1"># Make sure that frequency can be broadcast</span>
     <span class="k">if</span> <span class="n">freq</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="c1"># Reshape freq to match S dimensions</span>
-        <span class="n">freq</span> <span class="o">=</span> <span class="n">freq</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="p">,)</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)</span> <span class="o">*</span> <span class="p">(</span><span class="n">S</span><span class="o">.</span><span class="n">ndim</span> <span class="o">-</span> <span class="n">freq</span><span class="o">.</span><span class="n">ndim</span><span class="p">))</span>
+        <span class="n">freq</span> <span class="o">=</span> <span class="n">freq</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span>
 
     <span class="c1"># Compute cumulative energy</span>
     <span class="n">total_energy</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span>
@@ -633,12 +628,9 @@
     <span class="c1"># Reshape threshold for broadcasting</span>
     <span class="n">threshold</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">expand_dims</span><span class="p">(</span><span class="n">threshold</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span>
 
-    <span class="c1"># Find where cumulative energy exceeds threshold</span>
-    <span class="c1"># Use where to set values below threshold to nan</span>
-    <span class="n">ind</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">total_energy</span> <span class="o">&lt;</span> <span class="n">threshold</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-
-    <span class="c1"># Get the minimum frequency that meets the threshold</span>
-    <span class="n">rolloff</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">nanmin</span><span class="p">(</span><span class="n">ind</span> <span class="o">*</span> <span class="n">freq</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">2</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="c1"># Get the minimum frequency that meets the threshold.</span>
+    <span class="n">eligible</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">total_energy</span> <span class="o">&lt;</span> <span class="n">threshold</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">freq</span><span class="p">)</span>
+    <span class="n">rolloff</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">nanmin</span><span class="p">(</span><span class="n">eligible</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">2</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">rolloff</span></div>
 
@@ -1014,6 +1006,8 @@
     <span class="n">fmin</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">200.0</span><span class="p">,</span>
     <span class="n">n_bands</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">6</span><span class="p">,</span>
     <span class="n">quantile</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.02</span><span class="p">,</span>
+    <span class="n">ref</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">top_db</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mf">80.0</span><span class="p">,</span>
     <span class="n">linear</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Compute spectral contrast.</span>
@@ -1045,6 +1039,11 @@
 <span class="sd">            Subsequent bins will cover [fmin, 2*fmin], [2*fmin, 4*fmin], etc.</span>
 <span class="sd">        n_bands: Number of frequency bands</span>
 <span class="sd">        quantile: Quantile for determining peaks and valleys</span>
+<span class="sd">        ref: Reference for each peak and valley dB conversion. A callable</span>
+<span class="sd">            reduces over frequency and time independently for each channel.</span>
+<span class="sd">        top_db: Limit each peak and valley spectrum to this many dB below its</span>
+<span class="sd">            own maximum, independently for each channel. Use None to disable</span>
+<span class="sd">            clipping. The dB conversion options apply when linear is False.</span>
 <span class="sd">        linear: If True, return the linear difference of magnitudes: peaks - valleys.</span>
 <span class="sd">            If False, return the logarithmic difference: log(peaks) - log(valleys).</span>
 
@@ -1067,7 +1066,7 @@
 
     <span class="c1"># Compute the center frequencies of each bin</span>
     <span class="k">if</span> <span class="n">freq</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">freq</span> <span class="o">=</span> <span class="n">fft_frequencies</span><span class="p">(</span><span class="n">sr</span><span class="o">=</span><span class="n">sr</span><span class="p">,</span> <span class="n">n_fft</span><span class="o">=</span><span class="n">n_fft</span><span class="p">)</span>
+        <span class="n">freq</span> <span class="o">=</span> <span class="n">fft_frequencies</span><span class="p">(</span><span class="n">sr</span><span class="o">=</span><span class="n">sr</span><span class="p">,</span> <span class="n">n_fft</span><span class="o">=</span><span class="n">n_fft</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">result_type</span><span class="p">(</span><span class="n">S</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="nb">float</span><span class="p">))</span>
 
     <span class="n">freq</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">atleast_1d</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">freq</span><span class="p">))</span>
 
@@ -1083,140 +1082,45 @@
     <span class="k">if</span> <span class="n">fmin</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span><span class="s2">"fmin must be a positive number"</span><span class="p">)</span>
 
-    <span class="c1"># Create octave bands</span>
-    <span class="n">octa</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_bands</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span>
-    <span class="n">octa</span> <span class="o">=</span> <span class="n">octa</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">fmin</span> <span class="o">*</span> <span class="p">(</span><span class="mf">2.0</span> <span class="o">**</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_bands</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sr</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">number</span><span class="p">))</span> <span class="ow">and</span> <span class="n">fmin</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">**</span> <span class="p">(</span><span class="n">n_bands</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">sr</span> <span class="o">/</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span><span class="s2">"Frequency band exceeds Nyquist. Reduce either fmin or n_bands."</span><span class="p">)</span>
 
-    <span class="c1"># Calculate maximum possible quantile index size</span>
-    <span class="c1"># The largest band is typically the last one, which can extend to all remaining bins</span>
-    <span class="c1"># from the lowest frequency of that band to the Nyquist frequency</span>
-    <span class="c1"># In the worst case, this could be nearly all frequency bins</span>
-    <span class="n">max_possible_band_size</span> <span class="o">=</span> <span class="n">S</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>  <span class="c1"># Conservative upper bound</span>
-    <span class="c1"># Use Python int() to ensure it's a static value</span>
-    <span class="n">max_quantile_size</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">max_possible_band_size</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="n">quantile</span><span class="p">))</span> <span class="o">+</span> <span class="mi">1</span>
-    
-    <span class="c1"># Process bands using scan for JIT compatibility</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">process_band</span><span class="p">(</span><span class="n">carry</span><span class="p">,</span> <span class="n">k</span><span class="p">):</span>
-        <span class="n">S</span><span class="p">,</span> <span class="n">freq</span><span class="p">,</span> <span class="n">octa</span><span class="p">,</span> <span class="n">sr</span><span class="p">,</span> <span class="n">n_bands</span><span class="p">,</span> <span class="n">quantile</span> <span class="o">=</span> <span class="n">carry</span>
-        
-        <span class="n">f_low</span> <span class="o">=</span> <span class="n">octa</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
-        <span class="n">f_high</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">cond</span><span class="p">(</span>
-            <span class="n">k</span> <span class="o">&lt;</span> <span class="n">n_bands</span><span class="p">,</span>
-            <span class="k">lambda</span><span class="p">:</span> <span class="n">octa</span><span class="p">[</span><span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">],</span>
-            <span class="k">lambda</span><span class="p">:</span> <span class="n">sr</span> <span class="o">/</span> <span class="mi">2</span>
-        <span class="p">)</span>
-        
-        <span class="c1"># Create band mask</span>
-        <span class="n">band_mask</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">logical_and</span><span class="p">(</span><span class="n">freq</span> <span class="o">&gt;=</span> <span class="n">f_low</span><span class="p">,</span> <span class="n">freq</span> <span class="o">&lt;=</span> <span class="n">f_high</span><span class="p">)</span>
-        
-        <span class="c1"># Find first and last indices</span>
-        <span class="c1"># Use cumsum trick to find positions</span>
-        <span class="n">cumsum</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">band_mask</span><span class="p">)</span>
-        <span class="n">has_true</span> <span class="o">=</span> <span class="n">cumsum</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span>
-        
-        <span class="c1"># Find first True (where cumsum goes from 0 to 1)</span>
-        <span class="n">first_idx</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">has_true</span><span class="p">,</span>
-                             <span class="n">jnp</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">cumsum</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">),</span>
-                             <span class="mi">0</span><span class="p">)</span>
-        
-        <span class="c1"># Find last True</span>
-        <span class="n">reverse_cumsum</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">band_mask</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-        <span class="n">last_idx</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">has_true</span><span class="p">,</span>
-                            <span class="nb">len</span><span class="p">(</span><span class="n">band_mask</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">jnp</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">reverse_cumsum</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">),</span>
-                            <span class="mi">0</span><span class="p">)</span>
-        
-        <span class="c1"># Adjust boundaries as in librosa</span>
-        <span class="c1"># For k &gt; 0, include one bin below</span>
-        <span class="n">first_idx</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">cond</span><span class="p">(</span>
-            <span class="n">jnp</span><span class="o">.</span><span class="n">logical_and</span><span class="p">(</span><span class="n">k</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="n">first_idx</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">),</span>
-            <span class="k">lambda</span><span class="p">:</span> <span class="n">first_idx</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
-            <span class="k">lambda</span><span class="p">:</span> <span class="n">first_idx</span>
-        <span class="p">)</span>
-        
-        <span class="c1"># For the last band, extend to the end</span>
-        <span class="n">last_idx</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">cond</span><span class="p">(</span>
-            <span class="n">k</span> <span class="o">==</span> <span class="n">n_bands</span><span class="p">,</span>
-            <span class="k">lambda</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">freq</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
-            <span class="k">lambda</span><span class="p">:</span> <span class="n">last_idx</span>
-        <span class="p">)</span>
-        
-        <span class="c1"># Update band mask with adjusted boundaries</span>
-        <span class="n">indices</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">freq</span><span class="p">))</span>
-        <span class="n">band_mask_adjusted</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">logical_and</span><span class="p">(</span><span class="n">indices</span> <span class="o">&gt;=</span> <span class="n">first_idx</span><span class="p">,</span> <span class="n">indices</span> <span class="o">&lt;=</span> <span class="n">last_idx</span><span class="p">)</span>
-        
-        <span class="c1"># For non-final bands, exclude the last bin</span>
-        <span class="n">band_mask_final</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">cond</span><span class="p">(</span>
-            <span class="n">k</span> <span class="o">&lt;</span> <span class="n">n_bands</span><span class="p">,</span>
-            <span class="k">lambda</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">logical_and</span><span class="p">(</span><span class="n">band_mask_adjusted</span><span class="p">,</span> <span class="n">indices</span> <span class="o">&lt;</span> <span class="n">last_idx</span><span class="p">),</span>
-            <span class="k">lambda</span><span class="p">:</span> <span class="n">band_mask_adjusted</span>
-        <span class="p">)</span>
-        
-        <span class="c1"># Count bins for quantile calculation (use original band mask count)</span>
-        <span class="n">n_bins_for_quantile</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">band_mask_adjusted</span><span class="p">)</span>
-        
-        <span class="c1"># Extract sub-band values</span>
-        <span class="c1"># Use masking approach</span>
-        <span class="n">sub_band_values</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">band_mask_final</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">S</span><span class="p">,</span> <span class="o">-</span><span class="n">jnp</span><span class="o">.</span><span class="n">inf</span><span class="p">)</span>
-        
-        <span class="c1"># Sort along frequency axis</span>
-        <span class="n">sorted_sub</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">sub_band_values</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-        
-        <span class="c1"># Find where valid values start (first non-(-inf) value)</span>
-        <span class="n">valid_mask</span> <span class="o">=</span> <span class="n">sorted_sub</span> <span class="o">&gt;</span> <span class="o">-</span><span class="n">jnp</span><span class="o">.</span><span class="n">inf</span>
-        <span class="n">n_valid</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">valid_mask</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-        
-        <span class="c1"># Calculate quantile index</span>
-        <span class="n">n_idx</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">rint</span><span class="p">(</span><span class="n">quantile</span> <span class="o">*</span> <span class="n">n_bins_for_quantile</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
-        
-        <span class="c1"># For each time frame, we need to extract bottom n_idx and top n_idx values</span>
-        <span class="c1"># max_quantile_size is captured from the outer scope as a static value</span>
-        
-        <span class="c1"># Create index arrays for gathering</span>
-        <span class="n">time_frames</span> <span class="o">=</span> <span class="n">S</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-        <span class="n">frame_indices</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">time_frames</span><span class="p">)</span>
-        <span class="n">idx_range</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">max_quantile_size</span><span class="p">)</span>
-        
-        <span class="c1"># Find first valid index per frame</span>
-        <span class="n">first_valid_idx</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">valid_mask</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-        
-        <span class="c1"># Valley indices: first n_idx valid values</span>
-        <span class="n">valley_indices</span> <span class="o">=</span> <span class="n">first_valid_idx</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+</span> <span class="n">idx_range</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span>
-        <span class="n">valley_indices</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">valley_indices</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">sorted_sub</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
-        
-        <span class="c1"># Gather valley values</span>
-        <span class="n">valley_values</span> <span class="o">=</span> <span class="n">sorted_sub</span><span class="p">[</span><span class="n">valley_indices</span><span class="p">,</span> <span class="n">frame_indices</span><span class="p">]</span>
-        <span class="n">valley_mask</span> <span class="o">=</span> <span class="n">idx_range</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="n">n_idx</span><span class="p">,</span> <span class="n">n_valid</span><span class="p">)[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
-        <span class="n">valley_values</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">valley_mask</span><span class="p">,</span> <span class="n">valley_values</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-        <span class="n">valley</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">valley_values</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">/</span> <span class="n">jnp</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">valley_mask</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
-        
-        <span class="c1"># Peak indices: last n_idx valid values</span>
-        <span class="n">last_valid_idx</span> <span class="o">=</span> <span class="n">first_valid_idx</span> <span class="o">+</span> <span class="n">n_valid</span> <span class="o">-</span> <span class="mi">1</span>
-        <span class="n">peak_start_idx</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">last_valid_idx</span> <span class="o">-</span> <span class="n">n_idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">first_valid_idx</span><span class="p">)</span>
-        
-        <span class="n">peak_indices</span> <span class="o">=</span> <span class="n">peak_start_idx</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+</span> <span class="n">idx_range</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span>
-        <span class="n">peak_indices</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">peak_indices</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">sorted_sub</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
-        
-        <span class="c1"># Gather peak values</span>
-        <span class="n">peak_values</span> <span class="o">=</span> <span class="n">sorted_sub</span><span class="p">[</span><span class="n">peak_indices</span><span class="p">,</span> <span class="n">frame_indices</span><span class="p">]</span>
-        <span class="n">peak_mask</span> <span class="o">=</span> <span class="n">idx_range</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="n">n_idx</span><span class="p">,</span> <span class="n">n_valid</span><span class="p">)[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
-        <span class="n">peak_values</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">peak_mask</span><span class="p">,</span> <span class="n">peak_values</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-        <span class="n">peak</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">peak_values</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">/</span> <span class="n">jnp</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">peak_mask</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
-        
-        <span class="k">return</span> <span class="n">carry</span><span class="p">,</span> <span class="p">(</span><span class="n">valley</span><span class="p">,</span> <span class="n">peak</span><span class="p">)</span>
-    
-    <span class="c1"># Process all bands</span>
-    <span class="n">carry</span> <span class="o">=</span> <span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="n">freq</span><span class="p">,</span> <span class="n">octa</span><span class="p">,</span> <span class="n">sr</span><span class="p">,</span> <span class="n">n_bands</span><span class="p">,</span> <span class="n">quantile</span><span class="p">)</span>
-    <span class="n">_</span><span class="p">,</span> <span class="p">(</span><span class="n">valleys</span><span class="p">,</span> <span class="n">peaks</span><span class="p">)</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span>
-        <span class="n">process_band</span><span class="p">,</span> <span class="n">carry</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_bands</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
-    <span class="p">)</span>
-    
-    <span class="c1"># Compute contrast</span>
+    <span class="c1"># Sort masked bands along the frequency axis while retaining all leading</span>
+    <span class="c1"># batch and channel dimensions for the independent dB reductions below.</span>
+    <span class="n">octa</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">fmin</span> <span class="o">*</span> <span class="mf">2.0</span> <span class="o">**</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_bands</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)])</span>
+    <span class="n">bin_indices</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">freq</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">process_band</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">band</span><span class="p">):</span>
+        <span class="n">in_band</span> <span class="o">=</span> <span class="p">(</span><span class="n">freq</span> <span class="o">&gt;=</span> <span class="n">octa</span><span class="p">[</span><span class="n">band</span><span class="p">])</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">freq</span> <span class="o">&lt;=</span> <span class="n">octa</span><span class="p">[</span><span class="n">band</span> <span class="o">+</span> <span class="mi">1</span><span class="p">])</span>
+        <span class="n">first</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">in_band</span><span class="p">)</span>
+        <span class="n">last</span> <span class="o">=</span> <span class="n">freq</span><span class="o">.</span><span class="n">size</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">jnp</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">in_band</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">in_band</span> <span class="o">|=</span> <span class="p">(</span><span class="n">band</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">bin_indices</span> <span class="o">==</span> <span class="n">first</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">in_band</span> <span class="o">|=</span> <span class="p">(</span><span class="n">band</span> <span class="o">==</span> <span class="n">n_bands</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">bin_indices</span> <span class="o">&gt;</span> <span class="n">last</span><span class="p">)</span>
+
+        <span class="n">count</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">rint</span><span class="p">(</span><span class="n">quantile</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">in_band</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># For each band except the last, drop the last bin after sizing the quantiles.</span>
+        <span class="n">in_band</span> <span class="o">&amp;=</span> <span class="p">(</span><span class="n">band</span> <span class="o">==</span> <span class="n">n_bands</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="n">bin_indices</span> <span class="o">!=</span> <span class="n">last</span><span class="p">)</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">in_band</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">S</span><span class="p">,</span> <span class="o">-</span><span class="n">jnp</span><span class="o">.</span><span class="n">inf</span><span class="p">),</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">width</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">in_band</span><span class="p">)</span>
+        <span class="n">count</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="n">count</span><span class="p">,</span> <span class="n">width</span><span class="p">)</span>
+        <span class="n">first_valid</span> <span class="o">=</span> <span class="n">freq</span><span class="o">.</span><span class="n">size</span> <span class="o">-</span> <span class="n">width</span>
+        <span class="n">take_low</span> <span class="o">=</span> <span class="p">(</span><span class="n">bin_indices</span> <span class="o">&gt;=</span> <span class="n">first_valid</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">bin_indices</span> <span class="o">&lt;</span> <span class="n">first_valid</span> <span class="o">+</span> <span class="n">count</span><span class="p">)</span>
+        <span class="n">take_high</span> <span class="o">=</span> <span class="n">bin_indices</span> <span class="o">&gt;=</span> <span class="n">freq</span><span class="o">.</span><span class="n">size</span> <span class="o">-</span> <span class="n">count</span>
+        <span class="n">denominator</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">count</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">valley</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">take_low</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">values</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="n">denominator</span>
+        <span class="n">peak</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">take_high</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">values</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="n">denominator</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="p">(</span><span class="n">valley</span><span class="p">,</span> <span class="n">peak</span><span class="p">)</span>
+
+    <span class="n">_</span><span class="p">,</span> <span class="p">(</span><span class="n">valleys</span><span class="p">,</span> <span class="n">peaks</span><span class="p">)</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="n">process_band</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_bands</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">peaks</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">moveaxis</span><span class="p">(</span><span class="n">peaks</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">valleys</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">moveaxis</span><span class="p">(</span><span class="n">valleys</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+
     <span class="k">if</span> <span class="n">linear</span><span class="p">:</span>
-        <span class="n">contrast</span> <span class="o">=</span> <span class="n">peaks</span> <span class="o">-</span> <span class="n">valleys</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="n">contrast</span> <span class="o">=</span> <span class="n">power_to_db</span><span class="p">(</span><span class="n">peaks</span><span class="p">)</span> <span class="o">-</span> <span class="n">power_to_db</span><span class="p">(</span><span class="n">valleys</span><span class="p">)</span>
-    
-    <span class="k">return</span> <span class="n">contrast</span></div>
+        <span class="k">return</span> <span class="n">peaks</span> <span class="o">-</span> <span class="n">valleys</span>
+
+    <span class="k">return</span> <span class="n">power_to_db</span><span class="p">(</span><span class="n">peaks</span><span class="p">,</span> <span class="n">ref</span><span class="o">=</span><span class="n">ref</span><span class="p">,</span> <span class="n">top_db</span><span class="o">=</span><span class="n">top_db</span><span class="p">)</span> <span class="o">-</span> <span class="n">power_to_db</span><span class="p">(</span>
+        <span class="n">valleys</span><span class="p">,</span> <span class="n">ref</span><span class="o">=</span><span class="n">ref</span><span class="p">,</span> <span class="n">top_db</span><span class="o">=</span><span class="n">top_db</span>
+    <span class="p">)</span></div>
 
 
 
@@ -1359,6 +1263,8 @@
     <span class="n">fmax</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">htk</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">melspectrogram_params</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">ref</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">top_db</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mf">80.0</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Compute Mel-frequency cepstral coefficients (MFCCs).</span>
 
@@ -1395,6 +1301,11 @@
 <span class="sd">        htk: Use HTK formula for mel scale (used if y is provided)</span>
 <span class="sd">        melspectrogram_params: Additional keyword arguments for melspectrogram</span>
 <span class="sd">            (used if y is provided)</span>
+<span class="sd">        ref: Reference for converting the mel spectrogram to dB. A callable</span>
+<span class="sd">            reduces over frequency and time independently for each channel.</span>
+<span class="sd">        top_db: Limit the mel spectrogram to this many dB below each channel's</span>
+<span class="sd">            peak. Use None to disable clipping. Both dB conversion options</span>
+<span class="sd">            apply only when computing the mel spectrogram from y.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        MFCCs with shape ``(..., n_mfcc, N)``.</span>
@@ -1428,7 +1339,7 @@
         <span class="n">S</span> <span class="o">=</span> <span class="n">melspectrogram</span><span class="p">(</span><span class="o">**</span><span class="n">mel_params</span><span class="p">)</span>
 
         <span class="c1"># Convert to log scale</span>
-        <span class="n">S</span> <span class="o">=</span> <span class="n">power_to_db</span><span class="p">(</span><span class="n">S</span><span class="p">)</span>
+        <span class="n">S</span> <span class="o">=</span> <span class="n">power_to_db</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="n">ref</span><span class="o">=</span><span class="n">ref</span><span class="p">,</span> <span class="n">top_db</span><span class="o">=</span><span class="n">top_db</span><span class="p">)</span>
 
     <span class="c1"># Note: S has shape (..., n_mels, t)</span>
     <span class="c1"># Need to transpose for DCT which expects (..., t, n_mels)</span>
@@ -1568,6 +1479,7 @@
     <span class="n">bins_per_octave</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">12</span><span class="p">,</span>
     <span class="n">fmin</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">32.70</span><span class="p">,</span>
     <span class="n">tuning</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="n">dtype</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">jnp</span><span class="o">.</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Compute the center frequencies of Constant-Q bins.</span>
 
@@ -1576,16 +1488,15 @@
 <span class="sd">        bins_per_octave: Number of bins per octave</span>
 <span class="sd">        fmin: Minimum frequency (Hz)</span>
 <span class="sd">        tuning: Tuning deviation from A440 in fractions of a bin</span>
+<span class="sd">        dtype: Floating-point dtype of the frequency grid. The default follows</span>
+<span class="sd">            JAX's precision setting.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        jnp.ndarray: Center frequencies for each CQT bin</span>
 <span class="sd">    """</span>
-    <span class="n">correction</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">**</span> <span class="p">(</span><span class="n">tuning</span> <span class="o">/</span> <span class="n">bins_per_octave</span><span class="p">)</span>
-
-    <span class="c1"># Generate geometric sequence of frequencies</span>
-    <span class="n">frequencies</span> <span class="o">=</span> <span class="n">fmin</span> <span class="o">*</span> <span class="n">correction</span> <span class="o">*</span> <span class="p">(</span><span class="mf">2.0</span> <span class="o">**</span> <span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_bins</span><span class="p">)</span> <span class="o">/</span> <span class="n">bins_per_octave</span><span class="p">))</span>
-
-    <span class="k">return</span> <span class="n">frequencies</span></div>
+    <span class="k">return</span> <span class="n">_cqt_frequencies</span><span class="p">(</span>
+        <span class="n">n_bins</span><span class="p">,</span> <span class="n">fmin</span><span class="o">=</span><span class="n">fmin</span><span class="p">,</span> <span class="n">bins_per_octave</span><span class="o">=</span><span class="n">bins_per_octave</span><span class="p">,</span> <span class="n">tuning</span><span class="o">=</span><span class="n">tuning</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+    <span class="p">)</span></div>
 
 
 
@@ -1595,14 +1506,15 @@
     <span class="n">bins_per_octave</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">12</span><span class="p">,</span>
     <span class="n">fmin</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">32.70</span><span class="p">,</span>
     <span class="n">tuning</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="n">dtype</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Compute the center frequencies of Constant-Q bins using numpy.</span>
 <span class="sd">    </span>
 <span class="sd">    This is used internally for filter bank creation to avoid JIT issues.</span>
 <span class="sd">    """</span>
-    <span class="n">correction</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">**</span> <span class="p">(</span><span class="n">tuning</span> <span class="o">/</span> <span class="n">bins_per_octave</span><span class="p">)</span>
-    <span class="n">frequencies</span> <span class="o">=</span> <span class="n">fmin</span> <span class="o">*</span> <span class="n">correction</span> <span class="o">*</span> <span class="p">(</span><span class="mf">2.0</span> <span class="o">**</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_bins</span><span class="p">)</span> <span class="o">/</span> <span class="n">bins_per_octave</span><span class="p">))</span>
-    <span class="k">return</span> <span class="n">frequencies</span>
+    <span class="k">return</span> <span class="n">librosa</span><span class="o">.</span><span class="n">cqt_frequencies</span><span class="p">(</span>
+        <span class="n">n_bins</span><span class="p">,</span> <span class="n">fmin</span><span class="o">=</span><span class="n">fmin</span><span class="p">,</span> <span class="n">bins_per_octave</span><span class="o">=</span><span class="n">bins_per_octave</span><span class="p">,</span> <span class="n">tuning</span><span class="o">=</span><span class="n">tuning</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+    <span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_max_cqt_bins</span><span class="p">(</span>
@@ -1665,7 +1577,7 @@
     <span class="n">topbin_check</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">gamma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
     <span class="n">n_fft_fixed</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""Create CQT kernels following nnAudio's implementation.</span>
 <span class="sd">    </span>
 <span class="sd">    This function creates the CQT kernels in time domain, similar to nnAudio's</span>
@@ -1744,12 +1656,93 @@
         <span class="c1"># Place kernel in the array</span>
         <span class="n">kernels_np</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span><span class="n">start</span> <span class="o">+</span> <span class="n">l</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig</span>
     
-    <span class="c1"># Convert to JAX arrays at the end</span>
-    <span class="n">kernels</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">kernels_np</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">complex64</span><span class="p">)</span>
+    <span class="c1"># Keep the kernels on the host so sparsification can run at trace time.</span>
+    <span class="n">kernels</span> <span class="o">=</span> <span class="n">kernels_np</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">complex64</span><span class="p">)</span>
     <span class="n">lengths</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">lengths_np</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
     <span class="n">freqs</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">freqs_np</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
     
     <span class="k">return</span> <span class="n">kernels</span><span class="p">,</span> <span class="n">fftLen</span><span class="p">,</span> <span class="n">lengths</span><span class="p">,</span> <span class="n">freqs</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_sparse_cqt_basis</span><span class="p">(</span>
+    <span class="n">kernels</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">sparsity</span><span class="p">:</span> <span class="nb">float</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Pack retained FFT bins into groups of similarly sized filters."""</span>
+    <span class="n">n_freq</span> <span class="o">=</span> <span class="n">kernels</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="n">basis</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">kernels</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)[:,</span> <span class="p">:</span><span class="n">n_freq</span><span class="p">]</span><span class="o">.</span><span class="n">conj</span><span class="p">()</span>
+    <span class="n">sparse_basis</span> <span class="o">=</span> <span class="n">librosa</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">sparsify_rows</span><span class="p">(</span><span class="n">basis</span><span class="p">,</span> <span class="n">quantile</span><span class="o">=</span><span class="n">sparsity</span><span class="p">)</span>
+
+    <span class="c1"># Group rows by the next power of two of their support size. Padding all</span>
+    <span class="c1"># rows to the widest filter would inflate the gathered spectrogram.</span>
+    <span class="n">groups</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">row</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">sparse_basis</span><span class="o">.</span><span class="n">indptr</span><span class="p">)):</span>
+        <span class="n">width</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">count</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">bit_length</span><span class="p">()</span>
+        <span class="n">groups</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+
+    <span class="n">packed</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">row_order</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">width</span><span class="p">,</span> <span class="n">rows</span> <span class="ow">in</span> <span class="n">groups</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">rows</span><span class="p">),</span> <span class="n">width</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">rows</span><span class="p">),</span> <span class="n">width</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">basis</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">rows</span><span class="p">):</span>
+            <span class="n">start</span><span class="p">,</span> <span class="n">stop</span> <span class="o">=</span> <span class="n">sparse_basis</span><span class="o">.</span><span class="n">indptr</span><span class="p">[</span><span class="n">row</span> <span class="p">:</span> <span class="n">row</span> <span class="o">+</span> <span class="mi">2</span><span class="p">]</span>
+            <span class="n">indices</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:</span> <span class="n">stop</span> <span class="o">-</span> <span class="n">start</span><span class="p">]</span> <span class="o">=</span> <span class="n">sparse_basis</span><span class="o">.</span><span class="n">indices</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">stop</span><span class="p">]</span>
+            <span class="n">weights</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:</span> <span class="n">stop</span> <span class="o">-</span> <span class="n">start</span><span class="p">]</span> <span class="o">=</span> <span class="n">sparse_basis</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">stop</span><span class="p">]</span>
+        <span class="n">packed</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">indices</span><span class="p">,</span> <span class="n">weights</span><span class="p">))</span>
+        <span class="n">row_order</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">packed</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">row_order</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_project_sparse_cqt</span><span class="p">(</span>
+    <span class="n">y</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">kernels</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">hop_length</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sparsity</span><span class="p">:</span> <span class="nb">float</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Compute and project small blocks of frames to bound temporary buffers."""</span>
+    <span class="n">kernel_width</span> <span class="o">=</span> <span class="n">kernels</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">packed_basis</span><span class="p">,</span> <span class="n">row_order</span> <span class="o">=</span> <span class="n">_sparse_cqt_basis</span><span class="p">(</span><span class="n">kernels</span><span class="p">,</span> <span class="n">sparsity</span><span class="p">)</span>
+    <span class="n">n_frames</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">+</span> <span class="p">(</span><span class="n">y</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">kernel_width</span><span class="p">)</span> <span class="o">//</span> <span class="n">hop_length</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">project</span><span class="p">(</span><span class="n">segment</span><span class="p">):</span>
+        <span class="n">frames</span> <span class="o">=</span> <span class="n">_cqt_stft</span><span class="p">(</span><span class="n">segment</span><span class="p">,</span> <span class="n">kernel_width</span><span class="p">,</span> <span class="n">hop_length</span><span class="p">)</span><span class="o">.</span><span class="n">swapaxes</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">projected</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">frames</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">indices</span><span class="p">]</span> <span class="o">*</span> <span class="n">weights</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">indices</span><span class="p">,</span> <span class="n">weights</span> <span class="ow">in</span> <span class="n">packed_basis</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">projected</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)[</span><span class="o">...</span><span class="p">,</span> <span class="n">row_order</span><span class="p">]</span><span class="o">.</span><span class="n">swapaxes</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># Budget 32 frames across the batch to limit both FFT and gather buffers.</span>
+    <span class="n">block_size</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">32</span> <span class="o">//</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">y</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+    <span class="k">if</span> <span class="n">n_frames</span> <span class="o">&lt;=</span> <span class="n">block_size</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">project</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+
+    <span class="n">n_blocks</span><span class="p">,</span> <span class="n">remainder</span> <span class="o">=</span> <span class="nb">divmod</span><span class="p">(</span><span class="n">n_frames</span><span class="p">,</span> <span class="n">block_size</span><span class="p">)</span>
+    <span class="n">segment_length</span> <span class="o">=</span> <span class="n">kernel_width</span> <span class="o">+</span> <span class="p">(</span><span class="n">block_size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">hop_length</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">project_block</span><span class="p">(</span><span class="n">block</span><span class="p">):</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">block</span> <span class="o">*</span> <span class="n">block_size</span> <span class="o">*</span> <span class="n">hop_length</span>
+        <span class="n">segment</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">dynamic_slice_in_dim</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">segment_length</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">project</span><span class="p">(</span><span class="n">segment</span><span class="p">)</span>
+
+    <span class="n">blocks</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">project_block</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_blocks</span><span class="p">))</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">moveaxis</span><span class="p">(</span><span class="n">blocks</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">*</span><span class="n">blocks</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">n_blocks</span> <span class="o">*</span> <span class="n">block_size</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">remainder</span><span class="p">:</span>
+        <span class="n">tail</span> <span class="o">=</span> <span class="n">y</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">n_blocks</span> <span class="o">*</span> <span class="n">block_size</span> <span class="o">*</span> <span class="n">hop_length</span> <span class="p">:]</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">result</span><span class="p">,</span> <span class="n">project</span><span class="p">(</span><span class="n">tail</span><span class="p">)],</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_cqt_stft</span><span class="p">(</span><span class="n">y</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">kernel_width</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">hop_length</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">D</span> <span class="o">=</span> <span class="n">jssignal</span><span class="o">.</span><span class="n">stft</span><span class="p">(</span>
+        <span class="n">y</span><span class="p">,</span>
+        <span class="n">window</span><span class="o">=</span><span class="s2">"boxcar"</span><span class="p">,</span>  <span class="c1"># CQT kernels already have windows.</span>
+        <span class="n">nperseg</span><span class="o">=</span><span class="n">kernel_width</span><span class="p">,</span>
+        <span class="n">noverlap</span><span class="o">=</span><span class="n">kernel_width</span> <span class="o">-</span> <span class="n">hop_length</span><span class="p">,</span>
+        <span class="n">nfft</span><span class="o">=</span><span class="n">kernel_width</span><span class="p">,</span>
+        <span class="n">boundary</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># The caller pads the waveform.</span>
+        <span class="n">padded</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">D</span>
 
 
 <div class="viewcode-block" id="cqt">
@@ -1765,7 +1758,7 @@
     <span class="n">tuning</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
     <span class="n">filter_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
     <span class="n">norm</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
-    <span class="n">sparsity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">,</span>
+    <span class="n">sparsity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
     <span class="n">window</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"hann"</span><span class="p">,</span>
     <span class="n">scale</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">pad_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"constant"</span><span class="p">,</span>
@@ -1803,7 +1796,11 @@
 <span class="sd">        tuning: Tuning offset in fractions of a bin</span>
 <span class="sd">        filter_scale: Filter scale factor (Q = filter_scale / (2^(1/bins_per_octave) - 1))</span>
 <span class="sd">        norm: Normalization type for basis functions (1, 2, or None)</span>
-<span class="sd">        sparsity: Sparsification factor (not implemented)</span>
+<span class="sd">        sparsity: Fraction of each filter's FFT magnitude to discard, in</span>
+<span class="sd">            ``[0, 1)``. The default ``0.0`` uses the dense projection.</span>
+<span class="sd">            Positive values enable an approximate projection that gathers only</span>
+<span class="sd">            retained FFT bins. The speed and error depend on the filter bank</span>
+<span class="sd">            and input.</span>
 <span class="sd">        window: Window function</span>
 <span class="sd">        scale: If True, scale by sqrt(filter_lengths) following librosa normalization</span>
 <span class="sd">        pad_mode: Padding mode</span>
@@ -1822,6 +1819,9 @@
 <span class="sd">    """</span>
     <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span><span class="s2">"y cannot be None - audio input is required for CQT"</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">sparsity</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span><span class="s2">"sparsity must be in [0, 1)"</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">fmin</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">fmin</span> <span class="o">=</span> <span class="n">note_to_hz</span><span class="p">(</span><span class="s2">"C1"</span><span class="p">)</span>
@@ -1860,28 +1860,14 @@
     <span class="k">elif</span> <span class="n">pad_mode</span> <span class="o">==</span> <span class="s2">"reflect"</span><span class="p">:</span>
         <span class="n">y</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="n">kernel_width</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span> <span class="n">kernel_width</span> <span class="o">//</span> <span class="mi">2</span><span class="p">)),</span> <span class="n">mode</span><span class="o">=</span><span class="s2">"reflect"</span><span class="p">)</span>
 
-    <span class="c1"># Take FFT of kernels once</span>
-    <span class="n">cqt_kernels_fft</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">cqt_kernels</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-    <span class="c1"># Extract only the positive frequencies</span>
-    <span class="n">cqt_kernels_fft</span> <span class="o">=</span> <span class="n">cqt_kernels_fft</span><span class="p">[:,</span> <span class="p">:</span><span class="n">kernel_width</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
-    
-    <span class="c1"># Compute STFT for all batch elements at once</span>
-    <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">D</span> <span class="o">=</span> <span class="n">jssignal</span><span class="o">.</span><span class="n">stft</span><span class="p">(</span>
-        <span class="n">y</span><span class="p">,</span>
-        <span class="n">window</span><span class="o">=</span><span class="s2">"boxcar"</span><span class="p">,</span>  <span class="c1"># rectangular window since CQT kernels already have windows</span>
-        <span class="n">nperseg</span><span class="o">=</span><span class="n">kernel_width</span><span class="p">,</span>
-        <span class="n">noverlap</span><span class="o">=</span><span class="n">kernel_width</span> <span class="o">-</span> <span class="n">hop_length</span><span class="p">,</span>
-        <span class="n">nfft</span><span class="o">=</span><span class="n">kernel_width</span><span class="p">,</span>
-        <span class="n">boundary</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># No padding, we already padded</span>
-        <span class="n">padded</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
-    <span class="p">)</span>
-    
-    <span class="c1"># Multiply in frequency domain</span>
-    <span class="c1"># D shape: (batch, freq_bins, time_frames) for batched input</span>
-    <span class="c1"># cqt_kernels_fft shape: (n_bins, freq_bins)</span>
-    <span class="c1"># Result shape: (batch, n_bins, time_frames)</span>
-    <span class="n">C</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">'bf,...ft-&gt;...bt'</span><span class="p">,</span> <span class="n">cqt_kernels_fft</span><span class="o">.</span><span class="n">conj</span><span class="p">(),</span> <span class="n">D</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">sparsity</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">hop_length</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ParameterError</span><span class="p">(</span><span class="s2">"hop_length must be positive"</span><span class="p">)</span>
+        <span class="n">C</span> <span class="o">=</span> <span class="n">_project_sparse_cqt</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">cqt_kernels</span><span class="p">,</span> <span class="n">hop_length</span><span class="p">,</span> <span class="n">sparsity</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">D</span> <span class="o">=</span> <span class="n">_cqt_stft</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">kernel_width</span><span class="p">,</span> <span class="n">hop_length</span><span class="p">)</span>
+        <span class="n">cqt_kernels_fft</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">cqt_kernels</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)[:,</span> <span class="p">:</span><span class="n">kernel_width</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">C</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">'bf,...ft-&gt;...bt'</span><span class="p">,</span> <span class="n">cqt_kernels_fft</span><span class="o">.</span><span class="n">conj</span><span class="p">(),</span> <span class="n">D</span><span class="p">)</span>
 
     <span class="c1"># Apply normalization based on type</span>
     <span class="k">if</span> <span class="n">normalization_type</span> <span class="o">==</span> <span class="s2">"librosa"</span><span class="p">:</span>
@@ -2248,6 +2234,7 @@
             <span class="n">y</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">downsample_fn</span><span class="p">)(</span><span class="n">y</span><span class="p">)</span>
         
     <span class="c1"># Split kernels</span>
+    <span class="n">cqt_kernels</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">cqt_kernels</span><span class="p">)</span>
     <span class="n">cqt_kernels_real</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">cqt_kernels</span><span class="p">)[:,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,</span> <span class="p">:]</span>
     <span class="n">cqt_kernels_imag</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">imag</span><span class="p">(</span><span class="n">cqt_kernels</span><span class="p">)[:,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,</span> <span class="p">:]</span>
     
@@ -2639,6 +2626,8 @@
         <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">S</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">S</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">S</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">issubdtype</span><span class="p">(</span><span class="n">S</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">inexact</span><span class="p">):</span>
+            <span class="n">S</span> <span class="o">=</span> <span class="n">S</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">freq</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">freq</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">freq</span><span class="p">)</span>
 
